@@ -2,14 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   DESIGN TOKENS — the whole product's colour, in one file.
+
+   THIS IS A TEMPLATE. A school re-skins the platform by editing the values
+   inside the PALETTE block below and nothing else. No component file, no
+   Tailwind config, and no page hard-codes a colour: `tailwind.config.ts`
+   points its `platform` scale at these same variables, so utilities like
+   `bg-platform-600` and `border-platform/40` re-theme along with everything
+   written as `var(--…)`.
+
+   Palette entries are stored as SPACE-SEPARATED RGB CHANNELS ("37 99 235")
+   rather than hex. That is what lets Tailwind apply an opacity modifier to
+   the same token (`bg-platform/50` compiles to `rgb(var(--brand-600) / 0.5)`)
+   — a hex variable cannot do that.
+
+   Product names, taglines and copy are NOT here: they live in
+   `src/config/brand.ts`, the other file a new school edits.
+   ========================================================================== */
+
 :root {
+  /* ======================================================================
+     PALETTE — edit these, and only these, to re-skin.
+     ====================================================================== */
+
+  /* --- Brand ramp ---------------------------------------------------------
+     A full 50..900 scale. 600 is the action colour and must clear 4.5:1 on
+     white; if you swap in a lighter hue, darken 600/700 to keep buttons AA. */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 147 197 253;
+  --brand-400: 96 165 250;
+  --brand-500: 59 130 246;
+  --brand-600: 37 99 235; /* 5.17:1 on white — AA for normal text */
+  --brand-700: 29 78 216;
+  --brand-800: 30 64 175;
+  --brand-900: 30 58 138;
+
+  /* --- Marking ink ---------------------------------------------------------
+     The felt-tip red that circles the sign-in on the landing page. It is
+     deliberately NOT the brand colour: a teacher's pen is a second voice on
+     the page, and it has to read as annotation rather than as UI. */
+  --ink-mark: 220 38 38;
+
+  /* --- Friendly accents ---------------------------------------------------
+     Used sparingly, to keep an education product from feeling clinical. */
+  --accent-mint: #10b981;
+  --accent-sun: #f59e0b;
+  --accent-grape: #7c5cfc;
+
+  /* --- Status ------------------------------------------------------------- */
+  --status-success: #0f9d58;
+  --status-warning: #f59e0b;
+  --status-danger: #dc2626;
+
+  /* --- Surfaces -----------------------------------------------------------
+     White-dominant. The canvas carries a barely-there wash of the brand hue
+     (not grey) so that pure-white cards still separate from it without a
+     heavy border — grey canvases are what make an app feel like an admin
+     console. Re-tint these towards your own hue when you change the ramp. */
+  --bg-canvas: #f8faff;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f6fe; /* hovers, inert rows, quiet panels */
+
+  /* --- Lines --------------------------------------------------------------
+     Faintly brand-tinted so borders belong to the palette instead of reading
+     as dirty grey against white. */
+  --border-subtle: #e3ebf7;
+  --border-strong: #c9d9ef;
+
+  /* --- Text ---------------------------------------------------------------
+     A deep blue-black rather than pure black: softer, and it keeps the page
+     in one colour family. Both pass WCAG AA on white and on --bg-canvas. */
+  --text-strong: #16233a; /* 15.3:1 on white */
+  --text-muted: #55637a; /*  6.1:1 on white — AA for body text, not just large */
+
+  /* --- Shadow tint --------------------------------------------------------
+     Elevation is drawn in a dark version of the brand hue, never in black.
+     Channels only; each shadow picks its own opacity. */
+  --shadow-tint: 23 49 105;
+
+  /* ======================================================================
+     DERIVED — computed from the palette. You should not need to touch these.
+     ====================================================================== */
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
-  --bg-canvas: #f5f7fa;
-  --bg-surface: #ffffff;
-  --border-subtle: #e5e9f0;
-  --text-strong: #1a2230;
-  --text-muted: #5b6675;
+
+  --brand: rgb(var(--brand-600));
+  --brand-hover: rgb(var(--brand-700));
+  --brand-active: rgb(var(--brand-800));
+  --brand-tint: rgb(var(--brand-50));
+  --brand-ring: rgb(var(--brand-600) / 0.35);
+
+  --mark: rgb(var(--ink-mark));
+
+  --radius-card: 16px;
 }
 
 html,
@@ -31,9 +120,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Visible keyboard focus everywhere (WCAG 2.2). */
+/* Visible keyboard focus everywhere (WCAG 2.2 §2.4.11). */
 :focus-visible {
-  outline: 2px solid #0e76a8;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -45,9 +134,10 @@ body {
   top: 0;
   z-index: 100;
   padding: 0.5rem 1rem;
-  background: #0e76a8;
+  background: var(--brand);
   color: #fff;
   border-radius: 0 0 6px 0;
+  font-weight: 600;
 }
 .skip-link:focus {
   left: 0;
@@ -59,8 +149,124 @@ body {
   height: 8px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #cbd3df;
+  background: rgb(var(--brand-200));
   border-radius: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Auth surfaces
+   The sign-in pages are the only place in the app that gets decorative
+   colour. Kept here (not inline) so the two sign-in routes and any future
+   one — reset-password, accept-invite — stay visually identical.
+   -------------------------------------------------------------------------- */
+
+/* Soft blue field behind the welcome panel. Two offset radial gradients read
+   as depth without an image request. */
+.auth-hero {
+  background-color: var(--brand-hover);
+  background-image:
+    radial-gradient(28rem 22rem at 12% 8%, rgba(96, 165, 250, 0.55), transparent 62%),
+    radial-gradient(24rem 20rem at 92% 96%, rgba(124, 92, 252, 0.45), transparent 60%),
+    radial-gradient(20rem 18rem at 78% 12%, rgba(16, 185, 129, 0.28), transparent 58%);
+}
+
+/* Faint grid, like ruled paper — the one "education" cue that doesn't need
+   an illustration. `mask-image` fades it out so it never fights the text. */
+.auth-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(70% 60% at 30% 20%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(70% 60% at 30% 20%, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Landing surfaces — the "marked-up worksheet"
+
+   The front door is the only page that gets a scene. Its whole idea is a
+   sheet of school ruled paper that someone has annotated in pen: the ruled
+   lines are the education cue (no clipart, no mascot), and the felt-tip loop
+   around the sign-in is the instruction, in the visual language every
+   student already reads as "do this one".
+
+   Every colour below comes from the palette block at the top of this file, so
+   a school that changes --brand-* and --ink-mark gets a coherent scene for
+   free. Geometry lives here rather than inline so the page component stays
+   readable as layout.
+   -------------------------------------------------------------------------- */
+
+/* Ruled paper. Horizontal rules on a 34px rhythm plus one vertical margin
+   rule, exactly like an exercise book. Masked so it fades out well before it
+   reaches the text and never competes for contrast. */
+.paper-rules::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(var(--brand-600) / 0.07) 0 1px,
+    transparent 1px 34px
+  );
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%);
+  pointer-events: none;
+}
+
+/* The margin rule. One vertical line down the left of the sheet, in the same
+   ink as the annotation because on a real page it is printed, not drawn.
+   The page runs full-bleed, so the rule cannot simply hug a container edge:
+   it has to sit INSIDE the page's own left padding, in the gutter the layout
+   already reserves. `--margin-rule-x` is set per breakpoint by the element
+   itself, which keeps the one number that has to stay smaller than the page
+   padding right next to the padding it answers to.
+
+   Below lg that gutter does not exist, and a rule flush against the screen
+   edge stops reading as a margin and starts reading as a stray border, so it
+   is withheld rather than squeezed. */
+.paper-margin::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--margin-rule-x, 2.5rem);
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(var(--ink-mark) / 0.18) 12%,
+    rgb(var(--ink-mark) / 0.18) 72%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .paper-margin::after {
+    display: none;
+  }
+}
+
+/* A hand-drawn pen stroke. Round caps and joins are what stop an SVG loop
+   from reading as a border; the slight transparency is felt-tip on paper. */
+.mark-stroke {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.82;
+}
+
+/* Pen-written aside, e.g. "start here". Not a font swap: a small rotation and
+   the ink colour are enough to read as handwriting against the UI type. */
+.mark-note {
+  color: var(--mark);
+  transform: rotate(-6deg);
 }
 
 @media (prefers-reduced-motion: reduce) {

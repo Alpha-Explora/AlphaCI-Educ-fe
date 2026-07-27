@@ -1,9 +1,13 @@
 "use client";
 // ============================================================================
-// VIEW LAYER — global "GitHub is in Simulated mode" note
-// Appears whenever any GitHub operation has reported live:false, so simulated
-// repos/tokens are never mistaken for real ones. Reads the app-wide GitHub-mode
-// store via useGithubMode; renders nothing until a GitHub op has been observed.
+// VIEW LAYER — global "Simulated mode" note
+// Appears whenever a provisioning operation has reported live:false, so
+// simulated projects/tokens are never mistaken for real ones. Reads the
+// app-wide mode store via useGithubMode; renders nothing until an operation
+// has been observed.
+//
+// The copy names no hosting provider: which service backs provisioning is not
+// something a teacher or student is shown. "Ask your IT admin" is the action.
 // ============================================================================
 import { useGithubMode } from "@/viewmodels/useGithubMode";
 
@@ -20,8 +24,9 @@ export function GithubModeNote() {
         ⚠
       </span>
       <p>
-        <strong>GitHub is in Simulated mode.</strong> Repositories and tokens are mocked by the
-        backend — nothing is created on real GitHub yet. Flip the backend env flag to go live.
+        <strong>Simulated mode.</strong> Project workspaces and access tokens are mocked by
+        the platform — nothing is created for real yet. Ask your IT admin to finish
+        connecting source hosting to go live.
       </p>
     </div>
   );

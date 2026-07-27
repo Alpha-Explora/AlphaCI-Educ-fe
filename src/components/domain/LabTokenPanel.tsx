@@ -92,9 +92,17 @@ export function LabTokenPanel({
 
   const maskedToken = token ? "•".repeat(Math.min(token.token.length, 28)) : "";
   const shownToken = token ? (revealed ? token.token : maskedToken) : "";
-  const displayHost = token ? stripScheme(token.cloneUrl) : "";
+
+  /*
+    The clone URL contains the hosting organization, so it is NEVER rendered —
+    not even behind the Reveal toggle, which only uncovers the token.
+    `cloneCommand(token)` still puts the real, working command on the clipboard,
+    so a lab PC can clone and push exactly as before; the student just never
+    reads where their code lives. Function preserved, organization hidden.
+  */
+  const HIDDEN_HOST = "••••••••••/••••••••.git";
   const displaySnippet = token
-    ? `git clone https://x-access-token:${revealed ? token.token : maskedToken}@${displayHost}`
+    ? `git clone https://x-access-token:${revealed ? token.token : maskedToken}@${HIDDEN_HOST}`
     : "";
 
   return (
@@ -105,9 +113,9 @@ export function LabTokenPanel({
             Lab access token
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            A short-lived token scoped to <strong>only this repository</strong> — run{" "}
-            <code className="font-mono text-xs">git push</code> from a lab PC with no GitHub
-            account.
+            A short-lived token scoped to <strong>only this project</strong> — run{" "}
+            <code className="font-mono text-xs">git push</code> from a lab PC with no
+            personal account.
           </p>
         </div>
         {token && <GithubModeBadge live={token.live} />}
@@ -160,9 +168,13 @@ export function LabTokenPanel({
               </span>
               <span>({formatDateTime(token.expiresAt)})</span>
             </span>
+            {/* Was the repository URL. The scope guarantee is what matters,
+                not the address it points at. */}
             <span className="inline-flex items-center gap-1.5">
               <span aria-hidden="true">🎯</span> Scoped to{" "}
-              <span className="font-mono">{token.repoUrl}</span>
+              <span className="font-medium text-[var(--text-strong)]">
+                this project only
+              </span>
             </span>
           </div>
 

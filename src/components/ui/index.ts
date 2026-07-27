@@ -13,12 +13,12 @@ export { EmptyState } from "./EmptyState";
 export { Skeleton, SkeletonCard } from "./Skeleton";
 export { StateBoundary } from "./StateBoundary";
 export { Stat, ProgressBar, SectionHeading } from "./Stat";
+export { PresencePill } from "./PresencePill";
 export {
   RepoStatusPill,
   PipelineStatusPill,
   CheckStatusPill,
   PlagiarismPill,
   GenericPill,
-  GithubRoleBadge,
   GithubModeBadge,
 } from "./StatusPill";

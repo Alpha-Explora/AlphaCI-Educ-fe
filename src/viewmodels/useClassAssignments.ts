@@ -6,10 +6,11 @@ import { assignmentsApi, classesApi, ApiError } from "@/models/api";
 import type { Assignment } from "@/models/types";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
+import { brand } from "@/config/brand";
 
 function mapDeleteError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.isNetworkError) return "Can't reach AlphaCI right now. Try again.";
+    if (err.isNetworkError) return `Can't reach ${brand.name} right now. Try again.`;
     if (err.status === 401 || err.status === 403)
       return "Only the teacher of this class (or an admin) can delete a project.";
     return err.message;

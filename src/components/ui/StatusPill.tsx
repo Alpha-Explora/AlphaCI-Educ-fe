@@ -2,7 +2,6 @@
 import { cn } from "./cn";
 import type {
   CheckStatus,
-  GithubRole,
   PipelineStatus,
   PlagiarismStatus,
   RepoStatus,
@@ -128,23 +127,13 @@ export function GenericPill({
   );
 }
 
-// ADDENDUM A — GitHub org role badge, color-coded by privilege level.
-const GH_ROLE_TONE: Record<GithubRole, Tone> = {
-  OWNER: "info", // platform blue — highest privilege
-  MAINTAINER: "warning", // amber — class-team grading rights
-  MEMBER: "neutral", // slate — faculty visibility
-};
+// GithubRoleBadge (OWNER / MAINTAINER / MEMBER) was removed along with the
+// team-hierarchy view: it printed the hosting provider's role vocabulary
+// straight onto the admin screen. StaffRoleDirectory now describes access by
+// what the person can do instead.
 
-export function GithubRoleBadge({ role }: { role: GithubRole }) {
-  return (
-    <Pill tone={GH_ROLE_TONE[role]} dot={false}>
-      {role}
-    </Pill>
-  );
-}
-
-// ADDENDUM B — GitHub App mode badge. LIVE (green) once the backend env flag is
-// flipped; SIMULATED (amber) while GitHub is gated/mocked.
+// Provisioning mode badge. LIVE (green) once source hosting is connected;
+// SIMULATED (amber) while provisioning is mocked. Names no provider.
 export function GithubModeBadge({ live }: { live: boolean }) {
   return (
     <Pill tone={live ? "success" : "warning"}>{live ? "LIVE" : "SIMULATED"}</Pill>

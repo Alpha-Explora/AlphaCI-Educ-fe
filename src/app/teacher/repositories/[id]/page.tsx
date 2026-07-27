@@ -63,16 +63,8 @@ export default function TeacherRepositoryPage() {
                   <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
                 </>
               }
-              actions={
-                <a
-                  href={d.repo.githubRepoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-github px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-github-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-                >
-                  <span aria-hidden="true">↗</span> View on GitHub
-                </a>
-              }
+              // No external repository link — grading happens against the
+              // pipeline results below, inside the system.
             />
 
             {/* Assignment + people + submission meta */}

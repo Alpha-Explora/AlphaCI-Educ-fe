@@ -1,81 +1,41 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — IT Admin org overview
-// GitHub App / SSO / SCIM status, zero-footprint seat-savings, lab PC
-// inventory, IT admins, and the Archive-semester action. Consumes
-// useAdminOverview (org id from the signed-in admin's session).
+// Laboratory activity, the student-account monitor, lab PC inventory, staff &
+// roles, and the Archive-semester action. Consumes useAdminOverview and
+// useStudentMonitor (org id from the signed-in admin's session).
+//
+// Deliberately absent: the SSO / SCIM / source-hosting integration cards and
+// the licence-savings figures. They described how the platform is plumbed and
+// what it saves in seat licences — neither is something an admin supervising a
+// live laboratory acts on. Student presence is.
 // ============================================================================
+import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
 import { useAdminOverview } from "@/viewmodels/useAdminOverview";
-import {
-  Avatar,
-  Card,
-  EmptyState,
-  Skeleton,
-  Stat,
-  StateBoundary,
-  cn,
-} from "@/components/ui";
+import { useStudentMonitor } from "@/viewmodels/useStudentMonitor";
+import { Avatar, Card, EmptyState, Skeleton, Stat, StateBoundary } from "@/components/ui";
 import { ArchiveSemesterCard } from "@/components/domain/ArchiveSemesterCard";
-import { GithubTeamHierarchy } from "@/components/domain/GithubTeamHierarchy";
-import { formatUsd } from "@/components/ui/format";
-
-function StatusChip({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
-        ok
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-          : "bg-red-50 text-red-700 ring-red-200",
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-success" : "bg-danger")} />
-      {ok ? label : `${label} — inactive`}
-    </span>
-  );
-}
-
-function IntegrationCard({
-  icon,
-  title,
-  value,
-  children,
-}: {
-  icon: string;
-  title: string;
-  value: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card className="p-5 animate-fade-up">
-      <div className="flex items-center gap-2 text-[var(--text-muted)]">
-        <span aria-hidden="true" className="text-lg">
-          {icon}
-        </span>
-        <p className="text-xs font-semibold uppercase tracking-wide">{title}</p>
-      </div>
-      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
-      <div className="mt-3">{children}</div>
-    </Card>
-  );
-}
+import { StaffRoleDirectory } from "@/components/domain/StaffRoleDirectory";
+import { StudentAccountMonitor } from "@/components/domain/StudentAccountMonitor";
 
 export default function AdminOverviewPage() {
   const { user, selectedOrgId } = useSession();
   // ADDENDUM K — scope the overview to the lab the admin is currently viewing
   // (falls back to their home org if no lab is selected yet).
-  const vm = useAdminOverview(selectedOrgId ?? user?.orgId ?? null);
+  const orgId = selectedOrgId ?? user?.orgId ?? null;
+  const vm = useAdminOverview(orgId);
+  const studentsVm = useStudentMonitor(orgId);
   const d = vm.data;
 
   return (
     <div className="space-y-8">
       <div className="animate-fade-up">
         <h1 className="text-2xl font-semibold text-[var(--text-strong)]">
-          Organization overview
+          Laboratory overview
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Enterprise integration status, zero-footprint seat savings, and campus lab inventory.
+          Student activity, teaching staff, and campus lab inventory.
         </p>
       </div>
 
@@ -86,90 +46,62 @@ export default function AdminOverviewPage() {
         loadingFallback={
           <div className="space-y-6">
             <Skeleton className="h-28 w-full rounded-xl" />
-            <div className="grid gap-5 sm:grid-cols-3">
-              <Skeleton className="h-40 rounded-xl" />
-              <Skeleton className="h-40 rounded-xl" />
-              <Skeleton className="h-40 rounded-xl" />
-            </div>
+            <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         }
       >
         {d && (
           <>
-            {/* Org identity banner */}
+            {/*
+              Lab identity banner. Was a dark provider-branded header showing
+              "github.com/<org>" and the App installation ID; both identified the
+              hosting organization, so both are gone. The school's own name is
+              the identity that matters here.
+            */}
             <Card className="overflow-hidden animate-fade-up">
-              <div className="flex flex-wrap items-center justify-between gap-4 bg-github px-6 py-5 text-white">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-white/60">
-                    University organization
-                  </p>
-                  <h2 className="mt-0.5 text-xl font-semibold">{d.org.name}</h2>
-                  <p className="mt-1 font-mono text-sm text-white/70">
-                    github.com/{d.org.githubOrgName}
-                  </p>
-                </div>
-                <div className="text-right text-sm text-white/70">
-                  <p>Installation ID</p>
-                  <p className="font-mono text-white">{d.org.githubInstallationId}</p>
-                </div>
+              <div className="bg-platform-700 px-6 py-5 text-white">
+                <p className="text-xs font-medium uppercase tracking-wide text-white/70">
+                  Laboratory
+                </p>
+                <h2 className="mt-0.5 text-xl font-semibold">{d.org.name}</h2>
+                <p className="mt-1 text-sm text-white/70">
+                  {d.stats.totalClasses} classes · {d.stats.totalTeachers} teachers ·{" "}
+                  {d.stats.totalStudents} students
+                </p>
               </div>
             </Card>
 
-            {/* Integration status */}
-            <div className="grid gap-5 sm:grid-cols-3">
-              <IntegrationCard icon="🐙" title="GitHub App" value="Platform integration">
-                <StatusChip ok={d.githubAppInstalled} label="Installed" />
-              </IntegrationCard>
-              <IntegrationCard icon="🔐" title="SSO Provider" value={d.ssoProvider}>
-                <StatusChip ok label="SAML/OIDC active" />
-              </IntegrationCard>
-              <IntegrationCard icon="🔄" title="SCIM Provisioning" value="Auto de-provisioning">
-                <StatusChip ok={d.scimEnabled} label="Enabled" />
-              </IntegrationCard>
-            </div>
-
-            {/* Zero-footprint seat savings — the headline sales metric */}
+            {/*
+              Laboratory activity — what this lab currently HOLDS. The seat and
+              licence figures that used to headline this card are gone; the
+              project counts stayed because Archive semester below acts on them.
+            */}
             <Card className="overflow-hidden animate-fade-up">
               <div className="border-b border-[var(--border-subtle)] px-6 py-4">
                 <h2 className="text-base font-semibold text-[var(--text-strong)]">
-                  Zero-footprint savings
+                  Laboratory activity
                 </h2>
-                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                  Students interact via App Tokens and sit entirely outside GitHub billing.
-                </p>
               </div>
-              <div className="grid grid-cols-2 gap-5 p-6 sm:grid-cols-4">
-                <Stat
-                  label="Students (seats saved)"
-                  value={d.stats.seatsSaved}
-                  tone="platform"
-                  hint="Outside GitHub billing"
-                />
-                <Stat
-                  label="Est. annual savings"
-                  value={formatUsd(d.stats.estimatedSeatSavingsUsd)}
-                  tone="success"
-                  hint={`${d.stats.totalStudents} × $21/seat`}
-                />
+              <div className="grid grid-cols-2 gap-5 p-6 sm:grid-cols-5">
+                <Stat label="Students" value={d.stats.totalStudents} tone="platform" />
                 <Stat label="Teachers" value={d.stats.totalTeachers} />
                 <Stat label="Classes" value={d.stats.totalClasses} />
-              </div>
-              <div className="grid grid-cols-3 gap-5 border-t border-[var(--border-subtle)] bg-slate-50/60 p-6">
-                <Stat label="Total repositories" value={d.stats.totalRepositories} />
-                <Stat
-                  label="Active"
-                  value={d.stats.activeRepositories}
-                  tone="platform"
-                />
+                {/* "Projects", matching the language used everywhere a teacher
+                    or student sees these — they are never called repositories
+                    in the UI any more. */}
+                <Stat label="Active projects" value={d.stats.activeRepositories} />
                 <Stat label="Archived" value={d.stats.archivedRepositories} />
               </div>
             </Card>
+
+            {/* Who is actually using the lab, by their sign-in email. */}
+            <StudentAccountMonitor vm={studentsVm} />
 
             {/* Admins + Lab inventory */}
             <div className="grid gap-5 lg:grid-cols-2">
               <Card className="p-5">
                 <h2 className="text-base font-semibold text-[var(--text-strong)]">
-                  Organization owners (IT admins)
+                  Lab administrators
                 </h2>
                 <ul className="mt-3 space-y-3">
                   {d.itAdmins.map((a) => (
@@ -222,71 +154,55 @@ export default function AdminOverviewPage() {
               </Card>
             </div>
 
-            {/* GitHub Team & Role Hierarchy (plan §2) */}
+            {/* Staff & roles — was "GitHub team & role hierarchy" */}
             <section className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                  GitHub team &amp; role hierarchy
-                </h2>
-                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                  Where faculty and admins sit inside the single university GitHub org.
-                  Students are <strong>never</strong> team members — they interact via App
-                  Tokens and Outside Collaborator invites only.
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                    Staff &amp; roles
+                  </h2>
+                  <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                    Who has access to this laboratory and at what level. Students
+                    never appear here — they hold no staff access.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/teachers"
+                  className="shrink-0 rounded-lg border border-platform-200 bg-platform-50 px-3.5 py-2 text-sm font-medium text-platform-700 transition-colors hover:bg-platform-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+                >
+                  Manage teachers →
+                </Link>
+              </div>
+
+              {/* Staff headcount. The paired "Student accounts — No licence"
+                  card that used to sit beside this is gone; students are now
+                  covered properly by the monitor above, where the useful fact is
+                  who signed in, not what they cost. */}
+              <Card className="bg-[var(--bg-subtle)] p-5">
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <span aria-hidden="true" className="text-lg">
+                    🧑‍🏫
+                  </span>
+                  <p className="text-xs font-semibold uppercase tracking-wide">
+                    Staff accounts
+                  </p>
+                </div>
+                <p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--text-strong)]">
+                  {d.stats.githubSeatsUsed}
                 </p>
-              </div>
-
-              {/* Seat economics callout */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Card className="border-github/20 bg-slate-50 p-5">
-                  <div className="flex items-center gap-2 text-[var(--text-muted)]">
-                    <span aria-hidden="true" className="text-lg">
-                      🪑
-                    </span>
-                    <p className="text-xs font-semibold uppercase tracking-wide">
-                      GitHub seats used
-                    </p>
-                  </div>
-                  <p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--text-strong)]">
-                    {d.stats.githubSeatsUsed}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Faculty + admins ({d.stats.totalTeachers} teachers +{" "}
-                    {d.itAdmins.length} admins) — the only identities that consume paid
-                    org seats.
-                  </p>
-                </Card>
-
-                <Card className="border-emerald-200 bg-emerald-50/50 p-5">
-                  <div className="flex items-center gap-2 text-emerald-700">
-                    <span aria-hidden="true" className="text-lg">
-                      🎒
-                    </span>
-                    <p className="text-xs font-semibold uppercase tracking-wide">
-                      Students in the hierarchy
-                    </p>
-                  </div>
-                  <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-700">
-                    0 seats
-                  </p>
-                  <p className="mt-1 text-sm text-emerald-800/80">
-                    Zero-footprint — all {d.stats.seatsSaved} students sit outside billing as
-                    Outside Collaborators, saving{" "}
-                    <strong>{formatUsd(d.stats.estimatedSeatSavingsUsd)}</strong>/yr.
-                  </p>
-                </Card>
-              </div>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  {d.stats.totalTeachers} teachers + {d.itAdmins.length} admins.
+                </p>
+              </Card>
 
               {vm.teamsByTier.length === 0 ? (
                 <EmptyState
-                  icon="🐙"
-                  title="No GitHub teams configured"
-                  description="Teams appear here once the org's tier structure is provisioned."
+                  icon="🧑‍🏫"
+                  title="No staff groups yet"
+                  description="Groups appear here once this laboratory has teachers and classes."
                 />
               ) : (
-                <GithubTeamHierarchy
-                  teamsByTier={vm.teamsByTier}
-                  orgHandle={d.org.githubOrgName}
-                />
+                <StaffRoleDirectory teamsByTier={vm.teamsByTier} />
               )}
             </section>
 

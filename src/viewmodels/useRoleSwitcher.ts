@@ -22,6 +22,7 @@ const EMPTY: Record<UserRole, SystemUser[]> = {
   TEACHER: [],
   STUDENT: [],
   ADMIN: [],
+  SUPER_ADMIN: [],
 };
 
 export function useRoleSwitcher(): RoleSwitcherVM {
@@ -36,6 +37,7 @@ export function useRoleSwitcher(): RoleSwitcherVM {
       TEACHER: [],
       STUDENT: [],
       ADMIN: [],
+      SUPER_ADMIN: [],
     };
     for (const user of query.data ?? []) {
       if (user.status !== "ACTIVE") continue;

@@ -11,7 +11,7 @@ import type {
   RepoScaffold,
   Stack,
 } from "@/models/types";
-import { GithubMark, GithubModeBadge, cn } from "@/components/ui";
+import { GithubModeBadge, cn } from "@/components/ui";
 
 const STACK_LABEL: Record<Stack, string> = {
   nodejs: "Node.js",
@@ -63,30 +63,12 @@ export function ProvisionResultSummary({
       </div>
 
       <div className="mt-2 space-y-2">
-        {/* ADDENDUM D — where the repos landed (teacher persona vs org) */}
-        {summary.ownerLogin && (
-          <p className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--text-muted)]">
-            <GithubMark size={12} />
-            <span>
-              Owned by{" "}
-              <strong className="font-mono text-[var(--text-strong)]">
-                @{summary.ownerLogin}
-              </strong>
-            </span>
-            {summary.ownerMode && (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
-                {summary.ownerMode === "TEACHER"
-                  ? "your GitHub account"
-                  : "education org"}
-              </span>
-            )}
-            {summary.ownerFallback && (
-              <span className="rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700">
-                fell back from org
-              </span>
-            )}
-          </p>
-        )}
+        {/*
+          The provisioning owner (which GitHub account or org the repos landed
+          in) is intentionally NOT surfaced. Where source is hosted is an
+          implementation detail of the platform, not something a teacher needs —
+          or is allowed — to see. The backend still reports it for logs.
+        */}
         {summary.scaffold && (
           <p className="text-xs text-[var(--text-muted)]">
             Pushed a{" "}
@@ -123,34 +105,19 @@ export function ProvisionResultSummary({
                     </span>
                   )}
                 </span>
+                {/*
+                  One destination, live or simulated: the in-system workspace.
+                  This used to branch to external repo/Actions links when live,
+                  which was the only place a teacher could leave the platform
+                  and land on the raw organization.
+                */}
                 <span className="flex shrink-0 items-center gap-2">
-                  {summary.live ? (
-                    <>
-                      <a
-                        href={repo.githubRepoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-platform hover:underline"
-                      >
-                        <GithubMark size={12} /> Repo
-                      </a>
-                      <a
-                        href={`${repo.githubRepoUrl}/actions`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-platform hover:underline"
-                      >
-                        Actions ↗
-                      </a>
-                    </>
-                  ) : (
-                    <a
-                      href={`/teacher/repositories/${repo.id}`}
-                      className="text-xs font-medium text-platform hover:underline"
-                    >
-                      Workspace ↗
-                    </a>
-                  )}
+                  <a
+                    href={`/teacher/repositories/${repo.id}`}
+                    className="text-xs font-medium text-platform hover:underline"
+                  >
+                    Workspace →
+                  </a>
                 </span>
               </li>
             ))}
@@ -158,8 +125,8 @@ export function ProvisionResultSummary({
         )}
         {!summary.live && (
           <p className="text-[10px] text-[var(--text-muted)] italic">
-            Simulated — repositories created in-memory only. Sign in as a teacher via GitHub
-            and configure the backend OAuth app to create real repos.
+            Simulated — workspaces created in-memory only. Ask your IT admin to finish
+            connecting the platform to create real ones.
           </p>
         )}
       </div>

@@ -9,6 +9,7 @@ import type { PresentableError } from "@/viewmodels/errors";
 import { Banner } from "./Banner";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
+import { brand } from "@/config/brand";
 
 export function StateBoundary({
   isLoading,
@@ -43,7 +44,7 @@ export function StateBoundary({
             )
           }
         >
-          Could not reach the AlphaCI API at <code className="font-mono">{error.baseUrl}</code>.
+          Could not reach the {brand.name} API at <code className="font-mono">{error.baseUrl}</code>.
           Start the backend (<code className="font-mono">AlphaCI-Educ-be</code>) on port 4000,
           then retry.
         </Banner>

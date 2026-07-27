@@ -1,12 +1,12 @@
 "use client";
 // ============================================================================
 // VIEWMODEL LAYER — Session
-// Two auth paths (ADDENDUM B/I/J):
-//   • FACULTY & IT STAFF (TEACHER/ADMIN) — real GitHub OAuth. `loginWithGithub()`
-//     navigates the browser to the backend start URL; after the redirect dance
-//     the cookie session is validated by me(). The role comes from GitHub team.
-//   • STUDENTS — mock system-account login via loginAs({ userId }). No mock
-//     path exists for staff anymore.
+// ONE auth path: email + password, for every role (`loginWithPassword`).
+//
+// `loginWithGithub()` is NOT a login despite the name — it starts the GitHub
+// LINK flow from /connect-github, attaching a GitHub identity to the session
+// that already exists. The backend refuses it outright when nobody is signed in.
+// Staff roles are re-resolved from Team membership at that moment.
 // On mount we call me() (credentials are always included by the client) to
 // resolve whichever session exists. A 401 (or any HTTP error) means logged out;
 // a network error keeps the optimistic localStorage user so the demo still
@@ -22,18 +22,46 @@ import {
   type ReactNode,
 } from "react";
 import { authApi, setToken, ApiError } from "@/models/api";
-import type { AccessibleLab, SystemUser, UserRole } from "@/models/types";
+import { isStaffRole } from "@/models/types";
+import type {
+  AccessibleLab,
+  PasswordLoginRequest,
+  SystemUser,
+  UserRole,
+} from "@/models/types";
 
 const USER_STORAGE_KEY = "alphaci.user";
+
+/**
+ * What a completed sign-in yields. `needsLabSelection` is resolved here rather
+ * than left to the caller because it requires a second round-trip (GET
+ * /auth/labs) that only this ViewModel knows how to make — returning it means
+ * the form VM can redirect correctly in one step.
+ */
+export interface SignInResult {
+  user: SystemUser;
+  needsLabSelection: boolean;
+}
 
 interface SessionState {
   user: SystemUser | null;
   isReady: boolean; // initial me() resolution finished
   isLoading: boolean; // a mock-login call is in flight
   error: string | null;
-  /** Teacher path — full-page redirect to GitHub OAuth. */
+  /**
+   * Starts the GitHub ACCOUNT-LINK flow (full-page redirect). Requires an
+   * existing session — this is not a way to sign in.
+   */
   loginWithGithub: () => void;
-  /** Student / admin path — mock system-account login. */
+  /**
+   * Real credential sign-in — the only way in, for every role.
+   *
+   * Unlike loginAs, this REJECTS on failure instead of returning null and
+   * parking the message in `error`: the sign-in form needs the HTTP status to
+   * choose its copy (401 vs 403 vs 429).
+   */
+  loginWithPassword: (credentials: PasswordLoginRequest) => Promise<SignInResult>;
+  /** Legacy demo persona switcher. */
   loginAs: (
     payload: { userId: string } | { role: UserRole },
   ) => Promise<SystemUser | null>;
@@ -99,7 +127,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         persistUser(me);
         setUser(me);
 
-        if (me.role === "TEACHER" || me.role === "ADMIN") {
+        if (isStaffRole(me.role)) {
           try {
             const res = await authApi.labs();
             if (!cancelled) {
@@ -143,11 +171,57 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const loginWithGithub = useCallback(() => {
     if (typeof window !== "undefined") {
-      // The backend picks the destination from the user's GitHub team
-      // (/admin or /teacher); no returnTo needed on the happy path.
-      window.location.assign(authApi.githubStartUrl());
+      // Errors bounce back to the connect screen, which is the only place this
+      // flow is ever started from. On success the backend picks the destination
+      // from the role the team membership just granted.
+      window.location.assign(authApi.githubStartUrl("/connect-github"));
     }
   }, []);
+
+  /**
+   * ADDENDUM K — after any staff sign-in, load the labs this user may work in
+   * and report whether they must pick one. Students have no labs to choose, so
+   * they short-circuit. A failed labs call is non-fatal: the dashboard's empty
+   * state explains "no labs yet" better than a blocked sign-in would.
+   */
+  const loadLabsFor = useCallback(async (signedIn: SystemUser): Promise<boolean> => {
+    if (!isStaffRole(signedIn.role)) {
+      setLabs([]);
+      setSelectedOrgId(null);
+      return false;
+    }
+    try {
+      const res = await authApi.labs();
+      setLabs(res.labs);
+      setSelectedOrgId(res.selectedOrgId);
+      return res.labs.length > 1 && !res.selectedOrgId;
+    } catch {
+      setLabs([]);
+      setSelectedOrgId(null);
+      return false;
+    }
+  }, []);
+
+  const loginWithPassword = useCallback<SessionState["loginWithPassword"]>(
+    async (credentials) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await authApi.passwordLogin(credentials);
+        // The API also establishes an httpOnly session cookie; this bearer token
+        // is what keeps the existing student request path working unchanged.
+        setToken(res.token);
+        persistUser(res.user);
+        setUser(res.user);
+        const needsLab = await loadLabsFor(res.user);
+        setLabsReady(true);
+        return { user: res.user, needsLabSelection: needsLab };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadLabsFor],
+  );
 
   const loginAs = useCallback<SessionState["loginAs"]>(async (payload) => {
     setIsLoading(true);
@@ -183,9 +257,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const isStaff = user?.role === "TEACHER" || user?.role === "ADMIN";
+  const isStaff = user ? isStaffRole(user.role) : false;
+  // A platform operator is exempt: their home is the cross-lab console, which
+  // is meaningful with no lab selected. Forcing them through the picker would
+  // make "see every lab" impossible to reach without first picking one.
   const needsLabSelection = Boolean(
-    isStaff && labsReady && labs.length > 1 && !selectedOrgId,
+    isStaff &&
+      user?.role !== "SUPER_ADMIN" &&
+      labsReady &&
+      labs.length > 1 &&
+      !selectedOrgId,
   );
 
   const value = useMemo<SessionState>(
@@ -195,6 +276,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       loginWithGithub,
+      loginWithPassword,
       loginAs,
       logout,
       // ADDENDUM I — GitHub-authenticated staff (TEACHER or ADMIN) all carry a
@@ -214,6 +296,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       loginWithGithub,
+      loginWithPassword,
       loginAs,
       logout,
       labs,

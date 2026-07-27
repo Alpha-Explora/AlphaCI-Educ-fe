@@ -53,11 +53,9 @@ export default function ClassRosterPage() {
         backHref="/teacher"
         backLabel="Class Groups"
         title={info ? `${info.code} — ${info.name}` : "Class roster"}
-        subtitle={
-          info ? (
-            <span className="font-mono text-xs">@{info.githubTeamSlug}</span>
-          ) : undefined
-        }
+        // Was the class's team slug. Dropped: it exposed the organization, and
+        // the section/term pills below already identify the cohort.
+        subtitle={undefined}
         meta={
           info && (
             <>

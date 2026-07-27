@@ -17,10 +17,11 @@ import type {
 } from "@/models/types";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
+import { brand } from "@/config/brand";
 
 function mapCreateError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.isNetworkError) return "Can't reach AlphaCI right now. Try again.";
+    if (err.isNetworkError) return `Can't reach ${brand.name} right now. Try again.`;
     if (err.status === 400) return err.message || "A course with that code already exists.";
     if (err.status === 401 || err.status === 403)
       return "Only IT Admins can manage the course catalog.";
@@ -31,7 +32,7 @@ function mapCreateError(err: unknown): string {
 
 function mapDeleteError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.isNetworkError) return "Can't reach AlphaCI right now. Try again.";
+    if (err.isNetworkError) return `Can't reach ${brand.name} right now. Try again.`;
     if (err.status === 409)
       return err.message || "This course still has class sections. Remove them first.";
     if (err.status === 401 || err.status === 403)
@@ -43,7 +44,7 @@ function mapDeleteError(err: unknown): string {
 
 function mapInviteError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.isNetworkError) return "Can't reach AlphaCI right now. Try again.";
+    if (err.isNetworkError) return `Can't reach ${brand.name} right now. Try again.`;
     if (err.status === 409) return "That teacher is already an instructor of this course.";
     if (err.status === 400) return err.message || "That user can't be assigned to this course.";
     if (err.status === 401 || err.status === 403)

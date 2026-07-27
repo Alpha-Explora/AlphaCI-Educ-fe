@@ -3,6 +3,7 @@
 export { ApiError, API_BASE_URL, getToken, setToken } from "./client";
 export { authApi } from "./auth";
 export { organizationsApi } from "./organizations";
+export { platformApi } from "./platform";
 export { usersApi } from "./users";
 export { coursesApi } from "./courses";
 export { classesApi } from "./classes";

@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { classesApi, ApiError } from "@/models/api";
 import type { ClassCohort, CreateClassInput } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
+import { brand } from "@/config/brand";
 
 const DUPLICATE_MESSAGE =
   "A class for that course, section and term already exists.";
@@ -43,7 +44,7 @@ export function validateCreateClass(input: CreateClassInput): string[] {
 export function createClassErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.isNetworkError)
-      return "Can't reach AlphaCI right now. Check your connection and try again.";
+      return `Can't reach ${brand.name} right now. Check your connection and try again.`;
     if (err.status === 400) {
       // Client validation already guarantees non-blank fields, so a 400 here is
       // almost always the duplicate (code, section, term) constraint.

@@ -48,12 +48,11 @@ export function GithubActivityPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-strong)]">
-            Live from GitHub
+            Live activity
             {vm.isFetching && <Spinner size="sm" className="text-platform" />}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Your pushes, branches and CI runs — straight from the repository, refreshed
-            automatically.
+            Your pushes, branches and CI runs, refreshed automatically.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -78,21 +77,21 @@ export function GithubActivityPanel({
       {vm.error && (
         <Banner tone={vm.error.isNetworkError ? "network" : "error"} className="mt-4">
           {vm.error.isNetworkError
-            ? "Couldn't reach the backend for live GitHub data."
+            ? "Couldn't reach the backend for live activity."
             : vm.error.message}
         </Banner>
       )}
 
       {a && !a.live && (
         <Banner tone="info" className="mt-4">
-          Live GitHub data is off (simulated mode). Ask your admin to enable it to see real
+          Live activity is off (simulated mode). Ask your admin to enable it to see real
           commits, branches and CI runs here.
         </Banner>
       )}
 
       {a?.error && (
         <Banner tone="warning" className="mt-4">
-          GitHub couldn&rsquo;t be reached: {a.error}
+          Activity couldn&rsquo;t be loaded: {a.error}
         </Banner>
       )}
 
@@ -124,20 +123,16 @@ export function GithubActivityPanel({
                           {run.branch} · {run.sha.slice(0, 7)}
                         </span>
                       </div>
+                      {/*
+                        run.url is a link into the hosting provider's Actions
+                        tab — deliberately not rendered. The failing jobs and
+                        steps are expanded inline below, which is the detail a
+                        student actually needed that link for.
+                      */}
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-[var(--text-muted)]">
                           {formatDateTime(run.createdAt)}
                         </span>
-                        {run.url && (
-                          <a
-                            href={run.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-medium text-platform hover:underline"
-                          >
-                            View ↗
-                          </a>
-                        )}
                       </div>
                     </div>
 
@@ -191,8 +186,11 @@ export function GithubActivityPanel({
               <p className="mt-2 text-sm text-[var(--text-muted)]">No commits yet.</p>
             ) : (
               <ul className="mt-2 divide-y divide-[var(--border-subtle)]">
+                {/* c.url (the commit page on the hosting provider) is
+                    deliberately not rendered — the sha, author and message are
+                    the whole story a student needed that link for. */}
                 {a.commits.slice(0, 8).map((c) => (
-                  <li key={c.sha} className="flex items-start justify-between gap-3 py-2">
+                  <li key={c.sha} className="py-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-[var(--text-strong)]">{c.message}</p>
                       <p className="text-xs text-[var(--text-muted)]">
@@ -200,14 +198,6 @@ export function GithubActivityPanel({
                         {c.date ? ` · ${formatDateTime(c.date)}` : ""}
                       </p>
                     </div>
-                    <a
-                      href={c.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-xs font-medium text-platform hover:underline"
-                    >
-                      View ↗
-                    </a>
                   </li>
                 ))}
               </ul>

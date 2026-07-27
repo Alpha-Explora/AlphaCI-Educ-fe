@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { classesApi, ApiError } from "@/models/api";
 import type { ClassCohort } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
+import { brand } from "@/config/brand";
 
 export interface JoinClassVM {
   join: (rawCode: string) => void;
@@ -33,7 +34,7 @@ export function normalizeJoinCode(raw: string): string {
 export function joinErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.isNetworkError)
-      return "Can't reach AlphaCI right now. Check your connection and try again.";
+      return `Can't reach ${brand.name} right now. Check your connection and try again.`;
     if (err.status === 404) return "That code doesn't match any class.";
     if (err.status === 410) return "This code is no longer active.";
     if (err.status === 401 || err.status === 403)

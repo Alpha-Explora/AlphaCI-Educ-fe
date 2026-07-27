@@ -1,280 +1,220 @@
 "use client";
 // ============================================================================
-// VIEW LAYER — Landing (two auth paths, ADDENDUM B/I/J)
-//   • Faculty & IT Staff — "Sign in with GitHub" → real OAuth redirect; the
-//     GitHub team (IT-Staff vs Teacher) decides the dashboard (loginWithGithub).
-//   • Student — mock system-account switcher (loginAs({ userId })). There is no
-//     mock admin/teacher path anymore — staff use real GitHub only.
-// Session + login live in useSession; persona lists come from useRoleSwitcher.
-// If /auth/me already resolved a session, we route straight into the role area.
+// VIEW LAYER — Landing (/)
+//
+// ONE door. There used to be two, because staff authenticated with GitHub and
+// students with a password — asking each audience to read past the other's
+// instructions was the price of that split. GitHub is no longer a login (staff
+// link it after signing in), so everyone shares a single email + password form
+// and the chooser has nothing left to choose between.
+//
+// This page previously held the entire sign-in surface AND its logic — a
+// role→route map, an OAuth-error switch, and the mock persona switcher. Those
+// now live in the ViewModel layer (authRoutes, useAuthNotice, useRoleSwitcher),
+// leaving this file as presentation only.
+//
+// THE SCENE: a marked-up worksheet. The page is a sheet of ruled paper with a
+// margin rule, and the one thing a first-time visitor must do is circled in
+// pen. That is the whole design: the annotation is not decoration, it is the
+// instruction, written in the visual language every student in the building
+// already reads correctly.
+//
+// The circled card is deliberately OFF-CENTRE, in the right column. A centred
+// hero puts the action where a browser's own chrome and every other product's
+// modal already sit; parking it right, tilted, and ringed in ink makes it the
+// one object on the page that looks handled rather than laid out.
+//
+// TEMPLATE NOTE: every name and line of copy here comes from
+// src/config/brand.ts, and every colour from the palette block in globals.css.
+// A school re-skins by editing those two files. Nothing below hard-codes
+// either, so please keep it that way.
 // ============================================================================
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "@/viewmodels/useSession";
-import { useRoleSwitcher } from "@/viewmodels/useRoleSwitcher";
-import type { SystemUser, UserRole } from "@/models/types";
-import { Avatar, Banner, Button, GithubMark, Spinner, cn } from "@/components/ui";
+import Link from "next/link";
+import { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+import { Banner, Spinner } from "@/components/ui";
 import { Brand } from "@/components/layout/Brand";
+import { Annotated, MarkNote } from "@/components/landing/Annotated";
+import { PipelineRail } from "@/components/landing/PipelineRail";
+import { ChecksRow } from "@/components/landing/ChecksRow";
+import { useAuthNotice } from "@/viewmodels/useAuthNotice";
+import { useRedirectIfSignedIn } from "@/viewmodels/useRedirectIfSignedIn";
+import { SIGN_IN_ROUTE } from "@/viewmodels/authRoutes";
+import { brand, landingCopy } from "@/config/brand";
 
-function destinationFor(role: UserRole): string {
-  return role === "TEACHER" ? "/teacher" : role === "STUDENT" ? "/student" : "/admin";
-}
-
-// ADDENDUM I — the backend redirects back with ?auth=<reason> when GitHub
-// sign-in can't complete. Map each reason to a friendly notice.
-function authNoticeFor(reason: string | null): string | null {
-  switch (reason) {
-    case "not_authorized":
-      return "That GitHub account isn't on the IT-Staff or Teacher team for this organization. Ask an IT Admin to add you to the right team.";
-    case "unavailable":
-      return "GitHub sign-in isn't configured on this server yet. Use a mock account below for the demo.";
-    case "invalid_state":
-    case "failed":
-      return "GitHub sign-in didn't complete. Please try again.";
-    default:
-      return null;
-  }
-}
-
-// Mock roles shown as account switchers. Students only — teachers and IT
-// admins authenticate with real GitHub (ADDENDUM I/J).
-const MOCK_ROLES: Array<{
-  role: Extract<UserRole, "STUDENT">;
-  title: string;
-  blurb: string;
-  icon: string;
-  accent: string;
-}> = [
-  {
-    role: "STUDENT",
-    title: "Student",
-    blurb: "Work on assignments, read CI feedback, and view your grades.",
-    icon: "💻",
-    accent: "from-emerald-50 to-white",
-  },
-];
+// Split once, at module scope: the greeting template never changes at runtime,
+// and doing it here keeps the JSX free of string surgery.
+const [greetingBefore, greetingAfter] = landingCopy.greeting.split("{cohort}");
 
 export default function LandingPage() {
-  const router = useRouter();
-  const {
-    user,
-    isReady,
-    loginAs,
-    loginWithGithub,
-    isLoading,
-    error: sessionError,
-  } = useSession();
-  const { usersByRole, isLoading: usersLoading, error: usersError, hasUsers } =
-    useRoleSwitcher();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const { isResolving } = useRedirectIfSignedIn();
+  const notice = useAuthNotice();
 
-  // If a session already exists (GitHub staff or mock student/admin), route in.
-  useEffect(() => {
-    if (isReady && user) router.replace(destinationFor(user.role));
-  }, [isReady, user, router]);
-
-  // ADDENDUM I — surface any ?auth=<reason> the OAuth callback bounced back with.
-  useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get("auth");
-    setAuthNotice(authNoticeFor(reason));
-  }, []);
-
-  async function signInUser(u: SystemUser) {
-    setPendingKey(u.id);
-    const logged = await loginAs({ userId: u.id });
-    if (logged) router.push(destinationFor(logged.role));
-    else setPendingKey(null);
-  }
-
-  async function signInByRole(role: UserRole) {
-    setPendingKey(role);
-    const logged = await loginAs({ role });
-    if (logged) router.push(destinationFor(logged.role));
-    else setPendingKey(null);
-  }
-
-  // Brief spinner while the initial me() resolves (avoids a flash of the
-  // logged-out landing when a session cookie/token is already present).
-  if (!isReady || user) {
+  // A session cookie may already be present; don't flash the door before
+  // /auth/me resolves.
+  if (isResolving) {
     return (
       <main
         id="main-content"
-        className="grid min-h-dvh place-items-center bg-[var(--bg-canvas)] text-platform"
+        className="grid min-h-dvh place-items-center bg-[var(--bg-canvas)]"
       >
         <Spinner size="lg" />
+        <span className="sr-only">Checking your session…</span>
       </main>
     );
   }
 
+  // `overflow-x-clip`, not `overflow-hidden`: the pen loops and the tilted card
+  // sit slightly outside their boxes and must not be able to widen the page,
+  // but `hidden` would also trap vertical overflow in a nested scroll container
+  // and clip the footer on a short laptop screen. `clip` contains the
+  // horizontal axis without creating a scroll container at all.
   return (
-    <main
-      id="main-content"
-      className="relative min-h-dvh overflow-hidden bg-[var(--bg-canvas)]"
-    >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(60rem 40rem at 15% -10%, rgba(14,118,168,0.10), transparent 60%), radial-gradient(50rem 40rem at 100% 0%, rgba(36,41,46,0.06), transparent 55%)",
-        }}
-      />
+    <main id="main-content" className="relative min-h-dvh overflow-x-clip">
+      {/* The sheet. Ruled lines and a wash of the brand hue, both masked so
+          they fade well before they reach any text. Decorative only. */}
+      <div aria-hidden="true" className="paper-rules pointer-events-none absolute inset-0">
+        <div
+          className="absolute inset-x-0 top-0 h-[30rem]"
+          style={{
+            background:
+              "radial-gradient(58rem 28rem at 22% -14%, rgb(var(--brand-600) / 0.14), transparent 70%)",
+          }}
+        />
+      </div>
 
-      <div className="relative mx-auto flex min-h-dvh max-w-5xl flex-col px-4 py-10 sm:px-6">
-        <header className="flex items-center justify-between">
-          <Brand />
-          <span className="rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1 text-xs font-medium text-[var(--text-muted)]">
-            Prototype · GitHub OAuth + mock SSO
-          </span>
+      {/* Full-bleed: no max-width, no centring. The sheet IS the window, and a
+          front door that floats in a column with empty rails either side reads
+          as a dialog someone forgot to finish. The layout breathes through
+          page padding instead, which also gives the margin rule a gutter to
+          live in (--margin-rule-x must stay smaller than the padding here). */}
+      <div className="paper-margin relative flex min-h-dvh flex-col px-5 py-8 [--margin-rule-x:2.5rem] sm:px-8 lg:px-20 lg:[--margin-rule-x:2.75rem] xl:px-28 xl:[--margin-rule-x:4rem]">
+        <header>
+          <Brand size={40} />
         </header>
 
-        <div className="mt-14 max-w-2xl animate-fade-up">
-          <p className="text-sm font-semibold uppercase tracking-wide text-platform">
-            State University
-          </p>
-          <h1 className="mt-2 text-4xl font-semibold leading-tight text-[var(--text-strong)] sm:text-5xl">
-            Sign in to the AlphaCI Education Tier
-          </h1>
-          <p className="mt-4 text-base text-[var(--text-muted)]">
-            Faculty and IT staff sign in with their real GitHub account — your GitHub team
-            decides which dashboard you land on. Students use mock system accounts for the demo.
-          </p>
-        </div>
+        {/* ---------------------------------------------------------------- */}
+        {/* Band 1 — the message, and the one action.                        */}
+        {/*                                                                  */}
+        {/* Asymmetric split: the message reads left, the action sits far    */}
+        {/* right, so the eye lands on the circled button last and stops     */}
+        {/* there. Collapses to one column below lg, action FIRST — on a     */}
+        {/* phone nobody scrolls a login page to find the button.            */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="grid flex-1 items-center gap-y-16 py-12 lg:grid-cols-[1.2fr_0.8fr] lg:gap-x-16 xl:gap-x-24">
+          <section className="order-2 lg:order-1">
+            {/* The one word on this page that belongs to THIS school. Split
+                around the placeholder rather than interpolated into a string,
+                so the cohort name can carry the brand colour on its own. */}
+            <p
+              className="animate-fade-up text-2xl font-medium text-[var(--text-muted)] sm:text-3xl xl:text-[2.5rem]"
+              style={{ animationDelay: "20ms" }}
+            >
+              {greetingBefore}
+              <span className="font-semibold text-platform-600">{brand.cohort}</span>
+              {greetingAfter}
+            </p>
 
-        {authNotice && (
-          <Banner tone="warning" className="mt-6 max-w-2xl" title="GitHub sign-in">
-            {authNotice}
-          </Banner>
-        )}
+            {/* Capped in `ch`, not pixels: at full-bleed widths a headline
+                that tracks the column would run to a line length nobody can
+                read back to the start of. */}
+            <h1
+              className="animate-fade-up mt-4 text-[2.4rem] font-semibold leading-[1.06] tracking-tight text-[var(--text-strong)] sm:text-[3.25rem] lg:max-w-[13ch] xl:text-[4.25rem] 2xl:text-[4.75rem]"
+              style={{ animationDelay: "90ms" }}
+            >
+              {landingCopy.headline}
+            </h1>
+            <p
+              className="animate-fade-up mt-6 max-w-[44ch] text-lg leading-relaxed text-[var(--text-muted)] xl:text-xl"
+              style={{ animationDelay: "140ms" }}
+            >
+              {landingCopy.subline}
+            </p>
+          </section>
 
-        {sessionError && (
-          <Banner tone="error" className="mt-6 max-w-2xl" title="Could not sign in">
-            {sessionError}
-          </Banner>
-        )}
+          {/* ------------------------------------------------------------ */}
+          {/* The circled button. No card around it: a container would put  */}
+          {/* a second boundary inside the pen loop, and two nested frames  */}
+          {/* around one button is one frame too many. The loop IS the      */}
+          {/* container.                                                    */}
+          {/* ------------------------------------------------------------ */}
+          {/* Dropped below the headline and subline on wide screens. The
+              action should read as the answer to the sentence on the left,
+              which means arriving after it, not alongside it. Margin rather
+              than a transform, so the ink it carries stays inside the layout. */}
+          <div className="order-1 flex justify-center lg:order-2 lg:mt-28 lg:justify-end xl:mt-36">
+            <div className="w-full max-w-[24rem]">
+              {notice && (
+                <Banner tone={notice.tone} title={notice.title} className="mb-6">
+                  {notice.message}
+                </Banner>
+              )}
 
-        {usersError?.isNetworkError && (
-          <Banner tone="network" className="mt-6 max-w-2xl" title="Backend not reachable">
-            The API at <code className="font-mono">{usersError.baseUrl}</code> is offline, so
-            mock personas can&rsquo;t load and sign-in can&rsquo;t complete. Start the backend
-            (<code className="font-mono">AlphaCI-Educ-be</code>) on port 4000.
-          </Banner>
-        )}
+              {/* Sits over the loop's own padding, so the note and the ink
+                  share a gutter instead of stacking two of them. */}
+              <MarkNote className="ml-6">{landingCopy.ctaAside}</MarkNote>
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-2" aria-label="Choose how to sign in">
-          {/* Faculty & IT Staff — real GitHub OAuth (team decides the dashboard) */}
-          <div
-            className="flex flex-col overflow-hidden rounded-2xl border border-github/25 bg-white shadow-card animate-fade-up"
-            style={{ animationDelay: "0ms" }}
-          >
-            <div className="bg-github px-5 pb-5 pt-5 text-white">
-              <div className="flex items-center gap-2">
-                <GithubMark size={22} />
-                <span className="text-xs font-semibold uppercase tracking-wide text-white/60">
-                  Faculty &amp; IT Staff
-                </span>
-              </div>
-              <h2 className="mt-3 text-lg font-semibold">Sign in with GitHub</h2>
-              <p className="mt-1 text-sm text-white/70">
-                Teachers and IT admins both sign in here. Your GitHub team — IT-Staff or
-                Teacher — routes you to the right dashboard automatically.
-              </p>
-            </div>
-            <div className="flex flex-1 flex-col justify-end p-4">
-              <Button variant="github" className="w-full" onClick={loginWithGithub}>
-                <GithubMark size={18} /> Continue with GitHub
-              </Button>
-              <p className="mt-2 text-center text-xs text-[var(--text-muted)]">
-                Redirects to GitHub, then to your role&rsquo;s dashboard.
+              {/* Not a button. The circle is the affordance here: on a marked-
+                  up worksheet the thing you do is the thing that got ringed,
+                  and wrapping a filled blue slab in red ink puts two competing
+                  "look at me" treatments on one target. Plain words, circled.
+
+                  `block w-fit` rather than `inline-block`: the loop must hug
+                  the words instead of stretching across the column, but an
+                  inline-level box would sit on the same line as the MarkNote
+                  above it whenever the two happen to fit. Padding is
+                  clearance, not decoration — see the ellipse-vs-rectangle
+                  inequality documented in Annotated.tsx. */}
+              <Annotated
+                delay={0.5}
+                padX="2.5rem"
+                padY="1.35rem"
+                className="-mt-1 block w-fit"
+              >
+                <Link
+                  href={SIGN_IN_ROUTE}
+                  className="group inline-flex items-center gap-3 rounded-lg text-[2rem] font-semibold leading-none tracking-tight text-platform-700 transition-colors duration-150 hover:text-platform-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-platform sm:text-[2.25rem]"
+                >
+                  {landingCopy.ctaLabel}
+                  {/* Leans forward when you reach for it. Small on purpose:
+                      acknowledging the cursor, not performing. */}
+                  <ArrowRightIcon
+                    size={26}
+                    weight="bold"
+                    aria-hidden="true"
+                    className="transition-transform duration-200 ease-out group-hover:translate-x-1"
+                  />
+                </Link>
+              </Annotated>
+
+              {/* The loop's padding already reserves room for the ink, so this
+                  only needs ordinary spacing. */}
+              <p className="mt-1 max-w-[22rem] px-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                {landingCopy.ctaHint}
               </p>
             </div>
           </div>
+        </div>
 
-          {/* Student — mock account switcher (staff use GitHub above) */}
-          {usersLoading ? (
-            <div className="grid place-items-center py-16 text-platform">
-              <Spinner size="lg" />
-            </div>
-          ) : (
-            <div className="grid gap-5">
-              {MOCK_ROLES.map((meta, idx) => {
-                const people = usersByRole[meta.role];
-                return (
-                  <div
-                    key={meta.role}
-                    className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-white shadow-card animate-fade-up"
-                    style={{ animationDelay: `${(idx + 1) * 60}ms` }}
-                  >
-                    <div
-                      className={cn(
-                        "rounded-t-2xl bg-gradient-to-br px-5 pb-4 pt-5",
-                        meta.accent,
-                      )}
-                    >
-                      <span aria-hidden="true" className="text-2xl">
-                        {meta.icon}
-                      </span>
-                      <h2 className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
-                        {meta.title}
-                      </h2>
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">{meta.blurb}</p>
-                    </div>
-
-                    <div className="flex flex-1 flex-col gap-2 p-4">
-                      {hasUsers && people.length > 0 ? (
-                        people.map((u) => {
-                          const isPending = pendingKey === u.id;
-                          return (
-                            <button
-                              key={u.id}
-                              onClick={() => signInUser(u)}
-                              disabled={isLoading}
-                              className="group flex items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform disabled:opacity-60"
-                            >
-                              <Avatar name={u.fullName} color={u.avatarColor} size="sm" />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium text-[var(--text-strong)]">
-                                  {u.fullName}
-                                </span>
-                                <span className="block truncate text-xs text-[var(--text-muted)]">
-                                  {u.email}
-                                </span>
-                              </span>
-                              {isPending ? (
-                                <Spinner size="sm" className="text-platform" />
-                              ) : (
-                                <span
-                                  aria-hidden="true"
-                                  className="text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5"
-                                >
-                                  →
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          className="mt-auto w-full"
-                          loading={pendingKey === meta.role}
-                          disabled={isLoading}
-                          onClick={() => signInByRole(meta.role)}
-                        >
-                          Continue as {meta.title}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* ---------------------------------------------------------------- */}
+        {/* Band 2 — what a run is. Full width, because the pipeline is a    */}
+        {/* left-to-right thing and cramming it into a column would fight    */}
+        {/* the one property that makes the diagram legible.                 */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="border-t border-[var(--border-subtle)] pt-10 xl:pt-12">
+          <PipelineRail delay={0.35} />
+          <div className="mt-10 border-t border-[var(--border-subtle)] pt-8 xl:mt-12">
+            <ChecksRow delay={0.85} />
+          </div>
         </section>
 
-        <footer className="mt-auto pt-12 text-xs text-[var(--text-muted)]">
-          AlphaCI · Teachers via GitHub OAuth · Students zero-footprint · Single GitHub Org per university
+        <footer className="mt-12 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-[var(--text-muted)]">
+          <p>{landingCopy.helpLine}</p>
+          <p>
+            Powered by{" "}
+            <span className="font-medium text-[var(--text-strong)]">
+              {brand.poweredBy}
+            </span>
+          </p>
         </footer>
       </div>
     </main>

@@ -161,7 +161,7 @@ export function CreateProjectModal({
       description={
         showSuccess
           ? undefined
-          : "Create a solo or group project for this class. Real GitHub repositories are provisioned on submit."
+          : "Create a solo or group project for this class. Student workspaces are provisioned on submit."
       }
       size="xl"
     >
@@ -239,9 +239,12 @@ export function CreateProjectModal({
                 />
               )}
             </Field>
+            {/* Kept as a functional field — a teacher may genuinely have a
+                starter template to point at — but the placeholder no longer
+                advertises a specific hosting provider. */}
             <Field
-              label="Template repository URL"
-              hint="Optional starter template."
+              label="Starter template URL"
+              hint="Optional. Leave blank to start from an empty project."
               className="sm:col-span-2"
             >
               {({ id }) => (
@@ -250,7 +253,7 @@ export function CreateProjectModal({
                   type="url"
                   value={templateUrl}
                   onChange={(e) => setTemplateUrl(e.target.value)}
-                  placeholder="https://github.com/org/template"
+                  placeholder="https://…/starter-template"
                 />
               )}
             </Field>

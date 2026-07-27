@@ -4,7 +4,9 @@
 // comes from useSession; this component holds no data of its own.
 import { useRouter } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
+import { isStaffRole } from "@/models/types";
 import { Avatar, Button, Card } from "@/components/ui";
+import { brand } from "@/config/brand";
 
 function Row({ label, value }: { readonly label: string; readonly value: string }) {
   return (
@@ -21,7 +23,7 @@ export function SettingsView() {
 
   if (!user) return null;
 
-  const isStaff = user.role === "TEACHER" || user.role === "ADMIN";
+  const isStaff = isStaffRole(user.role);
   const activeLab = labs.find((l) => l.id === selectedOrgId) ?? null;
 
   return (
@@ -48,14 +50,15 @@ export function SettingsView() {
           <Row label="Role" value={user.role} />
           <Row
             label="Sign-in method"
-            value={isGithubSession ? "GitHub" : "School account"}
+            value={isGithubSession ? "Connected account" : "School account"}
           />
-          {user.githubLogin && <Row label="GitHub" value={`@${user.githubLogin}`} />}
+          {/*
+            Neither the linked account handle nor the lab's underlying
+            organization is listed. Where the platform hosts source is not
+            something any role — including staff — needs on a profile page.
+          */}
           {isStaff && (
             <Row label="Active laboratory" value={activeLab?.name ?? "None selected"} />
-          )}
-          {isStaff && activeLab && (
-            <Row label="GitHub organization" value={activeLab.githubOrgName} />
           )}
         </div>
       </Card>
@@ -63,7 +66,7 @@ export function SettingsView() {
       <Card className="p-5 animate-fade-up sm:max-w-2xl">
         <h2 className="text-base font-semibold text-[var(--text-strong)]">Session</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Sign out of AlphaCI on this device.
+          Sign out of {brand.name} on this device.
         </p>
         <Button
           className="mt-4"

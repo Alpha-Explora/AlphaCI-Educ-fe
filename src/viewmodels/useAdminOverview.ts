@@ -18,19 +18,22 @@ export interface TeamTierGroup {
   teams: GithubTeamWithMembers[];
 }
 
+// Access tiers described by what each group can DO. Previously these named the
+// hosting provider and its role vocabulary ("OWNER privileges over the entire
+// GitHub org", "teachers join as MAINTAINER") — that provider is now an
+// implementation detail the admin UI never mentions.
 const TIER_META: Record<number, { label: string; description: string }> = {
   1: {
-    label: "Tier 1 · Organization Owners",
-    description: "IT admins with OWNER privileges over the entire GitHub org.",
+    label: "Lab administrators",
+    description: "Full control of this laboratory and everyone in it.",
   },
   2: {
-    label: "Tier 2 · Faculty",
-    description: "Department-wide faculty team for shared visibility.",
+    label: "Faculty",
+    description: "Teaching staff who can create classes under their courses.",
   },
   3: {
-    label: "Tier 3 · Class Teams",
-    description:
-      "Per-cohort teams grouping assignment repos; teachers join as MAINTAINER.",
+    label: "Class groups",
+    description: "One group per cohort, holding that class's teacher and projects.",
   },
 };
 

@@ -1,17 +1,49 @@
 // MODEL LAYER — Auth resource
-// Students: mock login (unchanged). Teachers: real GitHub OAuth via a browser
-// redirect to `githubStartUrl()`. Session is validated with me() (cookie for
-// teachers, bearer token for students) and cleared with logout().
+// Three ways in:
+//   • passwordLogin  — real email + password, verified against Supabase Auth.
+//                      Students use this; staff use it as a fallback.
+//   • githubStartUrl — staff GitHub OAuth (full-page redirect, not a fetch).
+//   • mockLogin      — legacy persona switcher, demo only.
+// Session is validated with me() and cleared with logout().
 import { apiRequest, API_BASE_URL } from "./client";
 import type {
   AuthLoginResponse,
   LabsResponse,
+  PasswordLoginRequest,
   SystemUser,
   UserRole,
 } from "../types";
 
 export const authApi = {
-  // Students / admins — mock system-account login.
+  /**
+   * Real credential sign-in for EVERY role.
+   *
+   * No `audience` is sent: there is one door now, so there is no door to
+   * mismatch. The API still accepts the field from older clients and enforces it
+   * when present, which is why removing it here is safe rather than breaking.
+   */
+  passwordLogin(credentials: PasswordLoginRequest) {
+    return apiRequest<AuthLoginResponse>("/auth/login", {
+      method: "POST",
+      body: credentials,
+    });
+  },
+
+  /**
+   * Sends a password-reset email via Supabase Auth. Deliberately resolves even
+   * when the address is unknown — a distinguishable response here would turn
+   * this endpoint into an account-enumeration oracle for a school roster.
+   */
+  requestPasswordReset(email: string) {
+    return apiRequest<{ ok: true }>("/auth/request-password-reset", {
+      method: "POST",
+      body: { email },
+    });
+  },
+
+  // Legacy persona switcher — demo only, students only. Superseded by
+  // passwordLogin; kept so the seeded-persona demo path still works when no
+  // Supabase project is configured.
   mockLogin(payload: { userId: string } | { role: UserRole }) {
     return apiRequest<AuthLoginResponse>("/auth/mock-login", {
       method: "POST",

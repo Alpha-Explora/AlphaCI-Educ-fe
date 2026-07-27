@@ -8,7 +8,7 @@ export default function AdminIncidentsPage() {
       title="Incident management"
       subtitle="Track and resolve platform incidents across your laboratories."
       icon="🚨"
-      note="Incident tracking isn't implemented in this prototype yet. It will surface failed provisioning runs, GitHub App errors, and lab-PC issues for the labs you administer."
+      note="Incident tracking isn't implemented in this prototype yet. It will surface failed provisioning runs, source-hosting errors, and lab-PC issues for the labs you administer."
     />
   );
 }

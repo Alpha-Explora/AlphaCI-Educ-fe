@@ -7,7 +7,7 @@
 // its Actions/CI, plus the CI/CD scaffold stack + file count.
 // ============================================================================
 import { useProvisionRepositories } from "@/viewmodels/useProvisionRepositories";
-import { Banner, Button, GithubMark } from "@/components/ui";
+import { Banner, Button } from "@/components/ui";
 import { ProvisionResultSummary } from "./ProvisionResultSummary";
 
 export function ProvisionRepositoriesButton({
@@ -20,13 +20,10 @@ export function ProvisionRepositoriesButton({
 
   return (
     <div className="flex w-full flex-col items-end gap-2 sm:w-auto">
-      <Button
-        variant="github"
-        size="sm"
-        onClick={vm.provision}
-        loading={vm.isProvisioning}
-      >
-        <GithubMark size={15} /> Provision student repositories
+      {/* Was a provider-branded dark button with its logo. Provisioning is a
+          platform action, so it now uses the platform's primary button. */}
+      <Button size="sm" onClick={vm.provision} loading={vm.isProvisioning}>
+        Provision student workspaces
       </Button>
 
       {vm.error && (

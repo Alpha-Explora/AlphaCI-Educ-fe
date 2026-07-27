@@ -9,12 +9,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
+import { destinationFor } from "@/viewmodels/authRoutes";
+import { isStaffRole } from "@/models/types";
 import { Button, Card, EmptyState, Spinner, cn } from "@/components/ui";
 import { Brand } from "@/components/layout/Brand";
 
-function roleHome(role: string): string {
-  return role === "ADMIN" ? "/admin" : "/teacher";
-}
+
 
 export default function SelectLabPage() {
   const { user, isReady, labs, selectedOrgId, labsReady, selectLab, logout } =
@@ -23,7 +23,7 @@ export default function SelectLabPage() {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isStaff = user?.role === "TEACHER" || user?.role === "ADMIN";
+  const isStaff = user ? isStaffRole(user.role) : false;
 
   // Route away when this page has nothing to do: not signed in, not staff, or a
   // lab is already active (nothing left to pick).
@@ -33,7 +33,7 @@ export default function SelectLabPage() {
       router.replace("/");
       return;
     }
-    if (selectedOrgId) router.replace(roleHome(user.role));
+    if (selectedOrgId) router.replace(destinationFor(user.role));
   }, [isReady, labsReady, user, isStaff, selectedOrgId, router]);
 
   async function choose(orgId: string) {
@@ -42,7 +42,7 @@ export default function SelectLabPage() {
     setError(null);
     try {
       await selectLab(orgId);
-      router.replace(roleHome(user.role));
+      router.replace(destinationFor(user.role));
     } catch {
       setError("Could not open that lab. Please try again.");
       setPending(null);
@@ -119,8 +119,10 @@ export default function SelectLabPage() {
                       {lab.name}
                     </h2>
                   </div>
-                  <p className="mt-1 truncate font-mono text-xs text-[var(--text-muted)]">
-                    github.com/{lab.githubOrgName}
+                  {/* The lab's underlying organization handle is not shown —
+                      staff pick a laboratory by its human name. */}
+                  <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                    Laboratory workspace
                   </p>
                   <Button
                     className="mt-4 w-full"

@@ -8,7 +8,22 @@
 // ---------------------------------------------------------------------------
 // 1. Enums (as string-literal unions; values are the binding wire format)
 // ---------------------------------------------------------------------------
-export type UserRole = "STUDENT" | "TEACHER" | "ADMIN";
+/**
+ * SUPER_ADMIN is the PLATFORM operator (the vendor), not a school role. It is
+ * resolved from a team in the dedicated platform GitHub org — never from a
+ * customer lab's org — and passes every check ADMIN passes, in every lab.
+ */
+export type UserRole = "STUDENT" | "TEACHER" | "ADMIN" | "SUPER_ADMIN";
+
+/** Roles that administer a laboratory: the school's IT admin, or the vendor. */
+export function isAdminRole(role: UserRole): boolean {
+  return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+/** Roles that belong to a staff area (anything that isn't a student). */
+export function isStaffRole(role: UserRole): boolean {
+  return role !== "STUDENT";
+}
 export type UserStatus = "ACTIVE" | "ARCHIVED" | "ANONYMIZED";
 export type EnrollmentRole = "TEACHER" | "STUDENT";
 export type RepoStatus = "IN_PROGRESS" | "SUBMITTED" | "GRADED" | "ARCHIVED";
@@ -67,10 +82,42 @@ export interface SystemUser {
   // ADDENDUM A — org-seat GitHub identity (additive, backward-compatible)
   githubUsername: string | null; // org-seat handle for TEACHER/ADMIN; null for students
   consumesGithubSeat: boolean; // true for TEACHER & ADMIN, false for STUDENT
-  // ADDENDUM B — real GitHub OAuth identity (teacher-only; null for students)
-  githubLogin: string | null; // GitHub login the teacher authenticated as
-  githubAvatarUrl: string | null; // GitHub avatar image URL
-  githubProfileUrl: string | null; // https://github.com/<login>
+  // ADDENDUM B — real GitHub OAuth identity (teacher-only; null for students).
+  //
+  // These are NOT rendered anywhere in the UI any more: the platform still uses
+  // GitHub as its source host, but no role sees the organization, its teams, or
+  // anyone's handle. They remain on the type because the app uses them as
+  // signals — githubLogin doubles as "this staff member has actually signed in"
+  // on the admin teacher directory, and githubAvatarUrl is shown as a plain
+  // profile photo with no attribution.
+  githubLogin: string | null;
+  githubAvatarUrl: string | null;
+  githubProfileUrl: string | null;
+  // Supabase Auth link + last successful sign-in. Undefined for a rostered
+  // person who has never set a password.
+  authUserId?: string | null;
+  lastSignInAt?: string;
+  /** Last authenticated request — the "online now" heartbeat. In-memory on the
+   *  API, so it resets when the backend restarts. */
+  lastSeenAt?: string;
+}
+
+/**
+ * One row of the IT-Admin student monitor (GET /organizations/:id/students).
+ * A narrow projection of SystemUser — the API deliberately withholds auth ids
+ * and source-host identity from this roster.
+ */
+export interface StudentAccountSummary {
+  id: string;
+  fullName: string;
+  email: string;
+  avatarColor: string;
+  status: UserStatus;
+  lastSignInAt: string | null;
+  lastSeenAt: string | null;
+  classNames: string[];
+  activeProjects: number;
+  createdAt: string;
 }
 
 // ADDENDUM H — Course catalog + IT-Admin-driven instructor assignment.
@@ -297,6 +344,65 @@ export interface PipelineRunDetail {
   checks: PipelineCheck[];
 }
 
+// ---------------------------------------------------------------------------
+// Platform (SUPER_ADMIN) console — cross-lab operational view.
+// ---------------------------------------------------------------------------
+
+/** One laboratory's operational vitals, as the platform operator sees them. */
+export interface PlatformLabSummary {
+  orgId: string;
+  orgName: string;
+  githubOrgName: string;
+  sourceHostingConnected: boolean;
+  admins: number;
+  teachers: number;
+  students: number;
+  courses: number;
+  classes: number;
+  totalProjects: number;
+  activeProjects: number;
+  archivedProjects: number;
+  pipelineRuns: number;
+  /** Runs whose status is FAILED — the "errors" signal an operator watches. */
+  failedRuns: number;
+  flaggedPlagiarism: number;
+}
+
+/**
+ * One person anywhere on the platform. Presence is deliberately NOT classified
+ * server-side — the raw timestamps travel and the ViewModel applies the single
+ * presence policy in viewmodels/presence.ts.
+ */
+export interface PlatformPerson {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  orgId: string;
+  orgName: string;
+  avatarColor: string;
+  lastSignInAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface PlatformOverview {
+  generatedAt: string;
+  labs: PlatformLabSummary[];
+  people: PlatformPerson[];
+  totals: {
+    labs: number;
+    admins: number;
+    teachers: number;
+    students: number;
+    classes: number;
+    projects: number;
+    activeProjects: number;
+    failedRuns: number;
+    flaggedPlagiarism: number;
+  };
+}
+
 export interface AdminOverview {
   org: UniversityOrganization;
   githubAppInstalled: boolean;
@@ -327,6 +433,120 @@ export interface AdminOverview {
 export interface AuthLoginResponse {
   token: string;
   user: SystemUser;
+}
+
+// Real email + password sign-in. Credentials are verified by Supabase Auth
+// (auth.users) server-side; the browser only ever posts them to our API over
+// HTTPS and receives a session back — it never talks to Supabase directly, and
+// no password ever reaches localStorage.
+export interface PasswordLoginRequest {
+  email: string;
+  password: string;
+}
+
+/**
+ * Which sign-in door the credentials were presented at. The API rejects a
+ * mismatch (a student's password at the staff door and vice versa) so that a
+ * wrong-door attempt produces a clear "use the other page" message instead of
+ * silently landing someone on a dashboard they can't use.
+ */
+export type SignInAudience = "STUDENT" | "STAFF";
+
+// ---------------------------------------------------------------------------
+// Admin — add a teacher (POST /organizations/:id/teachers)
+//
+// Name and email only. There is no GitHub field by design: the platform still
+// uses GitHub as the source host, but an admin never sees or types anything
+// about it — the org + Teacher-team invitation goes out by email server-side.
+// ---------------------------------------------------------------------------
+export interface AddTeacherRequest {
+  fullName: string;
+  email: string;
+  /**
+   * REQUIRED. Pins WHICH GitHub account may later link to this profile, and is
+   * the only invite form the GitHub App itself can send — an email-only invite
+   * would need a signed-in admin's own GitHub token.
+   */
+  githubUsername: string;
+}
+
+/** Same shape for both rungs of the chain — operator adds admin, admin adds teacher. */
+export type AddStaffRequest = AddTeacherRequest;
+
+/** DELETE /organizations/:id/teachers/:userId */
+export interface RemoveStaffResponse {
+  /** The deleted record, returned so the UI can name who went. */
+  user: SystemUser;
+  orgRemoval: {
+    /** true when a real GitHub call was made (vs. simulated with no token). */
+    live: boolean;
+    removed: boolean;
+    /** They had no GitHub account, so there was nothing in the org to remove. */
+    nothingToRemove?: boolean;
+    warning?: string;
+  };
+  /**
+   * false when they still teach at another laboratory: they were DETACHED from
+   * this one, not deleted. Their account and the other lab's data are untouched.
+   */
+  accountDeleted: boolean;
+  /** What was deleted alongside them, SCOPED TO THIS LABORATORY. */
+  cascade: {
+    classes: number;
+    assignments: number;
+    repositories: number;
+    enrollments: number;
+  };
+}
+
+/** POST /organizations/:id/staff/reconcile */
+export interface ReconcileResponse {
+  /** false when GitHub could not be read — in which case NOTHING was changed. */
+  live: boolean;
+  checked: number;
+  archived: SystemUser[];
+  /** Staff with no known GitHub handle, so nothing to compare against. */
+  skippedNoHandle: number;
+  warning?: string;
+}
+
+/**
+ * A teacher who already exists on the platform but is not in the laboratory
+ * being added to — offered so the admin can pick instead of retyping.
+ */
+export interface TransferableTeacher {
+  id: string;
+  fullName: string;
+  email: string;
+  /** The handle they are already bound to. Must be reused verbatim. */
+  githubUsername: string | null;
+  /** true once they have proved they own that GitHub account. */
+  githubLinked: boolean;
+  avatarColor: string;
+  /** Laboratories they already teach at, by name. */
+  labNames: string[];
+}
+
+export interface AddTeacherResponse {
+  teacher: SystemUser;
+  /**
+   * true when this address already had an account at another laboratory and was
+   * ATTACHED here rather than created — no new profile, no password email.
+   */
+  attachedExisting: boolean;
+  /**
+   * Whether source-host access actually went out. Reported rather than assumed
+   * because the profile is created even when the invite fails — the admin needs
+   * to know which half succeeded.
+   */
+  accessInvite: {
+    sent: boolean;
+    alreadyHadAccess: boolean;
+    live: boolean;
+    warning?: string;
+  };
+  /** Whether a set-your-password email was sent. */
+  passwordInviteSent: boolean;
 }
 
 // ADDENDUM K — multi-lab (multi-org). A lab/organization a signed-in staff

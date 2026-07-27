@@ -9,6 +9,7 @@
 // ============================================================================
 import { useStartAssignment } from "@/viewmodels/useStartAssignment";
 import { Banner, Button, Card } from "@/components/ui";
+import { brand } from "@/config/brand";
 
 export function StartAssignmentPanel({ repoId }: { repoId: string }) {
   const vm = useStartAssignment(repoId);
@@ -20,7 +21,7 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
       </h2>
       <p className="mt-1 text-sm text-[var(--text-muted)]">
         One click opens this repository in VS Code on the lab PC with{" "}
-        <code className="font-mono text-xs">git push</code> already working — no GitHub
+        <code className="font-mono text-xs">git push</code> already working — no personal
         account needed.
       </p>
 
@@ -30,7 +31,7 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
 
       {vm.phase === "launching" && (
         <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Opening VS Code… If nothing happens, VS Code or the AlphaCI extension may not be
+          Opening VS Code… If nothing happens, VS Code or the {brand.name} extension may not be
           installed — use the <strong>manual steps below</strong>.
         </p>
       )}

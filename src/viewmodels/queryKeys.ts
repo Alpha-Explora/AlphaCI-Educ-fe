@@ -7,6 +7,13 @@ export const queryKeys = {
     all: ["organizations"] as const,
     detail: (id: string) => ["organizations", id] as const,
     adminOverview: (id: string) => ["organizations", id, "admin-overview"] as const,
+    teachers: (id: string) => ["organizations", id, "teachers"] as const,
+    students: (id: string) => ["organizations", id, "students"] as const,
+    transferableTeachers: (id: string) =>
+      ["organizations", id, "teachers", "available"] as const,
+  },
+  platform: {
+    overview: ["platform", "overview"] as const,
   },
   users: {
     detail: (id: string) => ["users", id] as const,

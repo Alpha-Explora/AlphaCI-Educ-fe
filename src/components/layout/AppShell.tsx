@@ -10,8 +10,9 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
-import type { UserRole } from "@/models/types";
-import { Avatar, Button, GithubMark, Spinner, cn } from "@/components/ui";
+import { canEnterArea } from "@/viewmodels/authRoutes";
+import { isStaffRole, type UserRole } from "@/models/types";
+import { Avatar, Button, Spinner, cn } from "@/components/ui";
 import { GithubModeNote } from "@/components/domain/GithubModeNote";
 import { Brand } from "./Brand";
 
@@ -25,6 +26,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   TEACHER: "Teacher",
   STUDENT: "Student",
   ADMIN: "IT Admin",
+  SUPER_ADMIN: "Platform operator",
 };
 
 export function AppShell({
@@ -50,19 +52,21 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isStaff = role === "TEACHER" || role === "ADMIN";
+  const isStaff = isStaffRole(role);
+  // A platform operator is admitted to the IT-Admin area too (see canEnterArea).
+  const mayEnter = user ? canEnterArea(user.role, role) : false;
 
   // Session guard: redirect when unauthenticated, role mismatch, or (ADDENDUM K)
   // a staff user hasn't yet chosen which lab to work in.
   useEffect(() => {
     if (!isReady) return;
-    if (!user || user.role !== role) {
+    if (!user || !mayEnter) {
       router.replace("/");
       return;
     }
     if (!labsReady) return;
     if (needsLabSelection) router.replace("/select-lab");
-  }, [isReady, labsReady, user, role, needsLabSelection, router]);
+  }, [isReady, labsReady, user, mayEnter, needsLabSelection, router]);
 
   // Hold the chrome until we know the session AND (for staff) the lab picture,
   // so the dashboard never flashes unscoped data before a lab is resolved.
@@ -70,7 +74,7 @@ export function AppShell({
   if (
     !isReady ||
     !user ||
-    user.role !== role ||
+    !mayEnter ||
     waitingOnLabs ||
     needsLabSelection
   ) {
@@ -181,24 +185,22 @@ export function AppShell({
               <p className="text-sm font-medium leading-tight text-[var(--text-strong)]">
                 {user.fullName}
               </p>
+              {/*
+                Every role now shows the same thing: role · email. Staff used to
+                get a mark and their linked account handle here instead, which
+                was the one identifier visible on every single screen.
+              */}
               <p className="text-xs leading-tight text-[var(--text-muted)]">
-                {isGithubSession && user.githubLogin ? (
-                  <span className="inline-flex items-center gap-1">
-                    <GithubMark size={11} />@{user.githubLogin}
-                  </span>
-                ) : (
-                  <>
-                    {ROLE_LABEL[user.role]} · {user.email}
-                  </>
-                )}
+                {ROLE_LABEL[user.role]} · {user.email}
               </p>
             </div>
-            {/* Teachers show their real GitHub avatar; others get initials. */}
+            {/* Staff keep their profile photo — it's just an avatar image, and
+                carries no organization or handle. */}
             {isGithubSession && user.githubAvatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.githubAvatarUrl}
-                alt={`${user.fullName} on GitHub`}
+                alt=""
                 width={36}
                 height={36}
                 className="h-9 w-9 rounded-full ring-2 ring-[var(--border-subtle)]"

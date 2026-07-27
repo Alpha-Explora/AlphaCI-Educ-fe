@@ -155,8 +155,10 @@ export default function TeacherDashboardPage() {
                             )}
                           </div>
 
-                          <p className="mt-1 truncate font-mono text-xs text-[var(--text-muted)]">
-                            @{c.githubTeamSlug}
+                          {/* The class's underlying team slug is an
+                              implementation detail and is no longer shown. */}
+                          <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                            Section {c.section}
                           </p>
 
                           <div className="mt-auto flex gap-6 pt-5">
