@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cicd-external-project.github.io/cicd-workflow/rubrics/rubric.schema.json",
+  "title": "Grading rubric",
+  "description": "What a pipeline run is worth and which stages stop it. Served by the AlphaCI backend per assignment; rubrics/default.rubric.yml is the fallback used only when that request fails.\n\nEvery `title` and `description` in this schema is rendered verbatim in the teacher's rubric documentation view. Editing wording here changes what teachers read — the docs cannot drift from the behaviour because they are generated from the same file the pipeline validates against.",
+  "type": "object",
+  "required": ["version", "coverage", "points", "gates"],
+  "additionalProperties": false,
+
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "source": {
+      "enum": ["backend", "fallback"],
+      "description": "Where this rubric came from. A run graded against `fallback` is reported as PROVISIONAL, because the thresholds are defaults rather than the teacher's."
+    },
+
+    "coverage": {
+      "type": "object",
+      "title": "Test coverage",
+      "description": "How much of the student's own code their visible tests execute. Each language reports coverage in a different format (JaCoCo, Cobertura, Clover, LCOV); the pipeline normalises all four before comparing, so one number means the same thing in Java, Python, PHP and Node.",
+      "required": ["lines", "enforce", "scoring"],
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Line coverage %",
+          "description": "Percentage of executable lines run by the test suite. The most commonly used measure and the one to set first."
+        },
+        "branches": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Branch coverage %",
+          "description": "Percentage of if/else and loop paths exercised. Stricter than line coverage: code can be 100% line-covered while never testing the false branch of a condition."
+        },
+        "functions": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Function coverage %",
+          "description": "Percentage of functions called at least once."
+        },
+        "statements": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Statement coverage %",
+          "description": "Percentage of statements executed. Close to line coverage in most languages."
+        },
+        "enforce": {
+          "type": "boolean",
+          "title": "Coverage failure stops the build",
+          "description": "ON: falling below the threshold fails the pipeline, and later stages do not run. OFF: it only costs points. Teachers commonly turn this off early in a term and on later, so a beginner still sees their test results."
+        },
+        "scoring": {
+          "enum": ["linear", "binary"],
+          "title": "How partial coverage scores",
+          "description": "LINEAR: points scale with the percentage reached, so 40% of a 80% target earns half marks. BINARY: full points at or above the threshold, none below. Linear rewards progress; binary enforces a hard standard."
+        }
+      }
+    },
+
+    "points": {
+      "type": "object",
+      "title": "Point allocation",
+      "description": "What each stage contributes to the final mark. These do not need to total 100 — the pipeline scales the result to the assignment's own total, so a teacher can think in whichever units they prefer.",
+      "additionalProperties": false,
+      "properties": {
+        "lint": {
+          "type": "number", "minimum": 0,
+          "title": "Style & formatting",
+          "description": "Awarded by stage 2. Naming, indentation, unused imports, line length — the conventions of the language rather than whether the code works."
+        },
+        "quality": {
+          "type": "number", "minimum": 0,
+          "title": "Code quality",
+          "description": "Awarded by stage 3 from the SonarCloud analysis: maintainability, duplication, complexity, and any bugs or vulnerabilities found. Measures whether the code is well built, not whether it is correct."
+        },
+        "publicTests": {
+          "type": "number", "minimum": 0,
+          "title": "Visible tests",
+          "description": "Awarded by stage 4. Tests the student can read and run locally before pushing."
+        },
+        "hiddenTests": {
+          "type": "number", "minimum": 0,
+          "title": "Hidden tests",
+          "description": "Awarded by stage 5. Your tests, which the student cannot read. These catch solutions written to satisfy the visible tests rather than the problem — edge cases, boundary values, error handling."
+        },
+        "bonus": {
+          "type": "number", "minimum": 0,
+          "title": "Bonus",
+          "description": "Optional points not tied to an automatic check, for manual award during review."
+        }
+      }
+    },
+
+    "gates": {
+      "type": "object",
+      "title": "Which failures stop the pipeline",
+      "description": "A stage that STOPS the run prevents everything after it from executing, so the student sees no further feedback that push. A stage that only DEDUCTS lets the run continue and the student still learns what else passed or failed.\n\nThe general rule: stop the pipeline only when continuing would be meaningless. Code that does not compile cannot be tested; code with a missing docstring can.",
+      "additionalProperties": false,
+      "properties": {
+        "lintBlocks": {
+          "type": "boolean",
+          "title": "Style failure stops the build",
+          "description": "Recommended OFF. A student whose run halts on a formatting error never reaches their test results and learns nothing from that push. Style is worth points, not the feedback loop."
+        },
+        "coverageBlocks": {
+          "type": "boolean",
+          "title": "Coverage failure stops the build",
+          "description": "Mirrors coverage.enforce. Set both together."
+        },
+        "qualityGateBlocks": {
+          "type": "boolean",
+          "title": "SonarCloud gate failure stops the build",
+          "description": "Recommended OFF for coursework. The default SonarCloud gate is tuned for professional codebases and will fail work that is perfectly acceptable for a beginner."
+        },
+        "integrityBlocks": {
+          "type": "boolean",
+          "const": false,
+          "title": "Integrity findings stop the build",
+          "description": "Always OFF, and not configurable. Similarity and authorship signals are probabilistic. Their false positives fall hardest on students writing in a second language or with an unusual working style, and an automatic penalty turns a statistical hint into an accusation with no appeal. Stage 6 raises a flag for your review; you decide."
+        }
+      }
+    },
+
+    "quality": {
+      "type": "object",
+      "title": "Code quality thresholds",
+      "description": "Applied to the SonarCloud analysis in stage 3.",
+      "additionalProperties": false,
+      "properties": {
+        "maxCognitiveComplexity": {
+          "type": "number", "minimum": 1,
+          "title": "Maximum cognitive complexity per function",
+          "description": "How hard a function is to follow — nested conditions and loops raise it. Roughly: above 15 a function is difficult to reason about, above 25 it should be split. Distinct from cyclomatic complexity, which counts paths rather than mental effort."
+        },
+        "maxDuplicationPercent": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Maximum duplicated lines %",
+          "description": "Copy-pasted blocks within the student's own submission. High duplication is a code-quality problem; it is not the cross-student similarity check, which is stage 6."
+        },
+        "minMaintainabilityRating": {
+          "enum": ["A", "B", "C", "D", "E"],
+          "title": "Minimum maintainability rating",
+          "description": "SonarCloud's A-E rating for how much work the code would take to fix relative to its size. A is best. Full marks at or above this rating, scaling down by 20% per grade below it."
+        },
+        "deductPerBug": {
+          "type": "number", "minimum": 0,
+          "title": "Points deducted per bug",
+          "description": "A Sonar 'bug' is code that will demonstrably misbehave — not a style opinion."
+        },
+        "deductPerVulnerability": {
+          "type": "number", "minimum": 0,
+          "title": "Points deducted per vulnerability",
+          "description": "Security-relevant findings, such as an injectable query or a hardcoded credential."
+        }
+      }
+    },
+
+    "hiddenTests": {
+      "type": "object",
+      "title": "Hidden test execution",
+      "description": "How and where your tests run against the student's code. This is a security decision as much as a pedagogical one — read both modes before choosing.",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["ci", "secure"],
+          "title": "Execution mode",
+          "description": "CI (default, for practice work): your tests are fetched into the student's own pipeline run, kept out of their repository, and their output is masked. Feedback arrives in about a minute. Because the student's code executes on the same machine, a determined student CAN read the test files — the pipeline plants a canary and reports any extraction as an integrity finding, but it detects rather than prevents.\n\nSECURE (for exams and summative work): the student's pipeline never receives your tests at all. AlphaCI checks their code out onto its own infrastructure and runs the tests there, then posts the score back. The student sees 'pending', then a result. Extraction is impossible because the tests never touch a machine the student controls. Results take longer and depend on the AlphaCI grading queue."
+        },
+        "revealAfterDue": {
+          "type": "boolean",
+          "title": "Show tests to students after the due date",
+          "description": "Publishes the hidden tests to each student's repository once the assignment closes, so they can see what their code was measured against. Strongly recommended: the feedback is where most of the learning happens, and it removes any incentive to extract them early."
+        },
+        "showFailureHints": {
+          "type": "boolean",
+          "title": "Show your hint text on failure",
+          "description": "ON: a failing hidden test shows the hint you wrote for it ('check how you handle an empty list'). OFF: only a pass/fail count. Assertion text and expected values are never shown in either case."
+        }
+      }
+    },
+
+    "integrity": {
+      "type": "object",
+      "title": "Academic integrity",
+      "description": "Similarity and authorship signals. These are surfaced for your review and never change a score automatically — see gates.integrityBlocks.",
+      "additionalProperties": false,
+      "properties": {
+        "similarityWarn": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Similarity % to note",
+          "description": "Pairs above this appear in your integrity report without being highlighted. Some similarity is expected and innocent: students follow the same lecture, solve the same problem, and start from the same scaffold."
+        },
+        "similarityFlag": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Similarity % to highlight",
+          "description": "Pairs above this are highlighted for review. Set this well above the level ordinary convergence produces, or the report fills with noise and stops being read."
+        },
+        "excludeBasecode": {
+          "type": "boolean",
+          "const": true,
+          "title": "Ignore the starter scaffold",
+          "description": "Always ON, and not configurable. Every student begins from identical generated files. Comparing those makes every pair look ~90% similar and renders the whole check useless."
+        }
+      }
+    }
+  }
+}
