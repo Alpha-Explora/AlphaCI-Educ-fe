@@ -194,6 +194,17 @@ export interface Assignment {
   // ADDENDUM L — set when a teacher ENDS (closes) the project. When present,
   // students can't start a lab session, get a token, or submit. null = open.
   closedAt?: string | null;
+  /**
+   * When the teacher published marks for this project; undefined while they are
+   * withheld.
+   *
+   * The backend already redacts `repo.grade` for students until this is set, so
+   * the UI cannot leak a mark by forgetting to check. This field exists so the
+   * UI can explain WHY a grade is missing — a withheld mark and an ungraded
+   * repository both arrive as `grade: null`, and telling a student "not graded
+   * yet" when their work HAS been assessed is misleading.
+   */
+  gradesReleasedAt?: string;
 }
 
 export interface AssignmentRepository {

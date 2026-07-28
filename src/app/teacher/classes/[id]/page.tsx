@@ -37,6 +37,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
+import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { JoinCodeButton } from "@/components/domain/JoinCodeButton";
@@ -340,6 +341,12 @@ export default function ClassRosterPage() {
                       points={a.points}
                       usersById={usersById}
                     />
+                    <div className="px-5 pb-4">
+                      <GradeReleaseControl
+                        assignmentId={a.id}
+                        releasedAt={a.gradesReleasedAt}
+                      />
+                    </div>
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-slate-50/60 px-5 py-3">
                       <p className="text-xs text-[var(--text-muted)]">
                         {a.isGroup
