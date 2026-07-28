@@ -8,6 +8,7 @@ export { usersApi } from "./users";
 export { coursesApi } from "./courses";
 export { classesApi } from "./classes";
 export { assignmentsApi } from "./assignments";
+export { hiddenTestsApi } from "./hidden-tests";
 export { repositoriesApi } from "./repositories";
 export { pipelineApi } from "./pipeline";
 export { dashboardsApi } from "./dashboards";

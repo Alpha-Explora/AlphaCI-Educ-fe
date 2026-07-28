@@ -184,6 +184,53 @@ export interface ClassCohort {
   joinCodeActive: boolean; // teacher can disable joining
 }
 
+// ---------------------------------------------------------------------------
+// Hidden tests — the teacher's own suite, which students must not read.
+// Mirrors AlphaCI-Educ-be/src/domain/types.ts.
+// ---------------------------------------------------------------------------
+export type HiddenTestMode = "ci" | "secure";
+
+export interface HiddenTestFile {
+  /** Path relative to the language's inject directory, e.g. "test_edges.py". */
+  path: string;
+  /** Test source. Never renders in a student-reachable view. */
+  content: string;
+}
+
+export interface HiddenTestSuite {
+  id: string;
+  assignmentId: string;
+  version: number;
+  files: HiddenTestFile[];
+  hints: string[];
+  mode: HiddenTestMode;
+  revealAfterDue: boolean;
+  showFailureHints: boolean;
+  uploadedByUserId: string;
+  uploadedAt: string;
+}
+
+/** Counts and settings, never file content. */
+export interface HiddenTestSuiteSummary {
+  assignmentId: string;
+  version: number;
+  fileCount: number;
+  mode: HiddenTestMode;
+  revealAfterDue: boolean;
+  showFailureHints: boolean;
+  uploadedAt: string;
+  /** True once the due date has passed and revealAfterDue is set. */
+  revealed: boolean;
+}
+
+export interface UploadHiddenTestsInput {
+  files: HiddenTestFile[];
+  hints?: string[];
+  mode?: HiddenTestMode;
+  revealAfterDue?: boolean;
+  showFailureHints?: boolean;
+}
+
 export interface ClassEnrollment {
   id: string;
   userId: string;

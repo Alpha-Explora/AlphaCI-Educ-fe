@@ -38,6 +38,7 @@ import {
 import { PageHeader } from "@/components/domain/PageHeader";
 import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
 import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
+import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { JoinCodeButton } from "@/components/domain/JoinCodeButton";
@@ -341,7 +342,8 @@ export default function ClassRosterPage() {
                       points={a.points}
                       usersById={usersById}
                     />
-                    <div className="px-5 pb-4">
+                    <div className="space-y-4 px-5 pb-4">
+                      <HiddenTestsPanel assignmentId={a.id} />
                       <GradeReleaseControl
                         assignmentId={a.id}
                         releasedAt={a.gradesReleasedAt}

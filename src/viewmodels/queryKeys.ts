@@ -24,6 +24,12 @@ export const queryKeys = {
       ["courses", filters ?? {}] as const,
     managed: (orgId: string) => ["courses", "managed", orgId] as const,
   },
+  hiddenTests: {
+    summary: (assignmentId: string) =>
+      ["assignments", assignmentId, "hidden-tests"] as const,
+    content: (assignmentId: string) =>
+      ["assignments", assignmentId, "hidden-tests", "content"] as const,
+  },
   classes: {
     list: (filters?: Record<string, string | undefined>) =>
       ["classes", filters ?? {}] as const,
