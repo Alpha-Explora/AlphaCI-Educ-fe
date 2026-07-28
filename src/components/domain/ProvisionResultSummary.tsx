@@ -13,11 +13,17 @@ import type {
 } from "@/models/types";
 import { GithubModeBadge, cn } from "@/components/ui";
 
+// Record<Stack, …> rather than a partial map on purpose: adding a language to
+// the Stack union then fails to compile until it is labelled here, instead of
+// silently rendering a raw key like "php" to a teacher.
 const STACK_LABEL: Record<Stack, string> = {
   nodejs: "Node.js",
   nestjs: "NestJS",
   nextjs: "Next.js",
   react: "React",
+  java: "Java (Maven)",
+  python: "Python",
+  php: "PHP",
 };
 
 function ComponentBadge({ component }: { component: RepoComponent }) {

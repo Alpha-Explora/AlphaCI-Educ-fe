@@ -42,7 +42,17 @@ export type GithubTeamType = "ORG_OWNERS" | "FACULTY" | "CLASS";
 export type GithubRole = "OWNER" | "MAINTAINER" | "MEMBER";
 
 // ADDENDUM G — project scaffold stack + repo layout
-export type Stack = "nodejs" | "nestjs" | "nextjs" | "react";
+export type Stack =
+  | "nodejs"
+  | "nestjs"
+  | "nextjs"
+  | "react"
+  // Backend-only. Valid for a SINGLE project and for the BACKEND half of a
+  // SPLIT one; deliberately absent from FRONTEND_STACK_OPTIONS so a split
+  // project can never scaffold a PHP "frontend" repository.
+  | "java"
+  | "python"
+  | "php";
 export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 export type RepoComponent = "SINGLE" | "BACKEND" | "FRONTEND";
 

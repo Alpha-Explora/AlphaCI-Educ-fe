@@ -36,12 +36,25 @@ export const STACK_OPTIONS: ReadonlyArray<{ value: Stack; label: string }> = [
   { value: "nestjs", label: "NestJS" },
   { value: "nextjs", label: "Next.js" },
   { value: "react", label: "React" },
+  { value: "java", label: "Java (Maven)" },
+  { value: "python", label: "Python" },
+  { value: "php", label: "PHP" },
 ];
+
+/**
+ * A SPLIT project scaffolds two repositories, and each half gets its own
+ * language. Java, Python and PHP are backend runtimes with no browser build, so
+ * they appear here and never in FRONTEND_STACK_OPTIONS — offering "PHP" as a
+ * frontend would generate a repository the pipeline has no way to build.
+ */
+const BACKEND_STACKS: ReadonlyArray<Stack> = ["nodejs", "nestjs", "java", "python", "php"];
+const FRONTEND_STACKS: ReadonlyArray<Stack> = ["nextjs", "react"];
+
 export const BACKEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
-  ["nodejs", "nestjs"].includes(o.value),
+  BACKEND_STACKS.includes(o.value),
 );
 export const FRONTEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
-  ["nextjs", "react"].includes(o.value),
+  FRONTEND_STACKS.includes(o.value),
 );
 
 // ---- Pure validation helpers (exported for inline hints in the View) --------
