@@ -13,87 +13,35 @@ import {
   Banner,
   Button,
   Card,
-  Field,
-  Input,
+  EmptyState,
   Select,
   Skeleton,
   Stat,
 } from "@/components/ui";
+import { CreateCourseModal } from "@/components/domain/CreateCourseModal";
 import type { CourseWithInstructors, SystemUser } from "@/models/types";
 
-export function CourseCatalogCard({ orgId }: { orgId: string | null }) {
+export function CourseCatalogCard({ orgId }: { readonly orgId: string | null }) {
   const vm = useCourseCatalog(orgId);
-  const [code, setCode] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-
-  function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code.trim() || !title.trim()) return;
-    vm.createCourse({ code: code.trim(), title: title.trim(), description: description.trim() });
-    setCode("");
-    setTitle("");
-    setDescription("");
-  }
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-[var(--text-strong)]">Course catalog</h2>
-        <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-          Create courses and assign instructors. A teacher can only build class sections under
-          a course you&apos;ve added them to — and they never see another teacher&apos;s classes.
-        </p>
+      {/* The create form is behind this button rather than sitting open above
+          the list — most visits to this page are to assign a teacher, not to
+          add a course. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text-strong)]">Course catalog</h2>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+            Create courses and assign instructors. A teacher can only build class sections under
+            a course you&apos;ve added them to — and they never see another teacher&apos;s classes.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)} disabled={!orgId}>
+          <span aria-hidden="true">＋</span> Create course
+        </Button>
       </div>
-
-      {/* Create course */}
-      <Card className="p-5">
-        <form onSubmit={handleCreate} noValidate className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-[10rem,1fr]">
-            <Field label="Course code" required hint="e.g. CS-301">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="CS-301"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="font-mono"
-                />
-              )}
-            </Field>
-            <Field label="Title" required hint="e.g. Algorithms">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Algorithms"
-                  autoComplete="off"
-                />
-              )}
-            </Field>
-          </div>
-          <Field label="Description" hint="Optional">
-            {({ id }) => (
-              <Input
-                id={id}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What this course covers"
-                autoComplete="off"
-              />
-            )}
-          </Field>
-          {vm.createError && <Banner tone="error">{vm.createError}</Banner>}
-          <div className="flex justify-end">
-            <Button type="submit" loading={vm.isCreating}>
-              <span aria-hidden="true">＋</span> Create course
-            </Button>
-          </div>
-        </form>
-      </Card>
 
       {/* Course list */}
       {vm.isLoading ? (
@@ -102,7 +50,16 @@ export function CourseCatalogCard({ orgId }: { orgId: string | null }) {
           <Skeleton className="h-40 rounded-xl" />
         </div>
       ) : vm.courses.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">No courses yet — create your first above.</p>
+        <EmptyState
+          icon="📚"
+          title="No courses yet"
+          description="Add your first course, then assign the teachers who should be able to build class sections under it."
+          action={
+            <Button onClick={() => setCreateOpen(true)} disabled={!orgId}>
+              <span aria-hidden="true">＋</span> Create course
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {vm.courses.map((course) => (
@@ -116,10 +73,23 @@ export function CourseCatalogCard({ orgId }: { orgId: string | null }) {
               onDelete={() => vm.deleteCourse(course.id)}
               isDeleting={vm.isDeleting && vm.deletingCourseId === course.id}
               deleteError={vm.deletingCourseId === course.id ? vm.deleteError : null}
+              onRemoveInstructor={(teacherId) =>
+                vm.removeInstructor(course.id, teacherId)
+              }
+              removingInstructorKey={vm.removingInstructorKey}
+              isRemovingInstructor={vm.isRemovingInstructor}
+              removeInstructorError={vm.removeInstructorError}
             />
           ))}
         </div>
       )}
+
+      <CreateCourseModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        vm={vm}
+        orgId={orgId}
+      />
     </section>
   );
 }
@@ -133,18 +103,30 @@ function CourseRow({
   onDelete,
   isDeleting,
   deleteError,
+  onRemoveInstructor,
+  removingInstructorKey,
+  isRemovingInstructor,
+  removeInstructorError,
 }: {
-  course: CourseWithInstructors;
-  teachers: SystemUser[];
-  onInvite: (teacherId: string) => void;
-  isInviting: boolean;
-  inviteError: string | null;
-  onDelete: () => void;
-  isDeleting: boolean;
-  deleteError: string | null;
+  readonly course: CourseWithInstructors;
+  readonly teachers: SystemUser[];
+  readonly onInvite: (teacherId: string) => void;
+  readonly isInviting: boolean;
+  readonly inviteError: string | null;
+  readonly onDelete: () => void;
+  readonly isDeleting: boolean;
+  readonly deleteError: string | null;
+  readonly onRemoveInstructor: (teacherId: string) => void;
+  readonly removingInstructorKey: string | null;
+  readonly isRemovingInstructor: boolean;
+  readonly removeInstructorError: string | null;
 }) {
   const [teacherId, setTeacherId] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Which instructor's "Remove?" confirmation is showing, if any.
+  const [confirmingInstructorId, setConfirmingInstructorId] = useState<string | null>(
+    null,
+  );
   const assignedIds = new Set(course.instructors.map((i) => i.id));
   const available = teachers.filter((t) => !assignedIds.has(t.id));
   const hasSections = course.classCount > 0;
@@ -222,14 +204,65 @@ function CourseRow({
           <p className="mt-1 text-sm text-[var(--text-muted)]">None assigned yet.</p>
         ) : (
           <ul className="mt-2 space-y-2">
-            {course.instructors.map((t) => (
-              <li key={t.id} className="flex items-center gap-2">
-                <Avatar name={t.fullName} color={t.avatarColor} size="sm" />
-                <span className="truncate text-sm text-[var(--text-strong)]">{t.fullName}</span>
-              </li>
-            ))}
+            {course.instructors.map((t) => {
+              const busy =
+                isRemovingInstructor && removingInstructorKey === `${course.id}:${t.id}`;
+              return (
+                <li key={t.id} className="flex items-center gap-2">
+                  <Avatar name={t.fullName} color={t.avatarColor} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-strong)]">
+                    {t.fullName}
+                  </span>
+
+                  {/* Confirmed rather than instant: revoking the grant can also
+                      remove this teacher from the laboratory entirely, when the
+                      course is the only reason they have access to it. */}
+                  {confirmingInstructorId === t.id ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        loading={busy}
+                        onClick={() => {
+                          onRemoveInstructor(t.id);
+                          setConfirmingInstructorId(null);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => setConfirmingInstructorId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${t.fullName} from ${course.code}`}
+                      onClick={() => setConfirmingInstructorId(t.id)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
+
+        {/* Scoped to this course — the VM reports which grant the last removal
+            targeted, so a 409 lands on the card that produced it. */}
+        {removeInstructorError &&
+          removingInstructorKey?.startsWith(`${course.id}:`) && (
+            <Banner tone="error" className="mt-2">
+              {removeInstructorError}
+            </Banner>
+          )}
       </div>
 
       {/* Invite */}

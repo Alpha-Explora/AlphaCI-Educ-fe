@@ -15,15 +15,46 @@ export interface StartAssignmentVM {
   isStarting: boolean;
   phase: StartPhase;
   message: string | null;
+  /**
+   * The live session window, once one has been started.
+   *
+   * Held here rather than thrown away with the response because the deep link
+   * hands off to VS Code and the browser tab stays open behind it — that tab is
+   * where a student naturally looks to ask "how long have I got?".
+   */
+  session: ActiveSession | null;
+}
+
+export interface ActiveSession {
+  /** Epoch ms the window closes. The deadline that ends the student's work. */
+  expiresAt: number;
+  /** Granted length in hours, as clamped by the server. */
+  hours: number | null;
+  /** True when the teacher's choice was cut down to the server ceiling. */
+  wasClamped: boolean;
+  startedAt: number;
 }
 
 export function useStartAssignment(repoId: string | null): StartAssignmentVM {
   const [phase, setPhase] = useState<StartPhase>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [session, setSession] = useState<ActiveSession | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => sessionApi.start(repoId as string),
     onSuccess: (res) => {
+      // Recorded even in simulated mode: the window is real either way, and a
+      // student following the manual steps is working against the same clock.
+      setSession({
+        expiresAt: res.sessionExpiresAt,
+        hours: res.sessionHours ?? null,
+        wasClamped:
+          res.sessionHours !== undefined &&
+          res.maxSessionHours !== undefined &&
+          res.sessionHours === res.maxSessionHours,
+        startedAt: Date.now(),
+      });
+
       if (res.live && res.deepLink) {
         setPhase("launching");
         setMessage(null);
@@ -62,5 +93,6 @@ export function useStartAssignment(repoId: string | null): StartAssignmentVM {
     isStarting: mutation.isPending,
     phase,
     message,
+    session,
   };
 }

@@ -62,19 +62,38 @@ function CountTile({
   );
 }
 
-export function StudentAccountMonitor({ vm }: { vm: StudentMonitorVM }) {
+export function StudentAccountMonitor({
+  vm,
+  /**
+   * Off when the surrounding page already titles this content — on
+   * /admin/students the page heading says it, so repeating it here would stack
+   * two headings that mean the same thing. The "Refreshing…" status still
+   * renders either way; it reports live state, not identity.
+   */
+  showHeading = true,
+}: {
+  vm: StudentMonitorVM;
+  showHeading?: boolean;
+}) {
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-            Student accounts
-          </h2>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-            Every student in this laboratory, by the email address they sign in
-            with. Presence refreshes automatically while this page is open.
-          </p>
-        </div>
+      <div
+        className={cn(
+          "flex flex-wrap items-start gap-3",
+          showHeading ? "justify-between" : "justify-end",
+        )}
+      >
+        {showHeading && (
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+              Student accounts
+            </h2>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+              Every student in this laboratory, by the email address they sign
+              in with. Presence refreshes automatically while this page is open.
+            </p>
+          </div>
+        )}
         {vm.isRefreshing && (
           <span className="text-xs text-[var(--text-muted)]" role="status">
             Refreshing…

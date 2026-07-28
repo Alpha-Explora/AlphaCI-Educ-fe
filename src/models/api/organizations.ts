@@ -1,5 +1,5 @@
 // MODEL LAYER — Organizations / Admin resource
-import { apiRequest } from "./client";
+import { apiRequest, API_BASE_URL } from "./client";
 import type {
   AddStaffRequest,
   AddTeacherRequest,
@@ -7,6 +7,7 @@ import type {
   AdminOverview,
   ArchiveSemesterResponse,
   GithubTeamWithMembers,
+  LabSetupInfo,
   ReconcileResponse,
   RemoveStaffResponse,
   StudentAccountSummary,
@@ -114,5 +115,21 @@ export const organizationsApi = {
       method: "POST",
       body: payload,
     });
+  },
+
+  /** Lab PC readiness: every prerequisite for the VS Code handoff, verified. */
+  labSetup(id: string) {
+    return apiRequest<LabSetupInfo>(`/organizations/${id}/lab-setup`);
+  },
+
+  /**
+   * URL of the install script with this deployment's backend URL baked in.
+   *
+   * A plain link rather than a fetch: the response is an attachment, so letting
+   * the browser navigate gives a real Save dialog. Session cookies ride along
+   * on a same-site navigation, so the ADMIN check still applies.
+   */
+  labSetupScriptUrl(id: string, workDirPolicy: "ephemeral" | "persistent") {
+    return `${API_BASE_URL}/organizations/${id}/lab-setup/script?workDirPolicy=${workDirPolicy}`;
   },
 };

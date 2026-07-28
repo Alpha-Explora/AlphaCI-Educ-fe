@@ -157,6 +157,16 @@ export interface ClassCohort {
   section: string; // explicit cohort boundary within a course/term
   term: string; // "Fall 2026"
   githubTeamSlug: string; // "state-univ-eng/cs101-fall2026"
+  /**
+   * Laboratories this class physically meets in, as organization ids.
+   *
+   * Separate from `orgId`, which is the single lab that owns the course and
+   * stores the GitHub repositories. This answers "where does the class sit",
+   * which can be several places — including labs other than the owning one.
+   * Descriptive only; keeping it on ONE class is what stops a cohort that moves
+   * between labs from becoming two records with two gradebooks.
+   */
+  meetingLabOrgIds?: string[];
   createdAt: string;
   // ADDENDUM D — magic join code (teacher writes it on the whiteboard)
   magicJoinCode: string; // e.g. "CS101-XYZ"
@@ -567,9 +577,50 @@ export interface LabsResponse {
 export interface StartSessionResponse {
   deepLink: string;
   live: boolean;
+  /** When the CURRENT GitHub token lapses (~1h). Refreshed silently — NOT the
+   *  end of the student's work, and not the thing to count down to. */
   tokenExpiresAt: string;
+  /** Epoch ms when the session window closes. THIS is the student's deadline. */
   sessionExpiresAt: number;
+  /** Granted window in hours, after the server clamped it. */
+  sessionHours?: number;
+  /** Server ceiling, so a clamped value can be explained rather than just shown. */
+  maxSessionHours?: number;
   fallbackAvailable: boolean;
+}
+
+// --- Lab PC setup (IT Admin) ------------------------------------------------
+// Every prerequisite for the one-click VS Code handoff, verified server-side.
+// `ok: false` always carries a `fix` — these are next actions, not diagnostics.
+export interface LabSetupCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  fix?: string;
+}
+
+export interface LabSetupInfo {
+  org: { id: string; name: string; githubOrgName: string };
+  /** The API base a lab PC must be pointed at, derived from this deployment. */
+  backendUrl: string;
+  extensionId: string;
+  /** vscode:extension/... — opens the extension in VS Code once published. */
+  extensionInstallUrl: string;
+  checks: LabSetupCheck[];
+  ready: boolean;
+  session: { maxSessionHours: number; claimTtlSec: number };
+  generatedAt: string;
+}
+
+// Bounds for the lab-session length a teacher may choose (GET /session/limits).
+export interface LabSessionLimits {
+  defaultSessionHours: number;
+  maxSessionHours: number;
+  minSessionHours: number;
+  /** Fixed at 60 by GitHub. Exposed so the UI never implies it is adjustable. */
+  tokenLifetimeMinutes: number;
+  handoffEnabled: boolean;
 }
 
 // ADDENDUM M — LIVE repo activity straight from GitHub (what the student sees
@@ -635,6 +686,32 @@ export interface LabToken {
 export type RepoOwnerMode = "TEACHER" | "ORG";
 
 // ADDENDUM B — CI/CD scaffold pushed to a freshly created repo ("like alphaci").
+// --- GitHub connection (verified, not inferred) -----------------------------
+// `linked` is identity — a GitHub account was attached to this profile at some
+// point. `connected` is the credential — this server holds a token GitHub
+// accepted moments ago. Only the second one predicts whether provisioning will
+// work, and the two can disagree, which is exactly the state that used to be
+// invisible.
+export type GithubConnectionState =
+  | "connected"
+  | "never_connected"
+  | "credential_missing"
+  | "revoked"
+  | "unconfigured"
+  | "check_failed"
+  | "not_applicable";
+
+export interface GithubConnectionStatus {
+  linked: boolean;
+  login: string | null;
+  connected: boolean;
+  state: GithubConnectionState;
+  scopes: string[];
+  /** Valid token AND the `repo` scope — the real precondition for provisioning. */
+  canCreateRepos: boolean;
+  checkedAt: string;
+}
+
 export interface RepoScaffold {
   files: string[]; // scaffold file paths, e.g. ["package.json", ".github/workflows/ci.yml"]
   stack: string; // e.g. "nodejs"
@@ -643,10 +720,20 @@ export interface RepoScaffold {
 // Result of teacher-triggered bulk provisioning for an assignment. When a
 // teacher is GitHub-authenticated the repos are REAL (live:true) and a scaffold
 // summary (same stack for all) accompanies the created repos.
+// One repository the backend could not finish. A non-empty `failures` list on
+// ProvisionResult means PARTIAL success — the repos in `created` are real, these
+// are not, and calling provisioning again retries exactly these.
+export interface ProvisionFailure {
+  repoId: string;
+  repoName: string;
+  reason: string;
+}
+
 export interface ProvisionResult {
   live: boolean;
   created: AssignmentRepository[];
   skipped: number;
+  failures?: ProvisionFailure[];
   defaultBranch?: string; // e.g. "main"
   scaffold?: RepoScaffold;
   // ADDENDUM D — where the repos landed
@@ -681,6 +768,7 @@ export interface CreateClassInput {
   section: string; // e.g. "A"
   term: string; // e.g. "Fall 2026"
   name?: string; // optional display name; defaults to the course title
+  meetingLabOrgIds?: string[]; // optional laboratories the class meets in
 }
 
 // IT-Admin create-course + invite-instructor inputs.
@@ -743,6 +831,11 @@ export interface CreateProjectInput {
   backendStack?: Stack; // SPLIT: backend repo stack (default 'nestjs')
   frontendStack?: Stack; // SPLIT: frontend repo stack (default 'nextjs')
   coverageThreshold?: number; // CI coverage gate, int 0..100 (default 80)
+  /**
+   * How long a student's lab session may last, in hours. Omitted = server
+   * default. NOT the GitHub token lifetime, which is fixed at 60 minutes.
+   */
+  labSessionHours?: number;
 }
 
 // Response of the create-assignment endpoint (DB records; repos are placeholder

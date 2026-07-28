@@ -8,8 +8,62 @@
 // State/actions come from useStartAssignment.
 // ============================================================================
 import { useStartAssignment } from "@/viewmodels/useStartAssignment";
-import { Banner, Button, Card } from "@/components/ui";
+import { useCountdown, type CountdownUrgency } from "@/viewmodels/useCountdown";
+import { Banner, Button, Card, cn } from "@/components/ui";
 import { brand } from "@/config/brand";
+
+const URGENCY_STYLE: Record<CountdownUrgency, string> = {
+  normal: "border-[var(--border-subtle)] bg-slate-50 text-[var(--text-strong)]",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  critical: "border-red-200 bg-red-50 text-red-700",
+  expired: "border-red-200 bg-red-50 text-red-700",
+};
+
+/**
+ * Time left in the lab session.
+ *
+ * Counts down to the SESSION WINDOW, never to the GitHub token's ~1h expiry.
+ * The extension replaces that token silently every hour, so showing it would
+ * put a scary clock on a non-event and — worse — teach students that their work
+ * ends at an hour when it does not. This is the only deadline that stops them.
+ */
+function SessionCountdown({
+  expiresAt,
+  hours,
+}: {
+  readonly expiresAt: number;
+  readonly hours: number | null;
+}) {
+  const countdown = useCountdown(expiresAt);
+  if (!countdown) return null;
+
+  return (
+    <div
+      className={cn(
+        "mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2.5",
+        URGENCY_STYLE[countdown.urgency],
+      )}
+      // Announced on the minute rather than every tick: a per-second live
+      // region would talk over a screen-reader user continuously.
+      role="timer"
+      aria-live="off"
+    >
+      <span className="text-sm font-medium">
+        {countdown.isExpired ? "Lab session ended" : "Lab session time remaining"}
+      </span>
+      <span className="font-mono text-base font-semibold tabular-nums">
+        {countdown.isExpired ? "—" : countdown.label}
+      </span>
+      <p className="w-full text-xs opacity-80">
+        {countdown.isExpired
+          ? "Press “Start assignment in VS Code” again to continue working. Your pushed work is safe on GitHub."
+          : `Your access renews automatically until this runs out${
+              hours ? ` (${hours}-hour session set by your teacher)` : ""
+            }. Push your work before it does.`}
+      </p>
+    </div>
+  );
+}
 
 export function StartAssignmentPanel({ repoId }: { repoId: string }) {
   const vm = useStartAssignment(repoId);
@@ -40,6 +94,12 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
         <Banner tone="info" className="mt-3">
           {vm.message}
         </Banner>
+      )}
+
+      {/* Shown for every started session, including simulated ones: a student
+          working through the manual steps is racing the same clock. */}
+      {vm.session && (
+        <SessionCountdown expiresAt={vm.session.expiresAt} hours={vm.session.hours} />
       )}
     </Card>
   );

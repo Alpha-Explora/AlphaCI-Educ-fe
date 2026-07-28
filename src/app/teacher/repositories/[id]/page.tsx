@@ -85,17 +85,23 @@ export default function TeacherRepositoryPage() {
                     <p className="text-xs text-[var(--text-muted)]">Submitted</p>
                     <p className="font-medium">{formatDateTime(d.repo.submittedAt)}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Template</p>
-                    <a
-                      href={d.assignment.templateGithubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-platform hover:underline"
-                    >
-                      Repository template
-                    </a>
-                  </div>
+                  {/* Only when one was actually recorded. This used to render
+                      unconditionally, and since the field defaults to an empty
+                      string every project without one showed a "Repository
+                      template" link whose empty href just reloaded this page. */}
+                  {d.assignment.templateGithubUrl && (
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Template</p>
+                      <a
+                        href={d.assignment.templateGithubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-platform hover:underline"
+                      >
+                        Repository template
+                      </a>
+                    </div>
+                  )}
                 </div>
               </Card>
 

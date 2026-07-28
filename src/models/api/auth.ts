@@ -8,6 +8,7 @@
 import { apiRequest, API_BASE_URL } from "./client";
 import type {
   AuthLoginResponse,
+  GithubConnectionStatus,
   LabsResponse,
   PasswordLoginRequest,
   SystemUser,
@@ -55,6 +56,18 @@ export const authApi = {
   // token). Throws ApiError(http, 401) when logged out.
   me() {
     return apiRequest<SystemUser>("/auth/me");
+  },
+
+  /**
+   * Is the GitHub connection actually usable right now?
+   *
+   * Verified server-side against GitHub. Distinct from `user.githubLogin`,
+   * which only records that a link once happened and cannot notice a revoked
+   * authorization — the gap that let the UI claim "connected" while every
+   * provisioning attempt returned 401.
+   */
+  githubStatus() {
+    return apiRequest<GithubConnectionStatus>("/auth/github/status");
   },
 
   // Clears the server-side session (GitHub teachers) — also safe for students.

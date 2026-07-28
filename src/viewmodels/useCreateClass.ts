@@ -20,13 +20,23 @@ const DUPLICATE_MESSAGE =
 // ADDENDUM H — a class is now created UNDER a course the teacher was invited
 // to. The teacher picks a course (courseId) and supplies section + term; the
 // course supplies code/title/org. `name` is an optional display override.
-/** Trims every field so blank-but-whitespace input can't slip through. */
+/**
+ * Trims every field so blank-but-whitespace input can't slip through.
+ *
+ * NOTE: this rebuilds the payload from named fields rather than spreading the
+ * input, so anything not listed here is silently dropped before the request.
+ * That is deliberate — it keeps stray client state out of the API — but it
+ * means EVERY new field must be added below. `meetingLabOrgIds` was missed once
+ * and the laboratories a teacher ticked never reached the server.
+ */
 export function normalizeCreateClassInput(input: CreateClassInput): CreateClassInput {
+  const meetingLabOrgIds = [...new Set(input.meetingLabOrgIds ?? [])];
   return {
     courseId: input.courseId.trim(),
     section: input.section.trim(),
     term: input.term.trim(),
     ...(input.name?.trim() ? { name: input.name.trim() } : {}),
+    ...(meetingLabOrgIds.length > 0 ? { meetingLabOrgIds } : {}),
   };
 }
 

@@ -37,6 +37,22 @@ export function ProvisionRepositoriesButton({
         </Banner>
       )}
 
+      {/* A 2xx no longer means every repo succeeded: the backend reports the
+          ones it could not finish instead of aborting the batch on the first
+          failure, so they have to be named here or they vanish silently. */}
+      {summary && summary.failures.length > 0 && (
+        <Banner tone="warning" className="w-full" title="Some repositories were not created">
+          <ul className="ml-4 list-disc space-y-1">
+            {summary.failures.map((f) => (
+              <li key={f.repoId}>
+                <code className="font-mono text-xs">{f.repoName}</code> — {f.reason}
+              </li>
+            ))}
+          </ul>
+          Press the button again to retry just these.
+        </Banner>
+      )}
+
       {summary && (
         <div className="w-full sm:w-80">
           <ProvisionResultSummary summary={summary} />

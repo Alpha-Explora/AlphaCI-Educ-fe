@@ -7,6 +7,7 @@ export { Button } from "./Button";
 export { Input, Textarea, Select, Field } from "./Input";
 export { CopyButton } from "./CopyButton";
 export { Modal } from "./Modal";
+export { Tabs, type TabItem } from "./Tabs";
 export { Spinner } from "./Spinner";
 export { Banner } from "./Banner";
 export { EmptyState } from "./EmptyState";

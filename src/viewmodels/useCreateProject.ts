@@ -9,13 +9,15 @@
 //   4. invalidate class assignments + roster + teacher dashboards
 // Views keep the form state; they call submit(input) and render the result.
 // ============================================================================
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { assignmentsApi, classesApi } from "@/models/api";
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assignmentsApi, classesApi, sessionApi } from "@/models/api";
 import type {
   Assignment,
   AssignmentRepository,
   CreateProjectInput,
+  LabSessionLimits,
+  ProvisionFailure,
   RepoOwnerMode,
   RepoScaffold,
   Stack,
@@ -91,6 +93,14 @@ export function validateCreateProject(input: CreateProjectInput): string[] {
       errors.push("Minimum test coverage must be a whole number between 0 and 100.");
   }
 
+  // Lab session length — a whole number of hours. The server clamps to its own
+  // ceiling, so this only catches nonsense (0, 7.5, 500) before a round trip.
+  const hours = input.labSessionHours;
+  if (hours !== undefined) {
+    if (!Number.isInteger(hours) || hours < 1 || hours > 24)
+      errors.push("Lab session length must be a whole number of hours between 1 and 24.");
+  }
+
   // ADDENDUM G — SPLIT requires both backend and frontend stacks.
   if (input.repoStructure === "SPLIT") {
     if (!input.backendStack) errors.push("Choose a backend language.");
@@ -108,24 +118,53 @@ export interface RepoNamePreview {
   name: string;
 }
 
-/** Slugify a title the same shape the backend uses for repo names. */
-function slugifyTitle(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "project"
-  );
+// The three helpers below MIRROR src/common/repo-name.util.ts on the backend,
+// which is what actually names the repositories. They used to disagree: this
+// file hyphenated words and showed only "<title>-group1", while the backend
+// produces "<code>-section<section>-<term>-<title>-<holder>" with every part
+// stripped of non-alphanumerics. So the preview promised a name that was never
+// created — harmless-looking until a teacher searches GitHub for it.
+//
+// Any change to the backend convention has to be made here too; the preview is
+// a promise about a name, so being approximately right is being wrong.
+
+/** "IS-1234" -> "is1234" */
+function slugifyAlnum(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+/** "Fall 2026" -> "fall26"; anything else falls back to a plain slug. */
+function abbreviateTerm(term: string): string {
+  const match = /([A-Za-z]+)\s+(\d{4})/.exec(term);
+  if (!match) return slugifyAlnum(term);
+  return `${match[1].toLowerCase()}${match[2].slice(-2)}`;
+}
+
+/** Titles are capped at 24 characters, exactly as the backend caps them. */
+function slugifyAssignmentTitle(title: string): string {
+  return slugifyAlnum(title).slice(0, 24);
 }
 
 export function repoNamePreview(
-  input: Pick<CreateProjectInput, "title" | "repoStructure" | "type">,
-  sampleStudentSlug = "student",
+  input: Pick<CreateProjectInput, "title" | "repoStructure" | "type"> & {
+    classCode?: string;
+    section?: string;
+    term?: string;
+  },
+  /** Stand-in for the student's full name, which differs per repo. */
+  sampleStudentSlug = "studentname",
 ): RepoNamePreview[] {
-  const slug = slugifyTitle(input.title);
   const holder = input.type === "GROUP" ? "group1" : sampleStudentSlug;
-  const base = `${slug}-${holder}`;
+  const base = [
+    slugifyAlnum(input.classCode ?? ""),
+    input.section ? `section${slugifyAlnum(input.section)}` : "",
+    abbreviateTerm(input.term ?? ""),
+    slugifyAssignmentTitle(input.title) || "project",
+    holder,
+  ]
+    .filter((part) => part.length > 0)
+    .join("-");
+
   if (input.repoStructure === "SPLIT") {
     return [
       { component: "BACKEND", name: `${base}-be` },
@@ -135,12 +174,43 @@ export function repoNamePreview(
   return [{ component: "SINGLE", name: base }];
 }
 
+/**
+ * The bounds a teacher may choose a lab-session length within.
+ *
+ * Fetched rather than hard-coded because the ceiling is an operator policy
+ * (`LAB_MAX_SESSION_HOURS`) that differs per deployment — offering 12 hours in
+ * a wizard on a server that clamps to 4 would be a promise the UI cannot keep.
+ * Falls back to safe values so the field still works if the call fails.
+ */
+export function useLabSessionLimits(): LabSessionLimits {
+  const query = useQuery({
+    queryKey: ["session", "limits"],
+    queryFn: () => sessionApi.limits(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  return (
+    query.data ?? {
+      defaultSessionHours: 8,
+      maxSessionHours: 8,
+      minSessionHours: 1,
+      tokenLifetimeMinutes: 60,
+      handoffEnabled: false,
+    }
+  );
+}
+
 // ---- ViewModel --------------------------------------------------------------
 
 export type CreateProjectPhase =
   | "idle"
   | "creating"
   | "provisioning"
+  // The project exists but its repositories do not. A distinct phase because
+  // it is neither success nor failure and the two useful actions differ from
+  // both: retry provisioning, or delete the half-made project.
+  | "partial"
   | "success"
   | "error";
 
@@ -149,6 +219,8 @@ export interface CreateProjectResult {
   repos: AssignmentRepository[];
   created: number;
   skipped: number;
+  /** Repos the backend could not finish; non-empty means partial success. */
+  failures: ProvisionFailure[];
   live: boolean;
   defaultBranch: string | null;
   scaffold: RepoScaffold | null;
@@ -166,39 +238,92 @@ export interface CreateProjectVM {
   error: PresentableError | null;
   result: CreateProjectResult | null;
   reset: () => void;
+  /**
+   * Set once the assignment exists, whatever happened afterwards. The View
+   * needs this to stop calling a created-but-unprovisioned project a failure:
+   * it IS in the class list, and re-submitting the form only earns a duplicate
+   * -title conflict.
+   */
+  createdAssignment: Assignment | null;
+  /** Retry ONLY provisioning for the project that was already created. */
+  retryProvision: () => void;
+  /** Discard the half-made project, freeing its title for a fresh attempt. */
+  discardCreated: () => void;
+  isDiscarding: boolean;
+  /** True when this failure is "your GitHub link is missing/rejected" (a 401). */
+  needsGithubReconnect: boolean;
 }
 
 export function useCreateProject(classId: string | null): CreateProjectVM {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<CreateProjectPhase>("idle");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  // The assignment, once the backend has really made it.
+  //
+  // A ref as well as state because the mutation body reads it: creating and
+  // provisioning are two separate requests, and re-running the mutation after
+  // the SECOND one failed must resume at provisioning. Re-creating would hit
+  // the backend's duplicate-title conflict — which is exactly the dead end this
+  // whole state exists to prevent.
+  const createdRef = useRef<Assignment | null>(null);
+  const [createdAssignment, setCreatedAssignment] = useState<Assignment | null>(null);
+
+  const refreshClassViews = () => {
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.classes.assignments(classId ?? "none"),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.classes.roster(classId ?? "none"),
+    });
+    queryClient.invalidateQueries({ queryKey: ["classes"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboards", "teacher"] });
+  };
 
   const mutation = useMutation({
     mutationFn: async (input: CreateProjectInput) => {
-      // Step 1 — create the assignment + repo records.
-      setPhase("creating");
-      const created = await classesApi.createAssignment(classId as string, input);
+      // Step 1 — create the assignment + repo records. Skipped on a retry: the
+      // records already exist and are already visible in the class.
+      let assignment = createdRef.current;
+      if (!assignment) {
+        setPhase("creating");
+        const created = await classesApi.createAssignment(classId as string, input);
+        assignment = created.assignment;
+        createdRef.current = assignment;
+        setCreatedAssignment(assignment);
+        // Publish it NOW, before the step that can fail. The project is real
+        // from this moment; leaving the class list stale until the very end is
+        // what let a failed provision look like "nothing happened" while the
+        // backend already held the row.
+        refreshClassViews();
+      }
+
       // Step 2 — provision the real GitHub repos + scaffold.
       setPhase("provisioning");
-      const provision = await assignmentsApi.provisionRepositories(
-        created.assignment.id,
-      );
-      return { created, provision };
+      const provision = await assignmentsApi.provisionRepositories(assignment.id);
+      return { assignment, provision };
     },
     onSuccess: ({ provision }) => {
       reportGithubLive(provision.live);
-      // Refresh assignments list, roster, and teacher dashboards.
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.assignments(classId ?? "none"),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.roster(classId ?? "none"),
-      });
-      queryClient.invalidateQueries({ queryKey: ["classes"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards", "teacher"] });
-      setPhase("success");
+      refreshClassViews();
+      // Some repos may still have failed even on a 2xx — the backend now
+      // reports them instead of aborting the whole batch on the first one.
+      setPhase((provision.failures?.length ?? 0) > 0 ? "partial" : "success");
     },
-    onError: () => setPhase("error"),
+    // A failure AFTER the project was created is not a failed creation. Say so,
+    // or the teacher retries the form and meets a duplicate-title conflict for
+    // a project they cannot see any reason to exist.
+    onError: () => setPhase(createdRef.current ? "partial" : "error"),
+  });
+
+  const discardMutation = useMutation({
+    mutationFn: () => assignmentsApi.remove(createdRef.current?.id as string),
+    onSuccess: () => {
+      createdRef.current = null;
+      setCreatedAssignment(null);
+      mutation.reset();
+      setPhase("idle");
+      refreshClassViews();
+    },
   });
 
   const submit = (input: CreateProjectInput) => {
@@ -210,10 +335,11 @@ export function useCreateProject(classId: string | null): CreateProjectVM {
 
   const result: CreateProjectResult | null = mutation.data
     ? {
-        assignment: mutation.data.created.assignment,
+        assignment: mutation.data.assignment,
         repos: mutation.data.provision.created,
         created: mutation.data.provision.created.length,
         skipped: mutation.data.provision.skipped,
+        failures: mutation.data.provision.failures ?? [],
         live: mutation.data.provision.live,
         defaultBranch: mutation.data.provision.defaultBranch ?? null,
         scaffold: mutation.data.provision.scaffold ?? null,
@@ -223,15 +349,31 @@ export function useCreateProject(classId: string | null): CreateProjectVM {
       }
     : null;
 
+  const error = mutation.error ? toPresentableError(mutation.error) : null;
+
   return {
     submit,
     phase,
     isSubmitting: mutation.isPending,
     validationErrors,
-    error: mutation.error ? toPresentableError(mutation.error) : null,
+    error,
     result,
+    createdAssignment,
+    // Retrying re-enters the same mutation, which now short-circuits step 1.
+    // The input is irrelevant on this path and is never read.
+    retryProvision: () => mutation.mutate({} as CreateProjectInput),
+    discardCreated: () => {
+      if (createdRef.current) discardMutation.mutate();
+    },
+    isDiscarding: discardMutation.isPending,
+    // 401 is the backend's way of saying "connect (or reconnect) GitHub" —
+    // worth a link rather than a wall of text the teacher can only re-read.
+    needsGithubReconnect: error?.status === 401,
     reset: () => {
       mutation.reset();
+      discardMutation.reset();
+      createdRef.current = null;
+      setCreatedAssignment(null);
       setPhase("idle");
       setValidationErrors([]);
     },

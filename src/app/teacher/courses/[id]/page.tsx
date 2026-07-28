@@ -113,7 +113,7 @@ export default function TeacherCoursePage() {
         }
       >
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {(entry?.classes ?? []).map((c, idx) => (
+          {(entry?.classes ?? []).map(({ classInfo: c, sharedFromLabName }, idx) => (
             <Link
               key={c.id}
               href={`/teacher/classes/${c.id}`}
@@ -130,6 +130,13 @@ export default function TeacherCoursePage() {
                       {c.name}
                     </h3>
                     <p className="mt-0.5 text-xs text-[var(--text-muted)]">{c.term}</p>
+                    {/* Same subject, different lab's course record — say where
+                        it came from so the card isn't mistaken for a duplicate. */}
+                    {sharedFromLabName && (
+                      <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                        From <span className="font-medium">{sharedFromLabName}</span>
+                      </p>
+                    )}
                   </div>
                   {c.pendingGrading > 0 && (
                     <GenericPill tone="warning">{c.pendingGrading} to grade</GenericPill>
@@ -157,6 +164,8 @@ export default function TeacherCoursePage() {
           open
           courseId={entry.course.id}
           courseLabel={entry.label}
+          courseCode={entry.course.code}
+          courseOrgId={entry.course.orgId}
           onClose={() => setCreateOpen(false)}
         />
       )}

@@ -1,23 +1,25 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — IT Admin org overview
-// Laboratory activity, the student-account monitor, lab PC inventory, staff &
-// roles, and the Archive-semester action. Consumes useAdminOverview and
-// useStudentMonitor (org id from the signed-in admin's session).
+// Laboratory activity, lab PC inventory, staff & roles, and the
+// Archive-semester action. Consumes useAdminOverview (org id from the signed-in
+// admin's session).
 //
 // Deliberately absent: the SSO / SCIM / source-hosting integration cards and
 // the licence-savings figures. They described how the platform is plumbed and
 // what it saves in seat licences — neither is something an admin supervising a
-// live laboratory acts on. Student presence is.
+// live laboratory acts on.
+//
+// The per-student roster moved out to /admin/students (Manage Students): it is
+// a directory an admin works IN, not a figure they glance at, so it earns its
+// own nav entry rather than a section at the bottom of a summary page.
 // ============================================================================
 import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
 import { useAdminOverview } from "@/viewmodels/useAdminOverview";
-import { useStudentMonitor } from "@/viewmodels/useStudentMonitor";
 import { Avatar, Card, EmptyState, Skeleton, Stat, StateBoundary } from "@/components/ui";
 import { ArchiveSemesterCard } from "@/components/domain/ArchiveSemesterCard";
 import { StaffRoleDirectory } from "@/components/domain/StaffRoleDirectory";
-import { StudentAccountMonitor } from "@/components/domain/StudentAccountMonitor";
 
 export default function AdminOverviewPage() {
   const { user, selectedOrgId } = useSession();
@@ -25,20 +27,10 @@ export default function AdminOverviewPage() {
   // (falls back to their home org if no lab is selected yet).
   const orgId = selectedOrgId ?? user?.orgId ?? null;
   const vm = useAdminOverview(orgId);
-  const studentsVm = useStudentMonitor(orgId);
   const d = vm.data;
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-up">
-        <h1 className="text-2xl font-semibold text-[var(--text-strong)]">
-          Laboratory overview
-        </h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Student activity, teaching staff, and campus lab inventory.
-        </p>
-      </div>
-
       <StateBoundary
         isLoading={vm.isLoading}
         error={vm.error}
@@ -60,9 +52,13 @@ export default function AdminOverviewPage() {
             */}
             <Card className="overflow-hidden animate-fade-up">
               <div className="bg-platform-700 px-6 py-5 text-white">
-                <p className="text-xs font-medium uppercase tracking-wide text-white/70">
-                  Laboratory
-                </p>
+                {/* The page title lives here rather than above the banner: the
+                    banner already names the thing being overviewed, so a
+                    separate heading + strapline outside it was saying the same
+                    thing twice. */}
+                <h1 className="text-xs font-medium uppercase tracking-wide text-white/70">
+                  Laboratory overview
+                </h1>
                 <h2 className="mt-0.5 text-xl font-semibold">{d.org.name}</h2>
                 <p className="mt-1 text-sm text-white/70">
                   {d.stats.totalClasses} classes · {d.stats.totalTeachers} teachers ·{" "}
@@ -94,8 +90,8 @@ export default function AdminOverviewPage() {
               </div>
             </Card>
 
-            {/* Who is actually using the lab, by their sign-in email. */}
-            <StudentAccountMonitor vm={studentsVm} />
+            {/* Who is actually using the lab, by their sign-in email, now lives
+                on its own route: /admin/students (Manage Students). */}
 
             {/* Admins + Lab inventory */}
             <div className="grid gap-5 lg:grid-cols-2">

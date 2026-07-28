@@ -43,6 +43,15 @@ export const coursesApi = {
     });
   },
 
+  // IT Admin revokes one teacher's access to a course. 404 if they aren't an
+  // instructor, 409 while they still teach class sections under it.
+  removeInstructor(courseId: string, teacherId: string) {
+    return apiRequest<{ removed: boolean; courseId: string; teacherId: string }>(
+      `/courses/${courseId}/instructors/${teacherId}`,
+      { method: "DELETE" },
+    );
+  },
+
   // IT Admin deletes a course. 409 if it still has class sections.
   remove(courseId: string) {
     return apiRequest<{ deleted: boolean; courseId: string }>(`/courses/${courseId}`, {

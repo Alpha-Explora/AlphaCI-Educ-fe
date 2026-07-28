@@ -7,8 +7,8 @@
 import { AppShell, type NavItem } from "@/components/layout/AppShell";
 
 const NAV: NavItem[] = [
-  { href: "/super", label: "Platform Console", icon: "🛰️" },
-  { href: "/admin", label: "Laboratory Admin", icon: "🏫" },
+  { href: "/super", label: "Platform Console" },
+  { href: "/admin", label: "Laboratory Admin" },
 ];
 
 export default function SuperAdminLayout({

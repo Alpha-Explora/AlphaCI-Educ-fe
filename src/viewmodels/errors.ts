@@ -6,6 +6,12 @@ export interface PresentableError {
   message: string;
   isNetworkError: boolean;
   baseUrl: string;
+  /**
+   * HTTP status, when there was one. Kept so a View can react to the KIND of
+   * failure — a 401 deserves a "Connect GitHub" link, a 409 a rename prompt —
+   * rather than only ever printing the server's sentence back at the user.
+   */
+  status: number | null;
 }
 
 export function toPresentableError(error: unknown): PresentableError {
@@ -14,11 +20,13 @@ export function toPresentableError(error: unknown): PresentableError {
       message: error.message,
       isNetworkError: error.isNetworkError,
       baseUrl: error.baseUrl,
+      status: error.status,
     };
   }
   return {
     message: error instanceof Error ? error.message : "Something went wrong.",
     isNetworkError: false,
     baseUrl: API_BASE_URL,
+    status: null,
   };
 }

@@ -16,10 +16,12 @@ import { Avatar, Button, Spinner, cn } from "@/components/ui";
 import { GithubModeNote } from "@/components/domain/GithubModeNote";
 import { Brand } from "./Brand";
 
+// The sidebar is text-only across every area: the labels carry the meaning on
+// their own, and emoji glyphs beside them read as decoration rather than as
+// wayfinding. Hence no `icon` here — there is no per-area opt-in to re-add one.
 export interface NavItem {
   href: string;
   label: string;
-  icon: string;
 }
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -114,9 +116,6 @@ export function AppShell({
                     : "text-[var(--text-muted)] hover:bg-slate-50 hover:text-[var(--text-strong)]",
                 )}
               >
-                <span aria-hidden="true" className="text-base">
-                  {item.icon}
-                </span>
                 {item.label}
               </Link>
             );
@@ -132,7 +131,7 @@ export function AppShell({
               router.replace("/");
             }}
           >
-            <span aria-hidden="true">🚪</span> Logout
+            Logout
           </Button>
         </div>
       </aside>

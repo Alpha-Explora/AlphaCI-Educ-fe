@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { assignmentsApi } from "@/models/api";
 import type {
   AssignmentRepository,
+  ProvisionFailure,
   ProvisionResult,
   RepoOwnerMode,
   RepoScaffold,
@@ -21,6 +22,8 @@ import { toPresentableError, type PresentableError } from "./errors";
 export interface ProvisionSummary {
   created: number;
   skipped: number;
+  /** Repos that could not be finished — a 2xx no longer implies "all of them". */
+  failures: ProvisionFailure[];
   live: boolean;
   // ADDENDUM B — real repos + CI/CD scaffold when a teacher is GitHub-authed.
   repos: AssignmentRepository[];
@@ -62,6 +65,7 @@ export function useProvisionRepositories(
     ? {
         created: mutation.data.created.length,
         skipped: mutation.data.skipped,
+        failures: mutation.data.failures ?? [],
         live: mutation.data.live,
         repos: mutation.data.created,
         defaultBranch: mutation.data.defaultBranch ?? null,

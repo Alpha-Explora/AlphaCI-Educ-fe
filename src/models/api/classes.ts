@@ -31,6 +31,30 @@ export const classesApi = {
     });
   },
 
+  // Teacher-of-class (or admin) deletes a section. Cascades: its projects,
+  // their repositories and submitted work, and every enrolment. Student
+  // ACCOUNTS survive. 403 if it isn't your section.
+  remove(id: string) {
+    return apiRequest<{
+      deleted: boolean;
+      classId: string;
+      assignmentsRemoved: number;
+      reposRemoved: number;
+      studentsUnenrolled: number;
+      githubReposDeleted: number;
+    }>(`/classes/${id}`, { method: "DELETE" });
+  },
+
+  // Teacher-of-class (or admin) changes which laboratories a section meets in,
+  // mid-term. Replaces the whole list; [] clears it. Repositories don't move —
+  // they stay in the lab that owns the course. 403 if it isn't your section.
+  setMeetingLabs(id: string, meetingLabOrgIds: string[]) {
+    return apiRequest<ClassCohort>(`/classes/${id}/meeting-labs`, {
+      method: "PATCH",
+      body: { meetingLabOrgIds },
+    });
+  },
+
   roster(id: string) {
     return apiRequest<ClassRoster>(`/classes/${id}/roster`);
   },
