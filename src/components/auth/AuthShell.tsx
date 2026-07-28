@@ -1,87 +1,112 @@
 // ============================================================================
 // VIEW LAYER — shared chrome for every auth page.
 //
-// Pure presentation. No hooks, no data access, no navigation decisions: the
-// pages pass in their own copy and form. Both sign-in doors — and any future
-// reset-password / accept-invite page — use this so they cannot drift apart.
+// LAYOUT ONLY. The room, the pass, the physics, the two aside columns and the
+// run all live in their own files; this one decides where they go and hands
+// the page's copy to the card. If you are reading this to change a colour, a
+// spring, or a sentence, you are in the wrong file:
 //
-// Layout: a two-column split on lg+, stacked on mobile. The blue welcome panel
-// is DECORATIVE and comes second in the DOM, so keyboard and screen-reader
-// users reach the form first without needing a skip link.
+//   AuthScene.tsx        the background field and its drift
+//   LanyardBadge.tsx     the pass  (+ useLanyardSwing.ts, confetti.ts)
+//   AuthAside.tsx        the two decorative columns
+//   RunReadout.tsx       the pipeline story
+//   config/brand.ts      every string on this page
 //
-// SCENE: the form column carries the same ruled paper as the landing page, so
-// the two doors read as one product. What it does NOT carry is the felt-tip
-// ink. This form already uses red for validation (`border-danger`,
-// `text-danger`), and a red annotation on the same screen would put two
-// meanings on one colour — "do this" and "you got this wrong". The error state
-// would lose that argument, so the pen stays on the landing page.
+// Both sign-in doors — and any future reset-password / accept-invite page —
+// use this shell so they cannot drift apart.
+//
+// THE SCENE: one pass, hanging in the middle of the room.
+//
+// This replaced a two-column split (form left, decorative panel right), which
+// had an honest problem: the panel was the interesting half of the screen and
+// the form was the half you came to use, so the design spent its best real
+// estate on the thing nobody was there for. Centring the form inside the
+// badge collapses that — the object you look at and the object you use are
+// now the same object, and the copy around it can be quiet because it no
+// longer has to compete for the middle.
+//
+// A three-column grid on xl, the middle column alone below it:
+//
+//   left    the promise, and the first three minutes after the button
+//   centre  the pass. TOP-anchored, because it hangs from a hook and a hook
+//           floating in the vertical centre of a page is not a hook
+//   right   the run — stages, marks, verdict — then where to get help
+//
+// The outer columns are aria-hidden and come AFTER the form in the DOM, so
+// keyboard and screen-reader users reach the fields first with no skip link.
+// They are withheld below xl rather than squeezed: at that width the choice
+// is a readable pass or three cramped columns, and the pass wins.
 // ============================================================================
 import Link from "next/link";
-import type { Icon } from "@phosphor-icons/react";
 import { Brand } from "@/components/layout/Brand";
 import { cn } from "@/components/ui/cn";
-import { ICON_WEIGHT } from "@/components/landing/Icons";
-import { brand, authPanelCopy } from "@/config/brand";
-
-export interface AuthHighlight {
-  /**
-   * A vector icon component, not an emoji. Emoji render differently on every
-   * OS in the lab, cannot take the brand colour, and read as decoration where
-   * these need to read as UI.
-   */
-  icon: Icon;
-  title: string;
-  body: string;
-}
+import { AuthScene } from "./AuthScene";
+import { AuthPromise, AuthHelp } from "./AuthAside";
+import { LanyardBadge } from "./LanyardBadge";
+import { RunReadout } from "./RunReadout";
+import { brand, badgeCopy } from "@/config/brand";
 
 export function AuthShell({
   eyebrow,
   heading,
   subheading,
-  highlights,
   children,
   footer,
 }: {
   /**
-   * Small label above the welcome heading, e.g. "Password help". OPTIONAL, and
-   * worth omitting: on the main sign-in page it repeated the wordmark sitting
-   * 40px directly above it, which is a label telling you what you can already
-   * read. Pass one only when it says something the heading does not.
+   * Small label above the welcome heading, e.g. "Password help". OPTIONAL,
+   * and worth omitting: on the main sign-in page it repeated the wordmark
+   * sitting directly above it, which is a label telling you what you can
+   * already read. Pass one only when it says something the heading does not.
    */
   eyebrow?: string;
-  /** ReactNode, not string, so a page can colour part of it (the cohort name). */
+  /** ReactNode, not string, so a page can colour part of it (the cohort). */
   heading: React.ReactNode;
   subheading: string;
-  /** Three reassuring "here's what this is for" points on the blue panel. */
-  highlights: AuthHighlight[];
-  /** The form card contents. */
+  /** The form, printed on the card face. */
   children: React.ReactNode;
-  /** Cross-link to the other door. */
+  /** Cross-link to the other door, at the foot of the card face. */
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      {/* ---------------------------------------------------------------- */}
-      {/* Form column — first in the DOM so it gets focus order priority.  */}
-      {/* ---------------------------------------------------------------- */}
-      {/* `paper-rules` paints through an ::before, which is a positioned box
-          and therefore paints ABOVE normal-flow content. The content wrapper
-          below is `relative` for exactly that reason: once both are
-          positioned, DOM order decides, and the rules go behind. */}
+    <AuthScene>
+      <Link
+        href="/"
+        className="absolute left-6 top-6 z-20 inline-flex rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:left-10 sm:top-8"
+        aria-label={`${brand.name} home`}
+      >
+        {/* Mark only. The full wordmark is printed on the pass, and a school
+            name twice on one screen is the second one being ignored — this
+            corner's job is "way back", not identity. */}
+        <Brand onDark size={36} compact />
+      </Link>
+
       <main
         id="main-content"
-        className="paper-rules relative order-1 flex flex-col justify-center overflow-hidden bg-[var(--bg-surface)] px-5 py-10 sm:px-10 lg:px-16"
+        // The asides are justified to their outer edges, so on a big monitor
+        // the two columns sit AT the sides of the screen rather than huddling
+        // against the pass with a dead margin outside them. `1fr auto 1fr`
+        // keeps the pass optically centred however far apart they end up.
+        // The cap is wide but not absent: without one, an ultrawide would
+        // strand the columns a metre from the thing they describe.
+        className="relative mx-auto grid min-h-dvh w-full max-w-[112rem] items-center gap-10 px-5 pb-16 pt-24 sm:px-10 xl:grid-cols-[1fr_auto_1fr] xl:gap-12 xl:pt-16"
       >
-        <div className="relative mx-auto w-full max-w-[26rem]">
-          <Link
-            href="/"
-            className="inline-flex rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-            aria-label={`${brand.name} home`}
+        {/* ------------------------------------------------------------- */}
+        {/* The pass. FIRST in the DOM — it holds the form.               */}
+        {/* `self-start` keeps it hanging from the top of the grid while   */}
+        {/* the aside columns stay optically centred on it.                */}
+        {/* ------------------------------------------------------------- */}
+        <div className="order-1 flex justify-center xl:order-2 xl:self-start">
+          <LanyardBadge
+            header={
+              <div className="flex items-end justify-between gap-3 pt-1">
+                <Brand onDark size={30} />
+                <span className="pb-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                  {badgeCopy.kind}
+                </span>
+              </div>
+            }
           >
-            <Brand size={36} />
-          </Link>
-
-          <div className="mt-9">
             {eyebrow && (
               <p className="text-xs font-semibold uppercase tracking-wider text-platform-600">
                 {eyebrow}
@@ -89,108 +114,66 @@ export function AuthShell({
             )}
             <h1
               className={cn(
-                "text-[1.75rem] font-semibold leading-tight text-[var(--text-strong)]",
-                eyebrow && "mt-2",
+                "text-[1.4rem] font-semibold leading-tight text-[var(--text-strong)]",
+                eyebrow && "mt-1.5",
               )}
             >
               {heading}
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+            <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
               {subheading}
             </p>
-          </div>
 
-          <div className="mt-7">{children}</div>
+            <div className="mt-5">{children}</div>
 
-          {footer && (
-            <div className="mt-8 border-t border-[var(--border-subtle)] pt-5 text-sm text-[var(--text-muted)]">
-              {footer}
-            </div>
-          )}
+            {footer && (
+              <div className="mt-5 border-t border-[var(--border-subtle)] pt-4 text-xs leading-relaxed text-[var(--text-muted)]">
+                {footer}
+              </div>
+            )}
+          </LanyardBadge>
         </div>
+
+        {/* Each aside hugs its own outer edge — the left column starts at the
+            left of the page, the right column ends at the right of it — and on
+            a tall enough screen both start at the CARD'S TOP EDGE rather than
+            floating in the vertical middle.
+
+            The offset is the hook (h-2.5) plus the strap: exactly how far
+            below the column top the card face begins. Written from the same
+            --strap-h the strap itself uses, so a viewport that shortens the
+            lanyard moves all three in step instead of leaving the columns at
+            a height nothing else agrees with.
+
+            WHY THE HEIGHT GATE. Top-aligned, the right column needs about
+            810px of viewport (151 top + 594 tall + the page's bottom padding).
+            Below that it ran 41px past the fold on the 768px lab monitor this
+            product is built for — a login page that scrolls is a worse
+            outcome than one whose columns are centred. Under 860px they fall
+            back to the grid's `items-center`, which is what they did before
+            and which fits. */}
+        <aside
+          aria-hidden="true"
+          className="order-2 hidden xl:order-1 xl:block xl:justify-self-start xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
+        >
+          <AuthPromise />
+        </aside>
+
+        <aside
+          aria-hidden="true"
+          className="order-3 hidden xl:block xl:justify-self-end xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
+        >
+          <RunReadout />
+          <AuthHelp />
+        </aside>
       </main>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Welcome column — decorative, hidden from assistive tech and from  */}
-      {/* small screens entirely (it carries no information the form needs).*/}
-      {/* ---------------------------------------------------------------- */}
-      {/* Everything in here is anchored to the panel's RIGHT edge, and mirrored
-          to suit: icons sit after their text (`flex-row-reverse`) and the
-          wordmark reverses too. Half-mirroring is what looks like a mistake —
-          a right-aligned heading over a left-aligned list reads as a bug, so
-          the alignment is carried all the way through.
-
-          The message block is vertically CENTRED rather than distributed with
-          `justify-between`; the brand and the footnote are pinned to the
-          corners instead. Three-way distribution left a dead band between the
-          list and the footnote that got wider on every taller screen. */}
-      <aside
+      <p
         aria-hidden="true"
-        className="auth-hero auth-grid relative order-2 hidden flex-col justify-center overflow-hidden p-12 lg:flex"
+        className="pointer-events-none absolute bottom-6 right-6 text-xs text-white/45 sm:right-10"
       >
-        <Brand
-          onDark
-          size={36}
-          className="absolute right-12 top-12 flex-row-reverse text-right"
-        />
-
-        <div className="relative ml-auto max-w-md text-right">
-          <p className="whitespace-pre-line text-[2rem] font-semibold leading-[1.2] text-white">
-            {authPanelCopy.headline}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-white/80">
-            {authPanelCopy.body}
-          </p>
-
-          <ul className="mt-9 space-y-4">
-            {highlights.map((item) => (
-              <li key={item.title} className="flex flex-row-reverse gap-3.5">
-                <span
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-white ring-1 ring-white/20"
-                  aria-hidden="true"
-                >
-                  <item.icon size={19} weight={ICON_WEIGHT} />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold text-white">
-                    {item.title}
-                  </span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-white/70">
-                    {item.body}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="absolute bottom-12 right-12 text-right">
-          <p className="text-xs text-white/60">{authPanelCopy.footnote}</p>
-          <p className="mt-1.5 text-xs text-white/45">
-            Powered by <span className="text-white/70">{brand.poweredBy}</span>
-          </p>
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-/** The white card the form sits in. Separate so pages can place siblings. */
-export function AuthCard({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-card border border-[var(--border-subtle)] bg-white p-5 shadow-card sm:p-6",
-        className,
-      )}
-    >
-      {children}
-    </div>
+        Powered by <span className="text-white/70">{brand.poweredBy}</span>
+      </p>
+    </AuthScene>
   );
 }

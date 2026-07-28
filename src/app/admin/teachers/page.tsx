@@ -137,8 +137,8 @@ export default function AdminTeachersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-strong)]">Teachers</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Add teaching staff to this laboratory, and see who has signed in and
-            connected their GitHub account.
+            Add teaching staff to one or more laboratories, and see who has signed in
+            and connected their GitHub account. The list below is this laboratory only.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

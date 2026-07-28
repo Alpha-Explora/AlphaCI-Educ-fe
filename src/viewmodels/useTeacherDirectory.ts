@@ -15,13 +15,28 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { organizationsApi, ApiError } from "@/models/api";
 import type {
+  AccessibleLab,
   AddTeacherRequest,
   AddTeacherResponse,
   SystemUser,
   TransferableTeacher,
 } from "@/models/types";
+import { useSession } from "./useSession";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
+
+/** What happened for ONE laboratory in a multi-lab add. */
+export interface AddTeacherLabResult {
+  labId: string;
+  labName: string;
+  ok: boolean;
+  /** Why it failed, when `ok` is false. */
+  error?: string;
+  /** true when the profile landed but source-host access did not go out. */
+  accessPending?: boolean;
+  /** The backend's reason for that, when it gave one. */
+  accessWarning?: string;
+}
 
 export interface AddTeacherOutcome {
   tone: "success" | "warning";
@@ -32,6 +47,8 @@ export interface AddTeacherOutcome {
    * stops being true — see the staleness effect in useTeacherDirectory.
    */
   teacherId: string;
+  /** Per-laboratory breakdown, so a partial success can be shown honestly. */
+  labs: AddTeacherLabResult[];
 }
 
 /** Result of a removal or a sync, phrased for the admin. */
@@ -58,6 +75,15 @@ export interface TeacherDirectoryVM {
   setGithubUsername: (value: string) => void;
   /** Per-field messages, shown only after a submit attempt. */
   fieldErrors: { fullName?: string; email?: string; githubUsername?: string };
+
+  // --- Which laboratories to invite them to ---
+  /** Every laboratory this admin may administer, as checkbox options. */
+  labOptions: AccessibleLab[];
+  /** The ticked laboratories. Defaults to the one being viewed. */
+  selectedLabIds: string[];
+  toggleLab: (labId: string) => void;
+  /** Shown after a submit attempt with nothing ticked. */
+  labsError: string | undefined;
   /** Whole-form failure (duplicate email, backend down). */
   formError: string | null;
   isSubmitting: boolean;
@@ -106,61 +132,106 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // trailing hyphen. Catching a typo here beats a confusing 404 from the invite.
 const GITHUB_HANDLE_SHAPE = /^[a-zA-Z\d](?:[a-zA-Z\d]|-(?=[a-zA-Z\d])){0,38}$/;
 
+/** "A", "A and B", "A, B and C" — reads better in prose than a comma list. */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 /**
  * Describes what actually happened, in the admin's language.
  *
  * Note that no branch mentions GitHub: "access" is as specific as the UI gets
  * about the source host, while still telling the admin whether they need to do
  * anything else.
+ *
+ * With several laboratories ticked, each one is its own success or failure —
+ * one lab rejecting the teacher does not undo the others. So the summary is
+ * built from the per-lab results rather than from a single response, and a
+ * partial result says "2 of 3" instead of a green tick that would be a lie.
+ *
+ * `first` is the response of the first laboratory that SUCCEEDED: it is the one
+ * that created (or matched) the account, so it alone carries the truth about
+ * whether a profile was made and whether a password email went out. Later
+ * laboratories always attach to that same account.
  */
-function describeOutcome(result: AddTeacherResponse): AddTeacherOutcome {
-  const name = result.teacher.fullName;
-  const teacherId = result.teacher.id;
-  const { accessInvite, passwordInviteSent, attachedExisting } = result;
+function describeOutcome(
+  first: AddTeacherResponse,
+  labs: AddTeacherLabResult[],
+): AddTeacherOutcome {
+  const name = first.teacher.fullName;
+  const teacherId = first.teacher.id;
+  const { passwordInviteSent, attachedExisting } = first;
 
-  if (accessInvite.sent || accessInvite.alreadyHadAccess) {
-    const how = accessInvite.alreadyHadAccess
-      ? "already had access to this laboratory"
-      : "has been invited to this laboratory";
+  const added = labs.filter((l) => l.ok);
+  const failed = labs.filter((l) => !l.ok);
+  const pending = added.filter((l) => l.accessPending);
 
-    // An existing teacher is a different story and needs different copy: no new
-    // account was made, no password email went out, and the admin should not be
-    // left wondering why the teacher never got one.
-    if (attachedExisting) {
-      return {
-        teacherId,
-        tone: "success",
-        title: `${name} was added to this laboratory`,
-        detail: `They already teach elsewhere on the platform, so we kept their existing account and sign-in — they ${how}. They'll see this laboratory the next time they sign in.`,
-      };
-    }
+  const addedNames = joinNames(added.map((l) => l.labName));
 
+  // How they will sign in. An existing account keeps its own password, and
+  // saying so stops an admin waiting for an email that was never sent.
+  const signIn = attachedExisting
+    ? " They already teach elsewhere on the platform, so we kept their existing account and sign-in."
+    : passwordInviteSent
+      ? " We've emailed them a link to set their password."
+      : " They can sign in with their connected account.";
+
+  const pendingText =
+    pending.length > 0
+      ? ` Access is still pending at ${joinNames(pending.map((l) => l.labName))}. ${
+          pending[0].accessWarning ??
+          "Access invitations need an administrator signed in with a connected account."
+        }`
+      : "";
+
+  // Some laboratories took them, some didn't. Name both sides — an admin who
+  // only reads "added" would never go back for the ones that were refused.
+  if (failed.length > 0) {
     return {
       teacherId,
-      tone: "success",
-      title: `${name} was added`,
-      detail: passwordInviteSent
-        ? `They ${how}, and we've emailed them a link to set their password.`
-        : `They ${how}. They can sign in with their connected account.`,
+      labs,
+      tone: "warning",
+      title: `${name} was added to ${added.length} of ${labs.length} laboratories`,
+      detail:
+        `They now have access to ${addedNames}.${signIn}${pendingText} ` +
+        `Not added to ${joinNames(failed.map((l) => l.labName))} — ` +
+        joinNames(failed.map((l) => l.error ?? "it was refused.")),
     };
   }
 
-  // Profile exists but access didn't go out — actionable, so say so plainly.
+  // Profile exists everywhere asked, but access didn't go out somewhere.
+  if (pending.length > 0) {
+    return {
+      teacherId,
+      labs,
+      tone: "warning",
+      title: `${name} was added, but access is still pending`,
+      detail: `They have a profile at ${addedNames}.${signIn}${pendingText}`,
+    };
+  }
+
   return {
     teacherId,
-    tone: "warning",
-    title: `${name} was added, but access is still pending`,
-    detail:
-      accessInvite.warning ??
-      (accessInvite.live
-        ? "We couldn't send their access invitation. Open this page again to retry, or check with your platform administrator."
-        : "Access invitations need an administrator signed in with a connected account. Sign in that way and add them again to send it."),
+    labs,
+    tone: "success",
+    title:
+      added.length === 1
+        ? `${name} was added to ${addedNames}`
+        : `${name} was added to ${added.length} laboratories`,
+    detail: `They have access to ${addedNames}.${signIn} They'll see ${
+      added.length === 1 ? "it" : "them"
+    } the next time they sign in.`,
   };
 }
 
 export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
   const queryClient = useQueryClient();
+  // An IT Admin administers every laboratory (see OrganizationsService.assertAdmin),
+  // so the session's lab list IS the set they may invite into.
+  const { labs: labOptions } = useSession();
 
+  const [selectedLabIds, setSelectedLabIds] = useState<string[]>([]);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [githubUsername, setGithubUsername] = useState("");
@@ -217,6 +288,24 @@ export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
 
   const fieldErrors = submitAttempted ? allErrors : {};
 
+  // The laboratory being viewed starts ticked — adding a teacher *here* is what
+  // the admin came to this page for. They can untick it and pick others, so the
+  // default is a starting point, not a floor.
+  useEffect(() => {
+    setSelectedLabIds(orgId ? [orgId] : []);
+  }, [orgId]);
+
+  const toggleLab = useCallback((labId: string) => {
+    setSelectedLabIds((prev) =>
+      prev.includes(labId) ? prev.filter((id) => id !== labId) : [...prev, labId],
+    );
+  }, []);
+
+  const labsError =
+    submitAttempted && selectedLabIds.length === 0
+      ? "Pick at least one laboratory."
+      : undefined;
+
   const reset = useCallback(() => {
     setFullName("");
     setEmail("");
@@ -226,35 +315,98 @@ export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
     setSubmitAttempted(false);
     setFormError(null);
     setOutcome(null);
-  }, []);
+    setSelectedLabIds(orgId ? [orgId] : []);
+  }, [orgId]);
 
   const mutation = useMutation({
-    mutationFn: (payload: AddTeacherRequest) =>
-      organizationsApi.addTeacher(orgId as string, payload),
-    onSuccess: (result) => {
-      setOutcome(describeOutcome(result));
+    mutationFn: async (payload: AddTeacherRequest) => {
+      /*
+        One request per ticked laboratory, run STRICTLY IN SEQUENCE.
+
+        The endpoint is per-organization, and the backend already composes
+        correctly across several: the first call creates the account, and each
+        later one finds it by email and ATTACHES it to that lab
+        (OrganizationsService.addStaff → addUserToLab), skipping the password
+        email so the teacher isn't mailed once per school.
+
+        That composition only holds if the calls are ordered. Fired together,
+        two of them can both look the account up before either has written it —
+        each takes the "no existing user" branch and creates its own profile for
+        the same person. The await points are real (the source-host invite is a
+        network call), so this is reachable, not theoretical. Hence the loop:
+        slower by design, and the only version that cannot duplicate a teacher.
+      */
+      const results: AddTeacherLabResult[] = [];
+      let first: AddTeacherResponse | null = null;
+
+      for (const labId of selectedLabIds) {
+        const labName = labOptions.find((l) => l.id === labId)?.name ?? "this laboratory";
+        try {
+          const res = await organizationsApi.addTeacher(labId, payload);
+          first ??= res;
+          const { accessInvite } = res;
+          results.push({
+            labId,
+            labName,
+            ok: true,
+            accessPending: !(accessInvite.sent || accessInvite.alreadyHadAccess),
+            accessWarning: accessInvite.warning,
+          });
+        } catch (err) {
+          // Keep going: the remaining laboratories are independent, and a
+          // conflict at one school shouldn't block the others.
+          results.push({
+            labId,
+            labName,
+            ok: false,
+            error:
+              err instanceof ApiError ? err.message : "we couldn't reach that laboratory.",
+          });
+        }
+      }
+
+      // Nothing landed anywhere — surface it as a form error so the admin stays
+      // in the dialog with their typing intact, rather than getting a banner
+      // behind a closed form.
+      if (!first) {
+        throw new Error(
+          results[0]?.error ?? "Couldn't add that teacher. Please try again.",
+        );
+      }
+      return { first, labs: results };
+    },
+    onSuccess: ({ first, labs }) => {
+      setOutcome(describeOutcome(first, labs));
       setFullName("");
       setEmail("");
       setGithubUsername("");
       setPickedExisting(null);
       setTransferableQuery("");
       setSubmitAttempted(false);
-      // Whoever was just added is no longer "available elsewhere" for this lab.
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.organizations.transferableTeachers(orgId ?? "none"),
-      });
-      // The new teacher changes both the directory and the admin overview's
-      // staff counts, so invalidate both rather than just the list.
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.organizations.teachers(orgId ?? "none"),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.organizations.adminOverview(orgId ?? "none"),
-      });
+
+      // Refresh EVERY laboratory that actually took them, not just the one on
+      // screen — the admin can switch labs straight after and would otherwise
+      // be looking at a directory that doesn't list the teacher they just added.
+      for (const lab of labs.filter((l) => l.ok)) {
+        // Whoever was just added is no longer "available elsewhere" for that lab.
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.organizations.transferableTeachers(lab.labId),
+        });
+        // The new teacher changes both the directory and the admin overview's
+        // staff counts, so invalidate both rather than just the list.
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.organizations.teachers(lab.labId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.organizations.adminOverview(lab.labId),
+        });
+      }
     },
+    // Covers ApiError (which extends Error) and the all-labs-failed throw above,
+    // both of which already carry admin-facing wording.
     onError: (err) => {
       setFormError(
-        err instanceof ApiError
+        err instanceof Error && err.message
           ? err.message
           : "Couldn't add that teacher. Please try again.",
       );
@@ -267,10 +419,9 @@ export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
       setSubmitAttempted(true);
       setFormError(null);
       setOutcome(null);
-      if (!orgId) {
-        setFormError("Select a laboratory first.");
-        return;
-      }
+      // Blocked by the inline checkbox message rather than a form-level banner,
+      // so the admin's eye goes to the control they need to fix.
+      if (selectedLabIds.length === 0) return;
       if (Object.keys(allErrors).length > 0) return;
       mutation.mutate({
         fullName: fullName.trim(),
@@ -278,7 +429,7 @@ export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
         githubUsername: githubUsername.trim().replace(/^@/, ""),
       });
     },
-    [allErrors, email, fullName, githubUsername, mutation, orgId],
+    [allErrors, email, fullName, githubUsername, mutation, selectedLabIds],
   );
 
 
@@ -443,6 +594,10 @@ export function useTeacherDirectory(orgId: string | null): TeacherDirectoryVM {
     setEmail,
     setGithubUsername,
     fieldErrors,
+    labOptions,
+    selectedLabIds,
+    toggleLab,
+    labsError,
     formError,
     isSubmitting: mutation.isPending,
     outcome,

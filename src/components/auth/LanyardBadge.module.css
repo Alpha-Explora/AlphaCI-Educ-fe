@@ -1,0 +1,59 @@
+/* ==========================================================================
+   The pass and what it hangs from.
+
+   Colocated with LanyardBadge.tsx rather than in globals.css: these three
+   rules describe ONE component's materials and nothing else in the product
+   uses them. globals.css is the file a school edits to re-skin — every line
+   in it that a school must not touch makes that file harder to hand over.
+
+   Everything here still reads from the palette tokens, so a re-skin reaches
+   these rules through the variables even though the file is not global.
+   ========================================================================== */
+
+/* The webbing. Two darker selvedge edges down a lighter middle is what makes
+   a flat strip read as woven rather than drawn — and it is why this is a
+   background rather than borders: the strap SCALES vertically when pulled,
+   and scaled borders would thicken as it stretched, which webbing does not
+   do. A background gradient is immune to that because it scales with the box.
+
+   `transform-origin: top` is load-bearing, not styling: the stretch is a
+   scaleY, and any other origin would move the hook end instead of the clip
+   end and tear the strap off its pivot. */
+.strap {
+  transform-origin: top center;
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--brand-500)) 0 2px,
+    rgb(var(--brand-300)) 2px calc(100% - 2px),
+    rgb(var(--brand-500)) calc(100% - 2px) 100%
+  );
+  box-shadow: inset 0 0 0 1px rgb(var(--brand-700) / 0.35);
+}
+
+/* The clip at the junction. Metal, so it is the one element on this page lit
+   from a fixed direction — a diagonal sheen, not the flat fills everything
+   else uses. That inconsistency is the point: it is the only part of the
+   assembly that is neither paper nor webbing.
+
+   Greys are mixed from the brand hue rather than being neutral, so brushed
+   steel on a green-themed school still belongs to the page. */
+.clip {
+  background-image: linear-gradient(
+    145deg,
+    rgb(var(--brand-50)) 0%,
+    rgb(var(--brand-200)) 38%,
+    rgb(var(--brand-100)) 55%,
+    rgb(var(--brand-300)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 6px rgb(var(--shadow-tint) / 0.35);
+}
+
+/* Card stock: a deeper, softer shadow than any in-app card, because this one
+   is a physical object hanging in a room rather than a panel on a page. */
+.card {
+  box-shadow:
+    0 30px 60px -20px rgb(var(--shadow-tint) / 0.55),
+    0 10px 24px -12px rgb(var(--shadow-tint) / 0.4);
+}

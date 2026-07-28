@@ -7,31 +7,10 @@
 // ============================================================================
 import { useId } from "react";
 import Link from "next/link";
-import { EnvelopeSimpleIcon } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
-import { LockKeyIcon } from "@phosphor-icons/react/dist/ssr/LockKey";
-import { HandWavingIcon } from "@phosphor-icons/react/dist/ssr/HandWaving";
 import { Banner, Button, Input } from "@/components/ui";
-import { AuthShell, type AuthHighlight } from "@/components/auth/AuthShell";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { useForgotPassword } from "@/viewmodels/useForgotPassword";
 import { SIGN_IN_ROUTES } from "@/viewmodels/authRoutes";
-
-const HIGHLIGHTS: AuthHighlight[] = [
-  {
-    icon: EnvelopeSimpleIcon,
-    title: "Check your school inbox",
-    body: "The reset link arrives in a minute or two and is valid for one use.",
-  },
-  {
-    icon: LockKeyIcon,
-    title: "Your work is untouched",
-    body: "Resetting a password never affects your repositories, grades, or submissions.",
-  },
-  {
-    icon: HandWavingIcon,
-    title: "Still stuck?",
-    body: "Your teacher can re-send an invite, and IT staff can reset it for you.",
-  },
-];
 
 export default function ForgotPasswordPage() {
   const vm = useForgotPassword();
@@ -44,9 +23,8 @@ export default function ForgotPasswordPage() {
       subheading={
         vm.isSent
           ? "If that address is on file, a reset link is on its way."
-          : "Enter the email you sign in with and we'll send you a link to set a new password."
+          : "Enter the email you sign in with."
       }
-      highlights={HIGHLIGHTS}
       footer={
         <p>
           <Link
@@ -71,8 +49,8 @@ export default function ForgotPasswordPage() {
         // Deliberately does NOT confirm the address exists — see the note in
         // useForgotPassword about roster enumeration.
         <Banner tone="success" title="Reset link sent">
-          Open the link in the email to choose a new password. It expires shortly, so
-          if it&rsquo;s already stale just request another one.
+          Open the link to choose a new password. It expires shortly; request
+          another if it goes stale.
         </Banner>
       ) : (
         <form onSubmit={vm.submit} noValidate className="space-y-4">

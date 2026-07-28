@@ -23,8 +23,8 @@ export default function TeacherCoursesPage() {
         <h1 className="text-2xl font-semibold text-[var(--text-strong)]">Courses</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Courses assigned to you in{" "}
-          <strong>{activeLab?.name ?? "your laboratory"}</strong>. Create and open class
-          sections from the <Link href="/teacher" className="text-platform hover:underline">Dashboard</Link>.
+          <strong>{activeLab?.name ?? "your laboratory"}</strong>. Open a course to create
+          and manage its class sections.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export default function TeacherCoursesPage() {
                 </p>
               )}
               <Link
-                href="/teacher"
+                href={`/teacher/courses/${course.id}`}
                 className="mt-auto pt-4 text-sm font-medium text-platform hover:underline"
               >
                 Open class sections →

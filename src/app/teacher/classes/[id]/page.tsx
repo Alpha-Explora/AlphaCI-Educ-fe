@@ -50,8 +50,10 @@ export default function ClassRosterPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        backHref="/teacher"
-        backLabel="Class Groups"
+        // Classes live under a course now, so go back to the course that owns
+        // this section rather than all the way out to the dashboard.
+        backHref={info ? `/teacher/courses/${info.courseId}` : "/teacher"}
+        backLabel={info ? `${info.code} — classes` : "My Courses"}
         title={info ? `${info.code} — ${info.name}` : "Class roster"}
         // Was the class's team slug. Dropped: it exposed the organization, and
         // the section/term pills below already identify the cohort.

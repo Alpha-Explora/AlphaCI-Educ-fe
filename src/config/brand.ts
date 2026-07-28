@@ -80,8 +80,101 @@ export const landingCopy = {
 export const authPanelCopy = {
   /** Line break is intentional and preserved via `whitespace-pre-line`. */
   headline: "Every push gets\na real answer.",
-  body: "Your work runs the moment you push it, then the report names what passed and what did not, so feedback arrives in minutes rather than next week.",
-  footnote: "Students keep a zero-footprint account · Staff link GitHub after signing in",
+  /**
+   * ONE short line. The panel's explaining is done by the animated run beside
+   * it, not by prose; the paragraph that used to live here was three clauses
+   * long and sat next to a form, which is the worst possible place to ask
+   * anyone to read.
+   */
+  body: "Push your work. See what passed.",
+} as const;
+
+/**
+ * The sign-in badge — the lanyard ID card the auth form lives inside.
+ *
+ * The metaphor is doing real work, not decoration: every reader of this page
+ * already owns a school ID, already knows it hangs round your neck, and already
+ * knows it is the thing that gets you through a door. Signing in IS that, so
+ * the form is printed on the pass rather than floated on a panel beside one.
+ *
+ * Everything here is on the CARD FACE, which is why it is worded like stamped
+ * card stock and not like UI. Keep these short: they are printed in small caps
+ * on a 24rem card and the second line of any of them would break the layout.
+ */
+export const badgeCopy = {
+  /** Sits under the wordmark on the blue header. What the pass IS. */
+  kind: "Lab access pass",
+  /**
+   * The strip along the card's foot, beside the barcode. A pass has an issue
+   * line; this is ours. NOT a real credential and never rendered as one — it
+   * is aria-hidden, like the barcode next to it.
+   */
+  serial: "AE · CLASS OF 2026",
+  /** The little pill at bottom-right of the card. One word if you can. */
+  status: "Issued",
+  // NOTE: there is deliberately no drag/pull hint here any more. The pass
+  // swings when grabbed and throws confetti when pulled and released, but
+  // nothing on the page says so — it is left to be found. If you ever want to
+  // advertise it again, the line belongs under the card, not on it.
+} as const;
+
+/**
+ * The quiet copy either side of the pass.
+ *
+ * Everything here is DECORATIVE — the columns holding it are aria-hidden, and
+ * every fact in them is also available to a screen-reader user from the form
+ * itself or from the page they arrived from. It exists because a centred card
+ * on an empty field reads as unfinished, not because a sign-in needs prose.
+ *
+ * The bar for adding a line here: it must be TRUE and CHECKABLE. No invented
+ * metrics, no "10,000 students", no fake activity — this is a school product
+ * and the one thing it cannot do on its front door is lie about a number.
+ */
+export const authAside = {
+  /**
+   * What happens after the button. Three steps, present tense, second person.
+   * Deliberately ends at the push rather than at a grade: the product's
+   * promise is the checked run, and promising more on a login screen is
+   * writing a cheque the dashboard has to cash.
+   */
+  stepsTitle: "Your first three minutes",
+  steps: [
+    "Sign in with the email your school issued.",
+    "Open your project in VS Code.",
+    "Push — the checks start on their own.",
+  ],
+  /** Bottom of the right column. The one thing to do when this page fails. */
+  helpTitle: "Can't get in?",
+  helpBody:
+    "Your teacher or the IT office can reset your password and add you to a lab.",
+} as const;
+
+/**
+ * The replayable run on the auth panel: three stages, then the marks.
+ *
+ * `stages` are the phases of a pipeline; `marks` are what a student actually
+ * gets back. Keeping them as two lists rather than one is the point of the
+ * thing — the stages say WHEN, the marks say WHAT, and a class needs both
+ * words before their first red build.
+ *
+ * `icon` keys into LANDING_ICONS so this stays a plain data file.
+ */
+export const runCard = {
+  stages: [
+    { icon: "push", label: "Push" },
+    { icon: "run", label: "Build" },
+    { icon: "test", label: "Test" },
+  ],
+  /**
+   * Phrased as a marking sheet, not a log: "Tests pass", not
+   * "jest --ci exited 0". This is the one place the product speaks to a
+   * fourteen-year-old and a head of IT in the same three lines.
+   */
+  marks: ["Project builds", "Tests pass", "Style is clean"],
+  verdict: "All checks passed",
+  // NOTE: no replay hint. Hovering the run still replays it — the label
+  // saying so was a caption on a decoration, which is one more thing to read
+  // on a page whose whole job is two fields and a button.
 } as const;
 
 /**

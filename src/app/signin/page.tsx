@@ -13,37 +13,13 @@
 // Presentation only: useSignIn owns fields, validation, failure copy, and the
 // post-login destination.
 // ============================================================================
-import { UserCircleIcon } from "@phosphor-icons/react/dist/ssr/UserCircle";
-import { SealCheckIcon } from "@phosphor-icons/react/dist/ssr/SealCheck";
-import { ShieldCheckIcon } from "@phosphor-icons/react/dist/ssr/ShieldCheck";
 import { Banner, Spinner } from "@/components/ui";
-import { AuthShell, type AuthHighlight } from "@/components/auth/AuthShell";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { CredentialsForm } from "@/components/auth/CredentialsForm";
 import { brand } from "@/config/brand";
 import { useSignIn } from "@/viewmodels/useSignIn";
 import { useAuthNotice } from "@/viewmodels/useAuthNotice";
 import { useRedirectIfSignedIn } from "@/viewmodels/useRedirectIfSignedIn";
-
-// Deliberately role-neutral: one page serves a 14-year-old and an IT director,
-// so the copy promises what the platform does rather than what any one role
-// gets. Role-specific reassurance now lives on the dashboards themselves.
-const HIGHLIGHTS: AuthHighlight[] = [
-  {
-    icon: UserCircleIcon,
-    title: "One account, one sign-in",
-    body: "Students, teachers and IT staff all use the same school email and password.",
-  },
-  {
-    icon: SealCheckIcon,
-    title: "Work checked automatically",
-    body: "Every push runs the tests and reports exactly which cases passed.",
-  },
-  {
-    icon: ShieldCheckIcon,
-    title: "Access matches your role",
-    body: "What you can see and do is decided after you sign in. Nothing to configure.",
-  },
-];
 
 export default function SignInPage() {
   const { isResolving } = useRedirectIfSignedIn();
@@ -72,17 +48,17 @@ export default function SignInPage() {
           <span className="text-platform-600">{brand.cohort}</span>
         </>
       }
-      subheading="Sign in with your school email address and password."
-      highlights={HIGHLIGHTS}
+      subheading="Use your school email and password."
       footer={
+        // Was five lines explaining who creates accounts for whom. Nobody at a
+        // sign-in prompt needs the org chart; they need to know it is not their
+        // job, and what to press.
         <p>
-          Don&rsquo;t have an account yet? Accounts are created for you — students
-          by their teacher, staff by their IT admin. Ask them which address they
-          used, then use{" "}
+          No account? Your teacher or IT admin makes it. Then use{" "}
           <span className="font-medium text-[var(--text-strong)]">
             Forgot password
-          </span>{" "}
-          to set your own.
+          </span>
+          .
         </p>
       }
     >

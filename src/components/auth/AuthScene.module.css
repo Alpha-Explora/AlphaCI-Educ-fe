@@ -1,0 +1,121 @@
+/* ==========================================================================
+   The room the pass hangs in — field, depth, and the slow drift behind it.
+
+   Colocated with AuthScene.tsx. Nothing else in the product renders this
+   surface, so nothing else should have to scroll past it.
+
+   ONE RULE GOVERNS THIS FILE: every colour is a palette token. This surface
+   used to carry three literal rgba() washes — a blue, a purple and a green —
+   which meant a school could re-skin --brand-* and still be handed somebody
+   else's purple. Where a token is a HEX (the accents are), softness comes
+   from `opacity` on the element, because `rgb(var(--x) / 0.4)` cannot apply
+   alpha to a hex variable.
+   ========================================================================== */
+
+.scene {
+  /* The one number that decides whether the pass HANGS or merely sits. The
+     floor keeps the whole assembly — hook, strap, card, hint — inside a 768px
+     lab monitor; the ceiling stops it drifting into the middle of a tall
+     desktop screen. Lengthen this and check 768 before you keep it.
+     Declared here because the badge reads it by inheritance. */
+  --strap-h: clamp(2.5rem, 10vh, 7rem);
+
+  background-color: var(--brand-hover);
+  background-image:
+    radial-gradient(32rem 26rem at 8% 4%, rgb(var(--brand-400) / 0.45), transparent 62%),
+    radial-gradient(28rem 22rem at 94% 96%, rgb(var(--brand-800) / 0.55), transparent 60%),
+    linear-gradient(to bottom, transparent 55%, rgb(var(--brand-900) / 0.4) 100%);
+}
+
+/* --------------------------------------------------------------------------
+   Aurora — the only thing on this page that moves without being asked.
+
+   Three soft blobs on very long, offset cycles. The rules that keep it from
+   competing with the form in front of it, all load-bearing:
+
+     · minutes, not seconds. At 48–72s nothing is ever SEEN to move; the page
+       just refuses to look like a screenshot.
+     · transform only. No filter, no background-position, no opacity
+       keyframes — one composited layer per blob, and no repaint.
+     · no blur(). `closest-side` radial gradients are already soft, and a
+       40rem blur radius is the most expensive thing you can put behind a
+       text field.
+
+   The global prefers-reduced-motion rule in globals.css collapses these to a
+   static first frame, which is a perfectly good background.
+   -------------------------------------------------------------------------- */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora > span {
+  position: absolute;
+  display: block;
+  border-radius: 9999px;
+  will-change: transform;
+}
+
+/* Sized in vmax so the composition survives a phone and an ultrawide without
+   a breakpoint: the blobs stay proportional to the room they drift in. */
+.blobBrand {
+  width: 55vmax;
+  height: 55vmax;
+  top: -18vmax;
+  left: -12vmax;
+  opacity: 0.4;
+  background: radial-gradient(closest-side, rgb(var(--brand-300)), transparent);
+  animation: drift-a 54s ease-in-out infinite;
+}
+
+.blobGrape {
+  width: 48vmax;
+  height: 48vmax;
+  right: -14vmax;
+  bottom: -16vmax;
+  opacity: 0.3;
+  background: radial-gradient(closest-side, var(--accent-grape), transparent);
+  animation: drift-b 72s ease-in-out infinite;
+}
+
+.blobMint {
+  width: 34vmax;
+  height: 34vmax;
+  right: 6vmax;
+  top: -10vmax;
+  opacity: 0.22;
+  background: radial-gradient(closest-side, var(--accent-mint), transparent);
+  animation: drift-c 48s ease-in-out infinite;
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(8%, 6%, 0) scale(1.14);
+  }
+}
+
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  50% {
+    transform: translate3d(-9%, -5%, 0) scale(1);
+  }
+}
+
+@keyframes drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-6%, 9%, 0) scale(1.2);
+  }
+}

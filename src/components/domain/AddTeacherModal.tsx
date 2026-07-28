@@ -10,10 +10,73 @@
 // Presentation only — the VM (useTeacherDirectory) owns validation, the
 // mutation, and the wording of the result.
 // ============================================================================
-import { Banner, Button, Modal } from "@/components/ui";
+import { Banner, Button, Modal, cn } from "@/components/ui";
 import { StaffFields } from "@/components/domain/StaffFields";
 import { ExistingTeacherPicker } from "@/components/domain/ExistingTeacherPicker";
 import type { TeacherDirectoryVM } from "@/viewmodels/useTeacherDirectory";
+
+/**
+ * Which laboratories this teacher should be able to work in.
+ *
+ * Checkboxes rather than a single picker because an IT Admin administers every
+ * laboratory, and a teacher shared between two schools is a normal case here —
+ * the backend attaches one account to each lab rather than making a second one.
+ */
+function LabChecklist({ vm }: { readonly vm: TeacherDirectoryVM }) {
+  if (vm.labOptions.length === 0) return null;
+
+  // Labs the picked teacher already teaches at. The API gives names, not ids,
+  // so this matches on name — it's a hint, never a gate.
+  const alreadyIn = new Set(
+    (vm.pickedExisting?.labNames ?? []).map((n) => n.toLowerCase()),
+  );
+
+  return (
+    <fieldset className="space-y-2" disabled={vm.isSubmitting}>
+      <legend className="text-sm font-medium text-[var(--text-strong)]">
+        Laboratories
+      </legend>
+      <p className="text-xs text-[var(--text-muted)]">
+        Tick every laboratory they should be able to teach in. They get one account
+        across all of them, not one per laboratory.
+      </p>
+
+      <div
+        className={cn(
+          "max-h-44 space-y-0.5 overflow-y-auto rounded-lg border p-1.5",
+          vm.labsError ? "border-danger" : "border-[var(--border-subtle)]",
+        )}
+      >
+        {vm.labOptions.map((lab) => {
+          const checked = vm.selectedLabIds.includes(lab.id);
+          return (
+            <label
+              key={lab.id}
+              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => vm.toggleLab(lab.id)}
+                className="h-4 w-4 shrink-0 accent-platform"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-strong)]">
+                {lab.name}
+              </span>
+              {alreadyIn.has(lab.name.toLowerCase()) && (
+                <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                  already teaches here
+                </span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+
+      {vm.labsError && <p className="text-xs font-medium text-danger">{vm.labsError}</p>}
+    </fieldset>
+  );
+}
 
 export function AddTeacherModal({
   open,
@@ -24,6 +87,8 @@ export function AddTeacherModal({
   readonly onClose: () => void;
   readonly vm: TeacherDirectoryVM;
 }) {
+  const labCount = vm.selectedLabIds.length;
+
   return (
     <Modal
       open={open}
@@ -31,8 +96,8 @@ export function AddTeacherModal({
       title="Add a teacher"
       description={
         vm.pickedExisting
-          ? "They already have an account — we'll add them to this laboratory and invite them to its organization."
-          : "They'll get an email inviting them to set a password and join this laboratory."
+          ? "They already have an account — we'll add them to the laboratories you tick and invite them to each organization."
+          : "They'll get one email inviting them to set a password, and access to every laboratory you tick."
       }
       size="md"
     >
@@ -69,6 +134,8 @@ export function AddTeacherModal({
           }}
         />
 
+        <LabChecklist vm={vm} />
+
         <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
           <Button
             type="button"
@@ -79,11 +146,13 @@ export function AddTeacherModal({
             Cancel
           </Button>
           <Button type="submit" loading={vm.isSubmitting}>
-            {vm.isSubmitting
-              ? "Adding…"
-              : vm.pickedExisting
-                ? "Add to this laboratory"
-                : "Add teacher"}
+            {(() => {
+              if (vm.isSubmitting) return "Adding…";
+              // Naming the count is the confirmation that the ticks took effect
+              // — this button is the last thing read before a multi-lab add.
+              if (labCount > 1) return `Add to ${labCount} laboratories`;
+              return vm.pickedExisting ? "Add to this laboratory" : "Add teacher";
+            })()}
           </Button>
         </div>
       </form>
