@@ -5,7 +5,7 @@ import { AppShell, type NavItem } from "@/components/layout/AppShell";
 // No icons here on purpose — the labels are long enough to be scanned on their
 // own, and the glyphs read as decoration next to them.
 const NAV: NavItem[] = [
-  { href: "/admin", label: "Dashboard" },
+  { href: "/admin", label: "Home" },
   { href: "/admin/teachers", label: "Manage Teachers" },
   { href: "/admin/students", label: "Manage Students" },
   { href: "/admin/courses", label: "Manage School Courses" },

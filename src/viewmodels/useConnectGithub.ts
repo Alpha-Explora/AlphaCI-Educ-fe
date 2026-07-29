@@ -33,7 +33,7 @@ export interface ConnectGithubVM {
 
 export function useConnectGithub(): ConnectGithubVM {
   const router = useRouter();
-  const { user, isReady, labsReady, needsLabSelection, loginWithGithub } = useSession();
+  const { user, isReady, labsReady, loginWithGithub } = useSession();
 
   const linked = Boolean(user?.githubLogin);
 
@@ -59,7 +59,7 @@ export function useConnectGithub(): ConnectGithubVM {
   // screen when they are unlinked, so calling it here would bounce them back and
   // make "skip" a no-op. Skipping means "go on with the role I already have".
   let skipDestination = SIGN_IN_ROUTE;
-  if (user) skipDestination = needsLabSelection ? "/select-lab" : destinationFor(user.role);
+  if (user) skipDestination = destinationFor(user.role);
 
   const skip = useCallback(() => {
     router.replace(skipDestination);

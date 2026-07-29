@@ -1,9 +1,11 @@
 // MODEL LAYER — Auth resource
-// Three ways in:
-//   • passwordLogin  — real email + password, verified against Supabase Auth.
-//                      Students use this; staff use it as a fallback.
-//   • githubStartUrl — staff GitHub OAuth (full-page redirect, not a fetch).
-//   • mockLogin      — legacy persona switcher, demo only.
+// One way in, plus one way to attach GitHub afterwards:
+//   • passwordLogin  — real email + password, for EVERY role. A student signing
+//                      in with an allowed school address for the first time is
+//                      provisioned by the API on the spot; nobody creates
+//                      student accounts by hand.
+//   • githubStartUrl — staff GitHub ACCOUNT LINK (full-page redirect, not a
+//                      fetch). Not a sign-in.
 // Session is validated with me() and cleared with logout().
 import { apiRequest, API_BASE_URL } from "./client";
 import type {
@@ -12,7 +14,6 @@ import type {
   LabsResponse,
   PasswordLoginRequest,
   SystemUser,
-  UserRole,
 } from "../types";
 
 export const authApi = {
@@ -39,16 +40,6 @@ export const authApi = {
     return apiRequest<{ ok: true }>("/auth/request-password-reset", {
       method: "POST",
       body: { email },
-    });
-  },
-
-  // Legacy persona switcher — demo only, students only. Superseded by
-  // passwordLogin; kept so the seeded-persona demo path still works when no
-  // Supabase project is configured.
-  mockLogin(payload: { userId: string } | { role: UserRole }) {
-    return apiRequest<AuthLoginResponse>("/auth/mock-login", {
-      method: "POST",
-      body: payload,
     });
   },
 

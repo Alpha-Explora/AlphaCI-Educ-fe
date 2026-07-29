@@ -49,7 +49,6 @@ export function AppShell({
     selectedOrgId,
     selectLab,
     labsReady,
-    needsLabSelection,
   } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -58,28 +57,21 @@ export function AppShell({
   // A platform operator is admitted to the IT-Admin area too (see canEnterArea).
   const mayEnter = user ? canEnterArea(user.role, role) : false;
 
-  // Session guard: redirect when unauthenticated, role mismatch, or (ADDENDUM K)
-  // a staff user hasn't yet chosen which lab to work in.
+  // Session guard: redirect when unauthenticated or the role may not be here.
+  //
+  // There is no longer a third case. A staff user with several labs used to be
+  // bounced to /select-lab from here; the backend now makes one active at
+  // sign-in and the switcher in this very header changes it, so arriving with
+  // no lab chosen is no longer a state that can happen.
   useEffect(() => {
     if (!isReady) return;
-    if (!user || !mayEnter) {
-      router.replace("/");
-      return;
-    }
-    if (!labsReady) return;
-    if (needsLabSelection) router.replace("/select-lab");
-  }, [isReady, labsReady, user, mayEnter, needsLabSelection, router]);
+    if (!user || !mayEnter) router.replace("/");
+  }, [isReady, user, mayEnter, router]);
 
   // Hold the chrome until we know the session AND (for staff) the lab picture,
   // so the dashboard never flashes unscoped data before a lab is resolved.
   const waitingOnLabs = isStaff && !labsReady;
-  if (
-    !isReady ||
-    !user ||
-    !mayEnter ||
-    waitingOnLabs ||
-    needsLabSelection
-  ) {
+  if (!isReady || !user || !mayEnter || waitingOnLabs) {
     return (
       <div className="grid min-h-dvh place-items-center text-platform">
         <Spinner size="lg" />
@@ -250,9 +242,22 @@ export function AppShell({
           })}
         </nav>
 
+        {/*
+          FULL WIDTH. This used to be `mx-auto max-w-6xl`, which capped the
+          content at 1152px and centred it — so on a 1900px monitor the sidebar
+          took 260px, the content used 1152px, and roughly 450px was split into
+          two empty margins the eye reads as broken layout rather than as
+          deliberate whitespace.
+
+          A reading-width cap is the right instinct for prose and the wrong one
+          here: these pages are dashboards, rosters and tables, which get better
+          as they get wider, and the pages that DO hold prose already cap their
+          own cards (SettingsView uses sm:max-w-2xl). Padding grows with the
+          viewport instead, so content never touches the chrome.
+        */}
         <main
           id="main-content"
-          className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8"
+          className="w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 xl:px-8 2xl:px-10"
         >
           <GithubModeNote />
           {children}

@@ -99,12 +99,30 @@ export function useSignIn(): SignInVM {
     return errors;
   }, [email, password]);
 
+  /**
+   * When a message is allowed to appear.
+   *
+   * Blur alone is not enough, and that was the bug: the email field is
+   * autoFocused, so simply arriving and then clicking anywhere — the password
+   * box, the page, another window — blurred an empty field and painted the form
+   * red before the visitor had typed a character. The screen greeted people by
+   * telling them they had done something wrong on the way in.
+   *
+   * So the rule is split by what the message is FOR:
+   *   - "Enter your…"  is a REQUIRED message. It only makes sense once someone
+   *     has actually tried to sign in, so it waits for a submit.
+   *   - "That doesn't look like an email address" is a FORMAT message about
+   *     something they typed, so it shows on blur — that is the moment it is
+   *     useful, and it cannot fire on an empty field.
+   */
   const fieldErrors = useMemo<SignInFieldErrors>(() => {
     const visible: SignInFieldErrors = {};
-    if (submitAttempted || touched.email) visible.email = allErrors.email;
-    if (submitAttempted || touched.password) visible.password = allErrors.password;
+    if (submitAttempted) return allErrors;
+    // Non-empty ⇒ any remaining error is about the SHAPE of what was entered.
+    if (touched.email && email.trim()) visible.email = allErrors.email;
+    if (touched.password && password) visible.password = allErrors.password;
     return visible;
-  }, [allErrors, submitAttempted, touched]);
+  }, [allErrors, submitAttempted, touched, email, password]);
 
   const markTouched = useCallback((field: "email" | "password") => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -122,15 +140,13 @@ export function useSignIn(): SignInVM {
       setIsSubmitting(true);
       void (async () => {
         try {
-          const { user, needsLabSelection } = await loginWithPassword({
+          const { user } = await loginWithPassword({
             email: email.trim(),
             password,
           });
           // Clear the password from memory before navigating away.
           setPassword("");
-          router.replace(
-            postLoginDestination(user.role, needsLabSelection, user.githubLogin),
-          );
+          router.replace(postLoginDestination(user.role, user.githubLogin));
         } catch (error) {
           setFormError(describeSignInFailure(error));
           setIsOffline(error instanceof ApiError && error.isNetworkError);

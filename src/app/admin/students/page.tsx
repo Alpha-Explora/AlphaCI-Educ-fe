@@ -32,8 +32,9 @@ export default function AdminStudentsPage() {
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Every student account in this laboratory, by the email address they
           sign in with. Presence refreshes automatically while this page is
-          open. Students are enrolled into a class by their teacher — they are
-          not added here.
+          open. Nobody adds students: an account appears here the first time
+          someone signs in with a recognised school address, and joins this
+          laboratory when they enter their teacher&rsquo;s class code.
         </p>
       </div>
 

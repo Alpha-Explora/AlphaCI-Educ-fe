@@ -1,13 +1,13 @@
 // ============================================================================
 // VIEW LAYER — shared chrome for every auth page.
 //
-// LAYOUT ONLY. The room, the pass, the physics, the two aside columns and the
-// run all live in their own files; this one decides where they go and hands
-// the page's copy to the card. If you are reading this to change a colour, a
-// spring, or a sentence, you are in the wrong file:
+// LAYOUT ONLY. The room, the pass, the two aside columns and the run all live
+// in their own files; this one decides where they go and hands the page's copy
+// to the card. If you are reading this to change a colour or a sentence, you
+// are in the wrong file:
 //
 //   AuthScene.tsx        the background field and its drift
-//   LanyardBadge.tsx     the pass  (+ useLanyardSwing.ts, confetti.ts)
+//   LanyardBadge.tsx     the pass (static — it no longer swings)
 //   AuthAside.tsx        the two decorative columns
 //   RunReadout.tsx       the pipeline story
 //   config/brand.ts      every string on this page

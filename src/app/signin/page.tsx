@@ -50,11 +50,15 @@ export default function SignInPage() {
       }
       subheading="Use your school email and password."
       footer={
-        // Was five lines explaining who creates accounts for whom. Nobody at a
-        // sign-in prompt needs the org chart; they need to know it is not their
-        // job, and what to press.
+        // Two audiences, one line each, because the answer to "I have no
+        // account" now differs by who is asking. A student does not have one to
+        // wait for — signing in IS the enrolment, so the only thing they can get
+        // wrong is using a personal address instead of their school one. If they
+        // do, the server says so by name; there is no point listing the domain
+        // here as well, where it would go stale the moment it is reconfigured.
         <p>
-          No account? Your teacher or IT admin makes it. Then use{" "}
+          Students: sign in with your school email — your account is set up on
+          your first sign-in. Staff: your IT admin creates yours, then use{" "}
           <span className="font-medium text-[var(--text-strong)]">
             Forgot password
           </span>
