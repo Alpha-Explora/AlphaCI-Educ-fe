@@ -92,18 +92,21 @@ export function needsGithubLink(role: UserRole, githubLogin: string | null | und
 }
 
 /**
- * ADDENDUM K — a staff user with access to more than one lab must choose one
- * before their dashboard means anything, so the picker takes precedence over
- * the role destination.
+ * Where a completed sign-in lands.
+ *
+ * There is no longer a lab picker in this path. A staff user with several labs
+ * used to be sent to /select-lab before their dashboard meant anything; the
+ * backend now auto-selects their first lab and the header's switcher changes it
+ * whenever they like — which is strictly better, because the choice is
+ * revisitable instead of being demanded once at the door.
+ *
+ * Linking GitHub still comes first: it can change the ROLE, and therefore the
+ * destination, so routing before it resolves would just have to be redone.
  */
 export function postLoginDestination(
   role: UserRole,
-  needsLabSelection: boolean,
   githubLogin?: string | null,
 ): string {
-  // Linking comes FIRST: it can change the role, which changes both the lab list
-  // and the destination. Sending someone to a lab picker built from a role they
-  // are about to stop having would just have to be redone a moment later.
   if (needsGithubLink(role, githubLogin)) return CONNECT_GITHUB_ROUTE;
-  return needsLabSelection ? "/select-lab" : destinationFor(role);
+  return destinationFor(role);
 }

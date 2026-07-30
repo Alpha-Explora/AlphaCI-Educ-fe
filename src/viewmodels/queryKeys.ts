@@ -24,6 +24,12 @@ export const queryKeys = {
       ["courses", filters ?? {}] as const,
     managed: (orgId: string) => ["courses", "managed", orgId] as const,
   },
+  hiddenTests: {
+    summary: (assignmentId: string) =>
+      ["assignments", assignmentId, "hidden-tests"] as const,
+    content: (assignmentId: string) =>
+      ["assignments", assignmentId, "hidden-tests", "content"] as const,
+  },
   classes: {
     list: (filters?: Record<string, string | undefined>) =>
       ["classes", filters ?? {}] as const,
@@ -45,6 +51,18 @@ export const queryKeys = {
     // ADDENDUM M — live GitHub state (branches/commits/workflow runs).
     githubActivity: (id: string, branch?: string) =>
       ["repositories", id, "github-activity", branch ?? "all"] as const,
+    // Per-run, and NOT nested under githubActivity's key: the activity key
+    // carries the branch filter, so nesting would throw away a run's cached
+    // jobs the moment the student changed that filter.
+    workflowRunJobs: (id: string, runId: number) =>
+      ["repositories", id, "workflow-runs", runId, "jobs"] as const,
+    pullRequests: (id: string) => ["repositories", id, "pull-requests"] as const,
+    // path and ref are part of the key: browsing is a different query per
+    // location, and caching them separately is what makes going back instant.
+    files: (id: string, path: string, ref: string | null) =>
+      ["repositories", id, "files", ref ?? "default", path] as const,
+    pullRequestFiles: (id: string, number: number) =>
+      ["repositories", id, "pull-requests", number, "files"] as const,
   },
   pipelineRuns: {
     detail: (id: string) => ["pipeline-runs", id] as const,

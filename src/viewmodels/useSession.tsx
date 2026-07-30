@@ -27,26 +27,26 @@ import type {
   AccessibleLab,
   PasswordLoginRequest,
   SystemUser,
-  UserRole,
 } from "@/models/types";
 
 const USER_STORAGE_KEY = "alphaci.user";
 
 /**
- * What a completed sign-in yields. `needsLabSelection` is resolved here rather
- * than left to the caller because it requires a second round-trip (GET
- * /auth/labs) that only this ViewModel knows how to make — returning it means
- * the form VM can redirect correctly in one step.
+ * What a completed sign-in yields.
+ *
+ * Just the user now. This used to also carry `needsLabSelection`, which existed
+ * only to route a multi-lab staff member to a picker screen; the backend
+ * auto-selects a lab and that screen is gone, so the caller has one destination
+ * to compute instead of two.
  */
 export interface SignInResult {
   user: SystemUser;
-  needsLabSelection: boolean;
 }
 
 interface SessionState {
   user: SystemUser | null;
   isReady: boolean; // initial me() resolution finished
-  isLoading: boolean; // a mock-login call is in flight
+  isLoading: boolean; // a sign-in call is in flight
   error: string | null;
   /**
    * Starts the GitHub ACCOUNT-LINK flow (full-page redirect). Requires an
@@ -56,15 +56,11 @@ interface SessionState {
   /**
    * Real credential sign-in — the only way in, for every role.
    *
-   * Unlike loginAs, this REJECTS on failure instead of returning null and
-   * parking the message in `error`: the sign-in form needs the HTTP status to
-   * choose its copy (401 vs 403 vs 429).
+   * REJECTS on failure rather than parking the message in `error`: the sign-in
+   * form needs the HTTP status to choose its copy (401 wrong password, 403 a
+   * refused address or deactivated account, 429 rate-limited).
    */
   loginWithPassword: (credentials: PasswordLoginRequest) => Promise<SignInResult>;
-  /** Legacy demo persona switcher. */
-  loginAs: (
-    payload: { userId: string } | { role: UserRole },
-  ) => Promise<SystemUser | null>;
   logout: () => void;
   /** true when the current user authenticated via GitHub (teacher). */
   isGithubSession: boolean;
@@ -76,8 +72,6 @@ interface SessionState {
   selectedOrgId: string | null;
   /** true once the labs fetch has resolved (so guards don't fire early). */
   labsReady: boolean;
-  /** true when the user must pick a lab before their dashboard is meaningful. */
-  needsLabSelection: boolean;
   /** Set the active lab for this session, then refresh local state. */
   selectLab: (orgId: string) => Promise<void>;
 }
@@ -180,25 +174,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /**
    * ADDENDUM K — after any staff sign-in, load the labs this user may work in
-   * and report whether they must pick one. Students have no labs to choose, so
-   * they short-circuit. A failed labs call is non-fatal: the dashboard's empty
-   * state explains "no labs yet" better than a blocked sign-in would.
+   * and which one the backend made active. Students have no labs, so they
+   * short-circuit. A failed labs call is non-fatal: the dashboard's empty state
+   * explains "no labs yet" better than a blocked sign-in would.
    */
-  const loadLabsFor = useCallback(async (signedIn: SystemUser): Promise<boolean> => {
+  const loadLabsFor = useCallback(async (signedIn: SystemUser): Promise<void> => {
     if (!isStaffRole(signedIn.role)) {
       setLabs([]);
       setSelectedOrgId(null);
-      return false;
+      return;
     }
     try {
       const res = await authApi.labs();
       setLabs(res.labs);
       setSelectedOrgId(res.selectedOrgId);
-      return res.labs.length > 1 && !res.selectedOrgId;
     } catch {
       setLabs([]);
       setSelectedOrgId(null);
-      return false;
     }
   }, []);
 
@@ -213,36 +205,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         persistUser(res.user);
         setUser(res.user);
-        const needsLab = await loadLabsFor(res.user);
+        await loadLabsFor(res.user);
         setLabsReady(true);
-        return { user: res.user, needsLabSelection: needsLab };
+        return { user: res.user };
       } finally {
         setIsLoading(false);
       }
     },
     [loadLabsFor],
   );
-
-  const loginAs = useCallback<SessionState["loginAs"]>(async (payload) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await authApi.mockLogin(payload);
-      setToken(res.token);
-      persistUser(res.user);
-      setUser(res.user);
-      return res.user;
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : "Unable to sign in. Please try again.";
-      setError(message);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   const logout = useCallback(() => {
     // Clear locally first for instant UX, then clear the server session.
@@ -257,18 +228,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const isStaff = user ? isStaffRole(user.role) : false;
-  // A platform operator is exempt: their home is the cross-lab console, which
-  // is meaningful with no lab selected. Forcing them through the picker would
-  // make "see every lab" impossible to reach without first picking one.
-  const needsLabSelection = Boolean(
-    isStaff &&
-      user?.role !== "SUPER_ADMIN" &&
-      labsReady &&
-      labs.length > 1 &&
-      !selectedOrgId,
-  );
-
   const value = useMemo<SessionState>(
     () => ({
       user,
@@ -277,17 +236,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       error,
       loginWithGithub,
       loginWithPassword,
-      loginAs,
       logout,
-      // ADDENDUM I — GitHub-authenticated staff (TEACHER or ADMIN) all carry a
-      // real githubLogin; mock students/admins don't. This is what tells a
-      // GitHub admin apart from a mock-switcher admin.
+      // Staff who have linked GitHub carry a real githubLogin. Students never
+      // do — they hold no GitHub identity by design.
       isGithubSession: Boolean(user?.githubLogin),
       // ADDENDUM K — multi-lab.
       labs,
       selectedOrgId,
       labsReady,
-      needsLabSelection,
       selectLab,
     }),
     [
@@ -297,12 +253,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       error,
       loginWithGithub,
       loginWithPassword,
-      loginAs,
       logout,
       labs,
       selectedOrgId,
       labsReady,
-      needsLabSelection,
       selectLab,
     ],
   );

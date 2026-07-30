@@ -1,18 +1,31 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — Student Assignment Hub (multi-class, ADDENDUM D)
-// Active + past assignments with status and latest CI score, filtered by the
-// selected class. Consumes useStudentDashboard (classes + selection + split).
-// "+ Join Class" opens the whiteboard-code modal. Cards link into the active
+//
+// ONE CONTAINER PER CLASS. Every class the student is in gets its own panel,
+// stacked down the page, holding that class's assignments. There is no class
+// filter: the tab strip that used to sit here defaulted to "All", so it did
+// nothing until pressed and then HID the other classes — which is the opposite
+// of what a student opening this page wants, namely everything they owe, at
+// once. Sections answer that by scrolling instead of by clicking.
+//
+// A student holds exactly one class per course, so each panel IS the course.
+// That is why the header reads "IS-1234 · Programming 1" with no section
+// letter: the split between a course and a section is a staff concept, and
+// showing it here would imply a choice the student does not have.
+//
+// Consumes useStudentDashboard, which owns the grouping and the active/past
+// split. "+ Join Class" opens the whiteboard-code modal; cards link into the
 // workspace at /student/repositories/[id].
 // ============================================================================
 import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
-import { useStudentDashboard } from "@/viewmodels/useStudentDashboard";
+import { useStudentDashboard, type ClassSection } from "@/viewmodels/useStudentDashboard";
 import type { StudentDashboard } from "@/models/types";
 import {
   Button,
+  Card,
   CardLink,
   EmptyState,
   GenericPill,
@@ -27,22 +40,19 @@ import { relativeDue } from "@/components/ui/format";
 
 type Row = StudentDashboard["assignments"][number];
 
-function AssignmentCard({ row, index }: { row: Row; index: number }) {
-  const { assignment, className, repo, latestRun } = row;
+function AssignmentCard({ row, index }: { readonly row: Row; readonly index: number }) {
+  const { assignment, repo, latestRun } = row;
   const inner = (
     <CardLink
       className="flex h-full flex-col p-5 animate-fade-up"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-platform">
-            {className}
-          </p>
-          <h3 className="mt-0.5 text-lg font-semibold text-[var(--text-strong)]">
-            {assignment.title}
-          </h3>
-        </div>
+        {/* The class name used to be printed here as an eyebrow. Inside a panel
+            headed with that same class it was the same words on every card. */}
+        <h3 className="min-w-0 text-lg font-semibold text-[var(--text-strong)]">
+          {assignment.title}
+        </h3>
         {assignment.isGroup && <GenericPill tone="info">Group</GenericPill>}
       </div>
 
@@ -100,6 +110,84 @@ function AssignmentCard({ row, index }: { row: Row; index: number }) {
   );
 }
 
+/**
+ * One class, as a container.
+ *
+ * The header carries the class identity so the cards inside no longer have to,
+ * and states the outstanding count — the one number a student scans for when
+ * deciding what to open next.
+ */
+function ClassPanel({
+  section,
+  index,
+}: {
+  readonly section: ClassSection;
+  readonly index: number;
+}) {
+  const { classInfo, active, past, total } = section;
+
+  let standing = "Nothing yet";
+  if (active.length > 0) standing = `${active.length} to do`;
+  else if (total > 0) standing = "All caught up";
+
+  return (
+    <Card
+      className="overflow-hidden animate-fade-up"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--border-subtle)] bg-slate-50/60 px-5 py-4">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <h2 className="text-base font-semibold text-[var(--text-strong)]">
+            {classInfo.code}
+          </h2>
+          <span aria-hidden="true" className="text-[var(--text-muted)]">
+            ·
+          </span>
+          <p className="text-base text-[var(--text-strong)]">{classInfo.name}</p>
+          <span className="text-xs text-[var(--text-muted)]">{classInfo.term}</span>
+        </div>
+        <p className="text-xs font-medium text-[var(--text-muted)]">{standing}</p>
+      </header>
+
+      <div className="space-y-6 p-5">
+        {total === 0 ? (
+          // Per class, not per page: with several classes, one of them having no
+          // work is normal and should not read as the whole hub being empty.
+          <p className="py-2 text-sm text-[var(--text-muted)]">
+            No assignments in this class yet. When your teacher publishes one, your
+            repository appears here automatically.
+          </p>
+        ) : (
+          <>
+            {active.length > 0 && (
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {active.map((row, i) => (
+                  <AssignmentCard key={row.assignment.id} row={row} index={i} />
+                ))}
+              </div>
+            )}
+
+            {/* Past work stays reachable but visually demoted — it is reference,
+                not something to act on. */}
+            {past.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Past ({past.length})
+                </h3>
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {past.map((row, i) => (
+                    <AssignmentCard key={row.assignment.id} row={row} index={i} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function StudentHubPage() {
   const { user } = useSession();
   const vm = useStudentDashboard(user?.id ?? null);
@@ -121,95 +209,38 @@ export default function StudentHubPage() {
         </Button>
       </div>
 
-      {/* Course selector — filters the assignment list by class */}
-      {vm.hasClasses && (
-        <div
-          role="tablist"
-          aria-label="Filter by class"
-          className="flex flex-wrap gap-1 rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
-        >
-          <ClassTab
-            label="All classes"
-            active={vm.selectedClassId === null}
-            onClick={() => vm.setSelectedClassId(null)}
-          />
-          {vm.classes.map((c) => (
-            <ClassTab
-              key={c.id}
-              label={c.code}
-              sublabel={c.term}
-              active={vm.selectedClassId === c.id}
-              onClick={() => vm.setSelectedClassId(c.id)}
-            />
-          ))}
-        </div>
-      )}
-
       <StateBoundary
         isLoading={vm.isLoading}
         error={vm.error}
         onRetry={vm.refetch}
-        isEmpty={!vm.hasClasses || vm.visibleCount === 0}
+        // Only the no-classes case is empty at PAGE level now. A student who is
+        // enrolled but has no work sees their class panels saying so, which is
+        // more informative than one blank page standing in for all of them.
+        isEmpty={!vm.hasClasses}
         emptyFallback={
-          !vm.hasClasses ? (
-            <EmptyState
-              icon="🎓"
-              title="You're not in any classes yet"
-              description="Ask your teacher for the class code from the whiteboard, then join to see your assignments."
-              action={
-                <Button onClick={() => setJoinOpen(true)}>
-                  <span aria-hidden="true">＋</span> Join Class
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              icon="🚀"
-              title="No assignments yet"
-              description="When your teacher publishes an assignment, your repository appears here automatically."
-            />
-          )
+          <EmptyState
+            icon="🎓"
+            title="You're not in any classes yet"
+            description="Ask your teacher for the class code from the whiteboard, then join to see your assignments."
+            action={
+              <Button onClick={() => setJoinOpen(true)}>
+                <span aria-hidden="true">＋</span> Join Class
+              </Button>
+            }
+          />
         }
         loadingFallback={
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
         }
       >
-        <div className="space-y-8">
-          <section className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Active ({vm.active.length})
-            </h2>
-            {vm.active.length === 0 ? (
-              <EmptyState
-                icon="✅"
-                title="All caught up"
-                description="No active assignments right now."
-              />
-            ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {vm.active.map((row, i) => (
-                  <AssignmentCard key={row.assignment.id} row={row} index={i} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {vm.past.length > 0 && (
-            <section className="space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Past ({vm.past.length})
-              </h2>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {vm.past.map((row, i) => (
-                  <AssignmentCard key={row.assignment.id} row={row} index={i} />
-                ))}
-              </div>
-            </section>
-          )}
+        <div className="space-y-6">
+          {vm.sections.map((section, i) => (
+            <ClassPanel key={section.classInfo.id} section={section} index={i} />
+          ))}
         </div>
       </StateBoundary>
 
@@ -222,38 +253,5 @@ export default function StudentHubPage() {
         />
       )}
     </div>
-  );
-}
-
-// Course-selector tab.
-function ClassTab({
-  label,
-  sublabel,
-  active,
-  onClick,
-}: {
-  label: string;
-  sublabel?: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={cn(
-        "rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
-        active
-          ? "bg-white text-platform-700 shadow-sm"
-          : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
-      )}
-    >
-      {label}
-      {sublabel && (
-        <span className="ml-1.5 text-xs font-normal opacity-70">{sublabel}</span>
-      )}
-    </button>
   );
 }

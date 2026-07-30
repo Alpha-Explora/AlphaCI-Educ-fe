@@ -20,6 +20,18 @@ export const assignmentsApi = {
     );
   },
 
+  /**
+   * Teacher publishes or withholds marks for every repository in this
+   * assignment. Reversible on purpose: a teacher who releases and then finds a
+   * broken hidden test needs to pull marks back while they fix it.
+   */
+  setGradesReleased(id: string, released: boolean) {
+    return apiRequest<Assignment>(`/assignments/${id}/grades-released`, {
+      method: "POST",
+      body: JSON.stringify({ released }),
+    });
+  },
+
   // Teacher-of-class (or admin) deletes a project: removes the assignment + its
   // repos locally and (live only) the real GitHub repos. 403 if not your class.
   remove(id: string) {

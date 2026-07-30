@@ -1,9 +1,11 @@
 // MODEL LAYER — Auth resource
-// Three ways in:
-//   • passwordLogin  — real email + password, verified against Supabase Auth.
-//                      Students use this; staff use it as a fallback.
-//   • githubStartUrl — staff GitHub OAuth (full-page redirect, not a fetch).
-//   • mockLogin      — legacy persona switcher, demo only.
+// One way in, plus one way to attach GitHub afterwards:
+//   • passwordLogin  — real email + password, for EVERY role. A student signing
+//                      in with an allowed school address for the first time is
+//                      provisioned by the API on the spot; nobody creates
+//                      student accounts by hand.
+//   • githubStartUrl — staff GitHub ACCOUNT LINK (full-page redirect, not a
+//                      fetch). Not a sign-in.
 // Session is validated with me() and cleared with logout().
 import { apiRequest, API_BASE_URL } from "./client";
 import type {
@@ -12,7 +14,6 @@ import type {
   LabsResponse,
   PasswordLoginRequest,
   SystemUser,
-  UserRole,
 } from "../types";
 
 export const authApi = {
@@ -31,6 +32,27 @@ export const authApi = {
   },
 
   /**
+   * Registers a student with their school email address.
+   *
+   * Creates CREDENTIALS only. The AlphaCI profile is created later, on the first
+   * confirmed sign-in — so an address that never confirms never joins a roster.
+   *
+   * Unlike requestPasswordReset below, this DOES answer differently for a
+   * refused address: "that is not your school's domain" and "you already have an
+   * account" are both things the student has to read to get any further.
+   */
+  studentSignup(credentials: { email: string; password: string }) {
+    return apiRequest<{
+      created: boolean;
+      needsEmailConfirmation: boolean;
+      message: string;
+    }>("/auth/student/signup", {
+      method: "POST",
+      body: credentials,
+    });
+  },
+
+  /**
    * Sends a password-reset email via Supabase Auth. Deliberately resolves even
    * when the address is unknown — a distinguishable response here would turn
    * this endpoint into an account-enumeration oracle for a school roster.
@@ -39,16 +61,6 @@ export const authApi = {
     return apiRequest<{ ok: true }>("/auth/request-password-reset", {
       method: "POST",
       body: { email },
-    });
-  },
-
-  // Legacy persona switcher — demo only, students only. Superseded by
-  // passwordLogin; kept so the seeded-persona demo path still works when no
-  // Supabase project is configured.
-  mockLogin(payload: { userId: string } | { role: UserRole }) {
-    return apiRequest<AuthLoginResponse>("/auth/mock-login", {
-      method: "POST",
-      body: payload,
     });
   },
 

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { PipelineRun, RepoBranch } from "@/models/types";
 import { Button, Card } from "@/components/ui";
 import { BranchToggle } from "./BranchToggle";
+import { CodeQualityCard } from "./CodeQualityCard";
 import { PipelineRunList } from "./PipelineRunList";
 import { PipelineStages } from "./PipelineStages";
 
@@ -20,6 +21,7 @@ export function RepoRunsExplorer({
   audience,
   onTriggerRun,
   isTriggering,
+  sonarDashboardUrl,
 }: {
   branches: RepoBranch[];
   selectedBranch: string | null;
@@ -28,6 +30,8 @@ export function RepoRunsExplorer({
   audience: "student" | "teacher";
   onTriggerRun?: () => void;
   isTriggering?: boolean;
+  /** This repository's SonarCloud project, when one was provisioned. */
+  sonarDashboardUrl?: string;
 }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
@@ -75,12 +79,25 @@ export function RepoRunsExplorer({
             onSelect={setSelectedRunId}
           />
         </div>
-        <Card className="p-4">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            5-stage breakdown
-          </p>
-          <PipelineStages runId={effectiveRunId} audience={audience} />
-        </Card>
+        <div className="space-y-4">
+          <Card className="p-4">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              5-stage breakdown
+            </p>
+            <PipelineStages runId={effectiveRunId} audience={audience} />
+          </Card>
+          {/*
+            Driven by the SELECTED run's stored snapshot, so switching runs
+            shows each one's own measurements rather than the project's current
+            state. Renders its own empty/unmeasured states, so it is mounted
+            unconditionally.
+          */}
+          <CodeQualityCard
+            quality={runs.find((r) => r.id === effectiveRunId)?.quality}
+            dashboardUrl={sonarDashboardUrl}
+            audience={audience}
+          />
+        </div>
       </div>
     </div>
   );

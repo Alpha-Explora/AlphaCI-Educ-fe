@@ -112,10 +112,11 @@ export const badgeCopy = {
   serial: "AE · CLASS OF 2026",
   /** The little pill at bottom-right of the card. One word if you can. */
   status: "Issued",
-  // NOTE: there is deliberately no drag/pull hint here any more. The pass
-  // swings when grabbed and throws confetti when pulled and released, but
-  // nothing on the page says so — it is left to be found. If you ever want to
-  // advertise it again, the line belongs under the card, not on it.
+  // NOTE: there is no drag/pull hint here because there is nothing to hint at.
+  // The pass used to swing when grabbed and throw confetti when released; that
+  // interaction was removed (see LanyardBadge.tsx) so the first screen on a
+  // shared lab PC is something you read and pass through, not something you
+  // play with. The card is now purely a picture of a pass.
 } as const;
 
 /**

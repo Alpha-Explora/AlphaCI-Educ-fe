@@ -11,10 +11,12 @@
 // keeping it out of the form's way — minutes-long cycles, transform only, no
 // blur — are documented in AuthScene.module.css next to the values.
 //
-// `overflow-x-hidden` is load-bearing, not tidiness: a swinging pass reaches
-// past its own column, and without it a hard throw would grow the document
-// and hand the page a horizontal scrollbar. The Y axis stays scrollable so a
-// short landscape viewport can still reach the form.
+// `overflow-x-hidden` is load-bearing, not tidiness: the drifting blobs are
+// deliberately larger than the viewport and travel past its edges, and without
+// it they would grow the document and hand the page a horizontal scrollbar.
+// (It also used to contain a pass that could be swung past its own column;
+// that interaction is gone, but the blobs alone still need this.) The Y axis
+// stays scrollable so a short landscape viewport can still reach the form.
 // ============================================================================
 import { cn } from "@/components/ui/cn";
 import styles from "./AuthScene.module.css";

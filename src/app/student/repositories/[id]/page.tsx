@@ -1,16 +1,17 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — Active workspace (student)
-// Branch toggle, Get Lab Token, Submit for grading, CI/CD error logs (per-stage
-// checks with human-readable hints; hidden tests masked), and a private Grades
-// & Feedback area. Consumes useRepositoryDetail + useGrading (submit only).
+// Open in VS Code, Get Lab Token, hand in, code browser, pull requests, GitHub
+// Actions runs, CI/CD error logs (per-stage checks with human-readable hints;
+// hidden tests masked), and a private Grades & Feedback area. Consumes
+// useRepositoryDetail + useGrading (submit only).
 //
 // TABBED because the page had grown to four full-height sections stacked in one
 // column — the actions a student needs constantly (open in VS Code, submit) sat
 // above three long read-only panels, so every visit to check a failing test
-// meant scrolling past them, and every submit meant scrolling back. The four
-// panels are also used at different moments, not together: you work, then you
-// look at what CI said, then much later you read a grade.
+// meant scrolling past them, and every submit meant scrolling back. The panels
+// are also used at different moments, not together: you work, you propose the
+// merge, you watch it run, then much later you read a grade.
 //
 // The header, the status pills and the closed-project banner stay OUTSIDE the
 // tabs: they describe the repository itself, and a student who cannot submit
@@ -35,28 +36,43 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
+import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
+import { CodeBrowserPanel } from "@/components/domain/CodeBrowserPanel";
 import { LabTokenPanel } from "@/components/domain/LabTokenPanel";
 import { StartAssignmentPanel } from "@/components/domain/StartAssignmentPanel";
-import { GithubActivityPanel } from "@/components/domain/GithubActivityPanel";
+import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { StudentGradesCard } from "@/components/domain/StudentGradesCard";
 import { relativeDue } from "@/components/ui/format";
 
 /**
  * Split by MOMENT, not by data source.
  *
- * "Work" is everything you touch while doing the assignment; the other three
- * are things you consult afterwards, in roughly this order — what did I push,
- * what did the tests say, what did I score. Activity and Test results stay
- * apart despite both being about CI: Activity is live GitHub truth (commits,
- * branches, workflow runs) and Test results is this platform's per-stage
- * breakdown with debugging hints. Merging them would rebuild the tall page
- * this split exists to break up.
+ * "Work" is everything you touch while doing the assignment; the rest are
+ * things you consult afterwards, in roughly this order — what did I submit,
+ * what ran on it, what did the tests say, what did I score.
+ *
+ * The names are GitHub's on purpose. A student who learns "Code / Pull
+ * requests / Actions" here reads a real repository on the first attempt; one
+ * who learns our private vocabulary has to learn it twice. Pull requests and
+ * Actions were previously called neither of those things — the merge flow was
+ * buried at the bottom of Work, and the run history was "Activity".
+ *
+ * Actions and Test results stay apart despite both being about CI: Actions is
+ * GitHub's own truth (which run, which job, which step) and Test results is
+ * this platform's per-stage grading breakdown. Merging them would rebuild the
+ * tall page this split exists to break up.
  */
-type WorkspaceTab = "work" | "activity" | "results" | "grades";
+type WorkspaceTab = "work" | "code" | "pulls" | "actions" | "results" | "grades";
 
 const TABS: ReadonlyArray<TabItem<WorkspaceTab>> = [
   { id: "work", label: "Work" },
-  { id: "activity", label: "Activity" },
+  // Directly after Work: reading your own code is part of doing the assignment,
+  // not an afterthought — and students have no GitHub account to read it on.
+  { id: "code", label: "Code" },
+  // Then the order the work actually moves in: propose it, watch it run, read
+  // what the tests said, read the mark.
+  { id: "pulls", label: "Pull requests" },
+  { id: "actions", label: "Actions" },
   { id: "results", label: "Test results" },
   { id: "grades", label: "Grades" },
 ];
@@ -126,8 +142,8 @@ export default function StudentWorkspacePage() {
             {closed && (
               <Banner tone="warning" title="Project closed">
                 Your teacher has ended this project. You can no longer open it in VS
-                Code, get a lab token, or submit. Your work and grades stay available
-                under Test results and Grades.
+                Code, get a lab token, merge a pull request, or submit. Your work and
+                grades stay available under Code, Actions, Test results and Grades.
               </Banner>
             )}
 
@@ -179,14 +195,25 @@ export default function StudentWorkspacePage() {
                         />
                       </div>
 
+                      {/*
+                        Deliberately reworded to stop this being confused with
+                        "Submit for review" below, which is the git operation.
+                        This button performs NO git action at all — it sets
+                        repo.status = SUBMITTED, a declaration that you are done.
+                        The previous copy said "your current work on {branch}",
+                        which was doubly misleading: the selected branch is only a
+                        run filter, and students cannot push to main in the first
+                        place, so the state it described was unreachable.
+                      */}
                       <Card className="p-5">
                         <h2 className="text-base font-semibold text-[var(--text-strong)]">
-                          Submit for grading
+                          Tell your teacher you&apos;re finished
                         </h2>
                         <p className="mt-1 text-sm text-[var(--text-muted)]">
-                          Lock in your current work on{" "}
-                          <strong>{vm.selectedBranch ?? "main"}</strong> and send it to your
-                          teacher for review.
+                          This is the last step, and it changes no code. Merge your
+                          work into <strong>main</strong> first, on the{" "}
+                          <strong>Pull requests</strong> tab — whatever is on{" "}
+                          <strong>main</strong> is what gets graded.
                         </p>
 
                         {submission.submitError && (
@@ -211,26 +238,81 @@ export default function StudentWorkspacePage() {
                               loading={submission.isSubmitting}
                               disabled={!canSubmit}
                             >
-                              <span aria-hidden="true">📤</span> Submit for grading
+                              <span aria-hidden="true">📤</span> Mark as finished
                             </Button>
                           )}
                         </div>
                       </Card>
                     </div>
                   )}
+
                 </div>
               )}
 
-              {/* ADDENDUM M — real commits / branches / CI runs from GitHub.
+              {/* Reading the code. Mounted only while selected so its per-path
+                  GitHub reads stop when the student moves to another tab. */}
+              {tab === "code" && (
+                <section
+                  id="workspace-panel-code"
+                  role="tabpanel"
+                  aria-labelledby="workspace-tab-code"
+                >
+                  <CodeBrowserPanel
+                    repoId={d.repo.id}
+                    branches={d.branches}
+                    defaultBranch={vm.selectedBranch}
+                  />
+                </section>
+              )}
+
+              {/*
+                Pull requests — its own tab, because this is a destination, not
+                a step inside "Work". It is the ONLY route from a pushed branch
+                into main: `git push origin main` is rejected by branch
+                protection, and students have no GitHub account to open a pull
+                request with. Sitting at the bottom of Work it read as an
+                optional extra below the submit button, which is precisely
+                backwards — nothing can be graded until it has been used.
+
+                Still hidden once the teacher closes the project: there is
+                nothing left to merge into, and offering the form would only
+                produce a refusal from the server.
+              */}
+              {tab === "pulls" && (
+                <section
+                  id="workspace-panel-pulls"
+                  role="tabpanel"
+                  aria-labelledby="workspace-tab-pulls"
+                  className="space-y-4"
+                >
+                  {closed ? (
+                    <Banner tone="info">
+                      This project is closed, so no new work can be merged. Your
+                      previous submissions are still under Test results and Grades.
+                    </Banner>
+                  ) : (
+                    // Branches come from live GitHub via getDetail, which is what
+                    // makes the branch picker non-empty on a real repository.
+                    <SubmitForReviewPanel
+                      repoId={d.repo.id}
+                      branches={d.branches}
+                      audience="student"
+                      isGroup={Boolean(d.assignment.isGroup)}
+                    />
+                  )}
+                </section>
+              )}
+
+              {/* ADDENDUM M — real GitHub Actions runs, one container per commit.
                   Only mounted while selected, which also stops its polling when a
                   student is reading something else. */}
-              {tab === "activity" && (
+              {tab === "actions" && (
                 <div
-                  id="workspace-panel-activity"
+                  id="workspace-panel-actions"
                   role="tabpanel"
-                  aria-labelledby="workspace-tab-activity"
+                  aria-labelledby="workspace-tab-actions"
                 >
-                  <GithubActivityPanel repoId={d.repo.id} />
+                  <GithubActionsPanel repoId={d.repo.id} />
                 </div>
               )}
 
@@ -266,6 +348,7 @@ export default function StudentWorkspacePage() {
                       isTriggering={vm.isTriggeringRun}
                     />
                   )}
+
                 </section>
               )}
 

@@ -18,18 +18,17 @@ import { isStaffRole } from "@/models/types";
 
 export function useRedirectIfSignedIn(): { isResolving: boolean } {
   const router = useRouter();
-  const { user, isReady, labsReady, needsLabSelection } = useSession();
+  const { user, isReady, labsReady } = useSession();
 
   useEffect(() => {
     if (!isReady || !user) return;
-    // Staff need their labs resolved first, or we'd send a multi-lab teacher to
-    // a dashboard scoped to no lab and immediately bounce her out again.
+    // Staff still wait for their labs to resolve, even though there is no
+    // picker any more: the dashboard is lab-scoped, and navigating before the
+    // active lab is known shows a moment of unscoped data.
     const isStaff = isStaffRole(user.role);
     if (isStaff && !labsReady) return;
-    router.replace(
-      postLoginDestination(user.role, needsLabSelection, user.githubLogin),
-    );
-  }, [isReady, labsReady, needsLabSelection, router, user]);
+    router.replace(postLoginDestination(user.role, user.githubLogin));
+  }, [isReady, labsReady, router, user]);
 
   return { isResolving: !isReady || Boolean(user) };
 }

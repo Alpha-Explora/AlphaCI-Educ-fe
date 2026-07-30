@@ -27,6 +27,10 @@ import {
   GROUP_MIN,
   GROUP_MAX,
   DEFAULT_COVERAGE,
+  COVERAGE_OPTIONS,
+  DEFAULT_POINTS,
+  POINTS_OPTIONS,
+  rubricSplitsEvenly,
   STACK_OPTIONS,
   BACKEND_STACK_OPTIONS,
   FRONTEND_STACK_OPTIONS,
@@ -172,6 +176,134 @@ function Stepper({
   );
 }
 
+/** Sentinel option value — no real total can collide with it. */
+const POINTS_CUSTOM = "custom";
+
+/**
+ * Total-points picker: a shortcut list plus a free Custom field.
+ *
+ * Points is not coverage. The total comes from the institution's grading
+ * scheme, so the list can only ever be a shortcut — closing it would tell a
+ * teacher their 25-point lab is not a thing. What the list buys is a nudge
+ * toward totals the rubric can actually divide, which the hint then makes
+ * explicit for the ones it can't.
+ */
+function PointsField({
+  value,
+  custom,
+  onChange,
+}: {
+  readonly value: string;
+  readonly custom: boolean;
+  readonly onChange: (next: { value: string; custom: boolean }) => void;
+}) {
+  const n = Number(value);
+  // Silent while the field is empty or nonsense — the step error owns that
+  // case, and two complaints about one field is one too many.
+  const uneven = value.trim() !== "" && Number.isInteger(n) && n > 0 && !rubricSplitsEvenly(n);
+
+  return (
+    <Field
+      label="Points"
+      required
+      hint={
+        uneven
+          ? `${n} does not divide evenly — stage marks get rounded.`
+          : undefined
+      }
+    >
+      {({ id }) => (
+        <div className="space-y-2">
+          <Select
+            id={id}
+            value={custom ? POINTS_CUSTOM : value}
+            onChange={(e) => {
+              const next = e.target.value;
+              // Choosing Custom keeps the current total as the starting point
+              // rather than blanking the field: the teacher edits a number they
+              // can see instead of facing an empty box that is already invalid.
+              onChange(
+                next === POINTS_CUSTOM
+                  ? { value, custom: true }
+                  : { value: next, custom: false },
+              );
+            }}
+          >
+            {POINTS_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {p === DEFAULT_POINTS ? `${p} (default)` : p}
+              </option>
+            ))}
+            <option value={POINTS_CUSTOM}>Custom…</option>
+          </Select>
+          {custom && (
+            // No max here on purpose. This field exists precisely because the
+            // institution's scale cannot be predicted, so inventing a ceiling
+            // would defeat the one thing it is for.
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={value}
+              onChange={(e) => onChange({ value: e.target.value, custom: true })}
+              aria-label="Points — custom total"
+              // Reached only by picking Custom, so focus follows the teacher's
+              // own action rather than stealing it on open.
+              autoFocus
+            />
+          )}
+        </div>
+      )}
+    </Field>
+  );
+}
+
+/**
+ * Minimum-coverage picker.
+ *
+ * One component for both layouts — SINGLE gives it half a row and SPLIT a
+ * third, so only the label shortens. A select rather than a number spinner
+ * because the choice is a teaching policy off a known ladder, not a free
+ * measurement: see COVERAGE_OPTIONS for why 83 was never a useful answer.
+ */
+function CoverageField({
+  label,
+  value,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly onChange: (value: number) => void;
+}) {
+  return (
+    <Field
+      label={label}
+      required
+      // The consequence of 0 is the one thing a teacher can get wrong here, and
+      // it is invisible from the word "No minimum" alone.
+      hint={
+        value === 0
+          ? "No gate — CI passes even with no tests."
+          : "CI fails below this %."
+      }
+    >
+      {({ id }) => (
+        <Select
+          id={id}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        >
+          {COVERAGE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
+
 export function CreateProjectModal({
   open,
   onClose,
@@ -196,7 +328,14 @@ export function CreateProjectModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [points, setPoints] = useState("100");
+  // Still a string: the Custom field is free text, so it has to hold "" and
+  // half-typed values on the way to a number.
+  const [points, setPoints] = useState(String(DEFAULT_POINTS));
+  // Whether Custom is showing, tracked rather than derived from "is `points`
+  // one of POINTS_OPTIONS". Deriving it would yank the input away from a
+  // teacher who picked Custom and then typed a number that happens to be on
+  // the list.
+  const [pointsCustom, setPointsCustom] = useState(false);
   const [type, setType] = useState<ProjectType>("SOLO");
   const [soloSelected, setSoloSelected] = useState<Set<string>>(
     () => new Set(students.map((s) => s.id)),
@@ -209,7 +348,9 @@ export function CreateProjectModal({
   const [stack, setStack] = useState<Stack>("nodejs");
   const [backendStack, setBackendStack] = useState<Stack>("nestjs");
   const [frontendStack, setFrontendStack] = useState<Stack>("nextjs");
-  const [coverage, setCoverage] = useState(String(DEFAULT_COVERAGE));
+  // A number, not a string: the picker can only yield values from
+  // COVERAGE_OPTIONS, so there is no half-typed intermediate state to hold.
+  const [coverage, setCoverage] = useState(DEFAULT_COVERAGE);
   // Lab session length. Empty string = "use the server default", which is a
   // real choice and not the same as typing the default in: a project that never
   // expressed an opinion follows the policy if the operator later changes it.
@@ -253,7 +394,11 @@ export function CreateProjectModal({
     if (step === "details") {
       if (!title.trim()) errors.push("Title is required.");
       if (!dueDate) errors.push("Due date is required.");
-      if (!(Number(points) > 0)) errors.push("Points must be a positive number.");
+      // Whole numbers only — mirrors validateCreateProject, which mirrors the
+      // DTO's @IsInt(). Reachable via the Custom points field.
+      const pts = Number(points);
+      if (!Number.isInteger(pts) || pts <= 0)
+        errors.push("Points must be a whole number greater than 0.");
     }
     if (step === "students") {
       if (type === "SOLO") {
@@ -268,11 +413,9 @@ export function CreateProjectModal({
       }
     }
     if (step === "repository") {
-      const cov = Number(coverage);
-      if (!Number.isInteger(cov) || cov < 0 || cov > 100)
-        errors.push(
-          "Minimum test coverage must be a whole number between 0 and 100.",
-        );
+      // Coverage is absent from this list on purpose — it is a picker over
+      // COVERAGE_OPTIONS, so it has no invalid state to report. The 0..100 rule
+      // still lives in validateCreateProject as the authority on the wire.
       if (sessionHours.trim() !== "") {
         const hrs = Number(sessionHours);
         if (!Number.isInteger(hrs) || hrs < limits.minSessionHours || hrs > limits.maxSessionHours)
@@ -290,7 +433,6 @@ export function CreateProjectModal({
     type,
     soloSelected,
     groups,
-    coverage,
     sessionHours,
     limits.minSessionHours,
     limits.maxSessionHours,
@@ -331,7 +473,7 @@ export function CreateProjectModal({
       description: description.trim(),
       dueDate,
       points: Number(points),
-      coverageThreshold: Number(coverage),
+      coverageThreshold: coverage,
       isPrivate,
       // Omitted entirely when left blank — see the sessionHours state comment.
       ...(sessionHours.trim() !== "" && { labSessionHours: Number(sessionHours) }),
@@ -540,17 +682,14 @@ export function CreateProjectModal({
                     />
                   )}
                 </Field>
-                <Field label="Points" required>
-                  {({ id }) => (
-                    <Input
-                      id={id}
-                      type="number"
-                      min={1}
-                      value={points}
-                      onChange={(e) => setPoints(e.target.value)}
-                    />
-                  )}
-                </Field>
+                <PointsField
+                  value={points}
+                  custom={pointsCustom}
+                  onChange={({ value, custom }) => {
+                    setPoints(value);
+                    setPointsCustom(custom);
+                  }}
+                />
                 {/*
                   "Starter template URL" used to sit here. It was never read by
                   provisioning — repository contents come entirely from
@@ -869,23 +1008,11 @@ export function CreateProjectModal({
                         </Select>
                       )}
                     </Field>
-                    <Field
+                    <CoverageField
                       label="Minimum test coverage (%)"
-                      required
-                      hint="CI fails below this %."
-                    >
-                      {({ id }) => (
-                        <Input
-                          id={id}
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={1}
-                          value={coverage}
-                          onChange={(e) => setCoverage(e.target.value)}
-                        />
-                      )}
-                    </Field>
+                      value={coverage}
+                      onChange={setCoverage}
+                    />
                   </div>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-3">
@@ -919,23 +1046,11 @@ export function CreateProjectModal({
                         </Select>
                       )}
                     </Field>
-                    <Field
+                    <CoverageField
                       label="Min. coverage (%)"
-                      required
-                      hint="CI fails below this %."
-                    >
-                      {({ id }) => (
-                        <Input
-                          id={id}
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={1}
-                          value={coverage}
-                          onChange={(e) => setCoverage(e.target.value)}
-                        />
-                      )}
-                    </Field>
+                      value={coverage}
+                      onChange={setCoverage}
+                    />
                   </div>
                 )}
 

@@ -3,10 +3,15 @@ import { apiRequest } from "./client";
 import type {
   AssignmentRepository,
   GithubRepoActivity,
+  GithubRunJobs,
   LabToken,
+  MergeResult,
   PipelineRun,
   PipelineRunDetail,
   ProvisionRepositoryResult,
+  PullRequestFile,
+  PullRequestView,
+  RepoContentListing,
   RepositoryDetail,
 } from "../types";
 
@@ -55,6 +60,75 @@ export const repositoriesApi = {
   githubActivity(id: string, branch?: string) {
     return apiRequest<GithubRepoActivity>(`/repositories/${id}/github-activity`, {
       query: { branch },
+    });
+  },
+
+  /**
+   * One run's jobs and steps — the detail behind a run in the Actions view.
+   *
+   * Separate from githubActivity because that one polls: fetching every run's
+   * jobs on every poll would spend the lab's shared GitHub rate limit on detail
+   * nobody has opened.
+   */
+  workflowRunJobs(id: string, runId: number) {
+    return apiRequest<GithubRunJobs>(
+      `/repositories/${id}/github-activity/runs/${runId}/jobs`,
+    );
+  },
+
+  /**
+   * Browse the repository's code at a branch.
+   *
+   * `ref` is a branch name (or sha). Omitting `path` lists the root.
+   */
+  files(id: string, params: { path?: string; ref?: string }) {
+    return apiRequest<RepoContentListing>(`/repositories/${id}/files`, {
+      query: { path: params.path, ref: params.ref },
+    });
+  },
+
+  // ── Pull requests ──────────────────────────────────────────────────────
+  // Students have no GitHub account and their lab token cannot open a pull
+  // request, so these four calls are the only route from a pushed branch to a
+  // merged one. The server decides every merge; nothing here can bypass it.
+
+  pullRequests(id: string) {
+    return apiRequest<PullRequestView[]>(`/repositories/${id}/pull-requests`);
+  },
+
+  openPullRequest(id: string, payload: { head: string; base: string; title?: string }) {
+    return apiRequest<PullRequestView>(`/repositories/${id}/pull-requests`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /** The changed files and patches for one pull request. */
+  pullRequestFiles(id: string, number: number) {
+    return apiRequest<PullRequestFile[]>(
+      `/repositories/${id}/pull-requests/${number}/files`,
+    );
+  },
+
+  approvePullRequest(id: string, number: number) {
+    return apiRequest<PullRequestView>(
+      `/repositories/${id}/pull-requests/${number}/approve`,
+      { method: "POST" },
+    );
+  },
+
+  /**
+   * `override` is teacher-only and the server enforces that. It bypasses a
+   * failing pipeline, never the peer-review requirement.
+   */
+  mergePullRequest(
+    id: string,
+    number: number,
+    payload?: { override?: boolean; reason?: string },
+  ) {
+    return apiRequest<MergeResult>(`/repositories/${id}/pull-requests/${number}/merge`, {
+      method: "POST",
+      body: payload ?? {},
     });
   },
 };

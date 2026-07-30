@@ -13,6 +13,7 @@
 // Presentation only: useSignIn owns fields, validation, failure copy, and the
 // post-login destination.
 // ============================================================================
+import Link from "next/link";
 import { Banner, Spinner } from "@/components/ui";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { CredentialsForm } from "@/components/auth/CredentialsForm";
@@ -50,11 +51,26 @@ export default function SignInPage() {
       }
       subheading="Use your school email and password."
       footer={
-        // Was five lines explaining who creates accounts for whom. Nobody at a
-        // sign-in prompt needs the org chart; they need to know it is not their
-        // job, and what to press.
+        // Two audiences, one line each, because the answer to "I have no
+        // account" now differs by who is asking. A student does not have one to
+        // wait for — signing in IS the enrolment, so the only thing they can get
+        // wrong is using a personal address instead of their school one. If they
+        // do, the server says so by name; there is no point listing the domain
+        // here as well, where it would go stale the moment it is reconfigured.
+        // The student line now points somewhere, because "set up on your first
+        // sign-in" was only ever true in development. In production a student
+        // needs credentials before there is anything to sign in WITH, and
+        // nothing on this page used to say where to get them.
         <p>
-          No account? Your teacher or IT admin makes it. Then use{" "}
+          Students:{" "}
+          <Link
+            href="/signin/create-account"
+            className="font-medium text-platform-600 underline-offset-2 hover:underline"
+          >
+            create an account
+          </Link>{" "}
+          with your school email — your workspace is set up on your first
+          sign-in. Staff: your IT admin creates yours, then use{" "}
           <span className="font-medium text-[var(--text-strong)]">
             Forgot password
           </span>

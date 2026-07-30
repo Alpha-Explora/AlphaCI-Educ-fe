@@ -30,18 +30,87 @@ export const GROUP_MIN = 2;
 export const GROUP_MAX = 4;
 export const DEFAULT_COVERAGE = 80;
 
+export const DEFAULT_POINTS = 100;
+
+/**
+ * Common assignment totals, offered as a shortcut — NOT as the whole range.
+ *
+ * Unlike coverage, points has no canonical scale: the figure comes from the
+ * institution's own grading scheme, so a closed list would make a 25-point lab
+ * or a 75-point project inexpressible. Hence the Custom escape hatch in the
+ * View. This list is only "what most teachers pick", ordered low to high.
+ */
+export const POINTS_OPTIONS: ReadonlyArray<number> = [20, 40, 50, 60, 80, 100, 150, 200];
+
+/**
+ * Does the backend's rubric divide this total without rounding?
+ *
+ * rubricFor (ci.service.ts) awards each stage `Math.round(total * fraction)`
+ * using the shares below, so a total those fractions cannot divide leaves a
+ * mark or two hanging on rounding — 50 points yields 5/8/15/13, which sums to
+ * 41 where 40 was intended. 15% is the binding share, so in practice this is
+ * "a multiple of 20", but deriving it from the shares keeps the two in step if
+ * the weighting is ever retuned.
+ *
+ * Percentages, not decimals, on purpose: `points * 15 % 100` is exact integer
+ * arithmetic, where `points * 0.15` is subject to float error.
+ */
+const RUBRIC_SHARE_PERCENTS: ReadonlyArray<number> = [10, 15, 30, 25];
+
+export function rubricSplitsEvenly(points: number): boolean {
+  if (!Number.isInteger(points) || points <= 0) return false;
+  return RUBRIC_SHARE_PERCENTS.every((pct) => (points * pct) % 100 === 0);
+}
+
+/**
+ * ADDENDUM G — the coverage thresholds a teacher may pick from.
+ *
+ * A free number box accepted 83, or 8 meant as 80. Both look deliberate and
+ * neither is: the figure is baked into the student's jest.config.ts as a build
+ * gate AND spread into the grading rubric (branches at −10, functions at −5),
+ * so an off-by-one keystroke silently rewrites how a class is marked. A fixed
+ * ladder turns the field into a policy choice — lenient, recommended, strict —
+ * and removes the typo class the validator existed to catch.
+ *
+ * 0 stays on the list deliberately. An early project where tests are not yet
+ * the point needs an honest way to say "no gate", rather than a threshold set
+ * so low it pretends to be one.
+ */
+export const COVERAGE_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
+  { value: 0, label: "No minimum" },
+  { value: 50, label: "50%" },
+  { value: 60, label: "60%" },
+  { value: 70, label: "70%" },
+  { value: 80, label: "80% (recommended)" },
+  { value: 90, label: "90%" },
+  { value: 100, label: "100%" },
+];
+
 // ADDENDUM G — stack option metadata for the language selects.
 export const STACK_OPTIONS: ReadonlyArray<{ value: Stack; label: string }> = [
   { value: "nodejs", label: "Node.js" },
   { value: "nestjs", label: "NestJS" },
   { value: "nextjs", label: "Next.js" },
   { value: "react", label: "React" },
+  { value: "java", label: "Java (Maven)" },
+  { value: "python", label: "Python" },
+  { value: "php", label: "PHP" },
 ];
+
+/**
+ * A SPLIT project scaffolds two repositories, and each half gets its own
+ * language. Java, Python and PHP are backend runtimes with no browser build, so
+ * they appear here and never in FRONTEND_STACK_OPTIONS — offering "PHP" as a
+ * frontend would generate a repository the pipeline has no way to build.
+ */
+const BACKEND_STACKS: ReadonlyArray<Stack> = ["nodejs", "nestjs", "java", "python", "php"];
+const FRONTEND_STACKS: ReadonlyArray<Stack> = ["nextjs", "react"];
+
 export const BACKEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
-  ["nodejs", "nestjs"].includes(o.value),
+  BACKEND_STACKS.includes(o.value),
 );
 export const FRONTEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
-  ["nextjs", "react"].includes(o.value),
+  FRONTEND_STACKS.includes(o.value),
 );
 
 // ---- Pure validation helpers (exported for inline hints in the View) --------
@@ -65,8 +134,11 @@ export function validateCreateProject(input: CreateProjectInput): string[] {
   const errors: string[] = [];
   if (!input.title.trim()) errors.push("Title is required.");
   if (!input.dueDate) errors.push("Due date is required.");
-  if (!Number.isFinite(input.points) || input.points <= 0)
-    errors.push("Points must be a positive number.");
+  // Whole numbers only, matching CreateAssignmentDto's @IsInt(). The old
+  // `isFinite` check let 33.5 through to a 400 from the API — reachable now
+  // that the points picker has a free-text Custom option.
+  if (!Number.isInteger(input.points) || input.points <= 0)
+    errors.push("Points must be a whole number greater than 0.");
 
   if (input.type === "SOLO") {
     if (!input.studentIds || input.studentIds.length === 0)
