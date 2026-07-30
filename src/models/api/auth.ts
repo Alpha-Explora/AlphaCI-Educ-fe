@@ -32,6 +32,27 @@ export const authApi = {
   },
 
   /**
+   * Registers a student with their school email address.
+   *
+   * Creates CREDENTIALS only. The AlphaCI profile is created later, on the first
+   * confirmed sign-in — so an address that never confirms never joins a roster.
+   *
+   * Unlike requestPasswordReset below, this DOES answer differently for a
+   * refused address: "that is not your school's domain" and "you already have an
+   * account" are both things the student has to read to get any further.
+   */
+  studentSignup(credentials: { email: string; password: string }) {
+    return apiRequest<{
+      created: boolean;
+      needsEmailConfirmation: boolean;
+      message: string;
+    }>("/auth/student/signup", {
+      method: "POST",
+      body: credentials,
+    });
+  },
+
+  /**
    * Sends a password-reset email via Supabase Auth. Deliberately resolves even
    * when the address is unknown — a distinguishable response here would turn
    * this endpoint into an account-enumeration oracle for a school roster.

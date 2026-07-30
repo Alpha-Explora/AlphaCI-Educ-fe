@@ -9,9 +9,10 @@
 // Both sign-in doors render this identically; the difference between them is
 // the surrounding copy, not the fields.
 // ============================================================================
-import { useId, useState } from "react";
+import { useId } from "react";
 import Link from "next/link";
 import { Banner, Button, Input } from "@/components/ui";
+import { PasswordField } from "./PasswordField";
 import type { SignInVM } from "@/viewmodels/useSignIn";
 
 export function CredentialsForm({
@@ -28,7 +29,6 @@ export function CredentialsForm({
 }) {
   const emailId = useId();
   const passwordId = useId();
-  const [showPassword, setShowPassword] = useState(false);
 
   const emailError = vm.fieldErrors.email;
   const passwordError = vm.fieldErrors.password;
@@ -74,59 +74,31 @@ export function CredentialsForm({
         )}
       </div>
 
-      {/* --- Password ---------------------------------------------------- */}
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <label
-            htmlFor={passwordId}
-            className="block text-sm font-medium text-[var(--text-strong)]"
-          >
-            Password
-          </label>
-          {forgotHref && (
+      {/* --- Password ----------------------------------------------------
+          The reveal toggle moved into PasswordField, shared with account
+          creation. It was a Show/Hide label here; the reasoning for HAVING a
+          toggle (shared lab PCs, typo-driven lockouts) is unchanged and now
+          lives with the component. */}
+      <PasswordField
+        id={passwordId}
+        label="Password"
+        value={vm.password}
+        onChange={vm.setPassword}
+        onBlur={() => vm.markTouched("password")}
+        disabled={vm.isSubmitting}
+        autoComplete="current-password"
+        error={passwordError}
+        labelAction={
+          forgotHref && (
             <Link
               href={forgotHref}
               className="rounded text-xs font-medium text-platform-600 underline-offset-2 hover:underline"
             >
               Forgot password?
             </Link>
-          )}
-        </div>
-        <div className="relative">
-          <Input
-            id={passwordId}
-            type={showPassword ? "text" : "password"}
-            value={vm.password}
-            onChange={(e) => vm.setPassword(e.target.value)}
-            onBlur={() => vm.markTouched("password")}
-            disabled={vm.isSubmitting}
-            autoComplete="current-password"
-            aria-invalid={passwordError ? true : undefined}
-            aria-describedby={passwordError ? `${passwordId}-error` : undefined}
-            className={passwordError ? "border-danger pr-16" : "pr-16"}
-          />
-          {/*
-            A show/hide toggle rather than a "reveal" icon: on a shared lab PC,
-            typo-driven lockouts are the most common sign-in failure, and being
-            able to check what you typed prevents most of them.
-            aria-pressed communicates the current state to screen readers.
-          */}
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-pressed={showPassword}
-            aria-controls={passwordId}
-            className="absolute inset-y-0 right-0 rounded-r-lg px-3 text-xs font-semibold text-platform-600 hover:text-platform-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform"
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
-        </div>
-        {passwordError && (
-          <p id={`${passwordId}-error`} className="text-xs text-danger">
-            {passwordError}
-          </p>
-        )}
-      </div>
+          )
+        }
+      />
 
       <Button type="submit" loading={vm.isSubmitting} className="w-full">
         {vm.isSubmitting ? "Signing you in…" : submitLabel}
