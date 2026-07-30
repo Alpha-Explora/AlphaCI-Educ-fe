@@ -9,6 +9,10 @@ const NAV: NavItem[] = [
   { href: "/teacher/courses", label: "Courses" },
   { href: "/teacher/groups", label: "Groups" },
   { href: "/teacher/reports", label: "Report" },
+  // /teacher/rubric existed and was rendered by nobody — no nav entry, no link
+  // from any page. The grading reference is the one document a teacher needs
+  // before setting an assignment, so it cannot be reachable only by typing a URL.
+  { href: "/teacher/rubric", label: "Grading" },
   { href: "/teacher/settings", label: "Settings" },
 ];
 

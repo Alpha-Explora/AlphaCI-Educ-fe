@@ -5,6 +5,9 @@ import { AppShell, type NavItem } from "@/components/layout/AppShell";
 const NAV: NavItem[] = [
   { href: "/student", label: "Courses" },
   { href: "/student/reports", label: "Report" },
+  // Before Settings, not after: a student meeting CI/CD for the first time needs
+  // this in the main flow, not filed under configuration they will never open.
+  { href: "/student/how-it-works", label: "How it works" },
   { href: "/student/settings", label: "Settings" },
 ];
 

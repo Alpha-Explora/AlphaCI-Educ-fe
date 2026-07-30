@@ -279,6 +279,15 @@ export interface AssignmentRepository {
   // ADDENDUM G — which side of a SPLIT project this repo is (SINGLE otherwise)
   component?: RepoComponent;
   stack?: Stack; // the language/framework scaffolded into this repo
+  /** This repository's own SonarCloud project key, once provisioned. */
+  sonarProjectKey?: string;
+  /** Deep link to its SonarCloud dashboard. Teacher-facing only. */
+  sonarDashboardUrl?: string;
+  /**
+   * Why Sonar setup did not complete. Present means stage ③ will report code
+   * quality as not measured until the repository is re-provisioned.
+   */
+  sonarError?: string;
 }
 
 export interface RepositoryCollaborator {
@@ -286,6 +295,96 @@ export interface RepositoryCollaborator {
   id: string;
   repoId: string;
   studentId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Pull requests — how a student's branch reaches `main`.
+//
+// `main` and `uat` refuse direct pushes, students have no GitHub identity, and
+// their lab token cannot open a pull request. So submitting, reviewing and
+// merging all happen here; the server holds the only credential that can merge.
+// ---------------------------------------------------------------------------
+export interface PullRequestView {
+  number: number;
+  title: string;
+  state: "open" | "closed" | "merged";
+  head: string;
+  /** The commit a merge would land. Approvals are bound to this. */
+  headSha: string;
+  base: string;
+  htmlUrl: string;
+  /** null while GitHub computes it — "checking", not "conflicts". */
+  mergeable: boolean | null;
+  createdAt: string;
+  mergedAt: string | null;
+  /** Who pressed submit. GitHub attributes the PR to the App, so this is ours. */
+  openedByName: string | null;
+  readiness: MergeReadiness;
+}
+
+export interface MergeReadiness {
+  canMerge: boolean;
+  /** True when the only remaining path is a teacher override. */
+  needsTeacher: boolean;
+  /** Plain-language reasons, safe to show a student verbatim. */
+  blockers: string[];
+  pipeline: {
+    status: "passing" | "failing" | "none";
+    runId: string | null;
+    score: number | null;
+  };
+  review: {
+    required: boolean;
+    satisfied: boolean;
+    approvals: { userId: string; name: string }[];
+  };
+}
+
+export interface MergeResult {
+  merged: boolean;
+  message: string;
+  readiness: MergeReadiness;
+}
+
+// ---------------------------------------------------------------------------
+// Reading code inside AlphaCI.
+//
+// Students have no GitHub account, so they cannot open their own repository to
+// read it. Without this the code being graded is the one thing they cannot look
+// at — and a teacher could not review a submission without leaving for a site
+// the student has no way to visit.
+// ---------------------------------------------------------------------------
+/** One changed file in a pull request, with its unified diff. */
+export interface PullRequestFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  /** null for binary files and diffs GitHub considers too large. */
+  patch: string | null;
+}
+
+export interface RepoContentEntry {
+  name: string;
+  path: string;
+  type: "dir" | "file";
+  size: number;
+}
+
+export interface RepoContentListing {
+  /** GitHub returns an array for a directory and an object for a file. */
+  kind: "dir" | "file" | "missing";
+  path: string;
+  entries: RepoContentEntry[];
+  file?: {
+    name: string;
+    path: string;
+    size: number;
+    /** null when binary or over GitHub's 1 MB inline limit. */
+    text: string | null;
+    isBinary: boolean;
+    tooLarge: boolean;
+  };
 }
 
 export interface HardwarePc {
@@ -308,6 +407,36 @@ export interface PipelineRun {
   logUrl: string; // mock S3 pointer
   startedAt: string;
   finishedAt: string | null;
+  /**
+   * SonarCloud measures as they stood when this run was graded.
+   *
+   * A snapshot, not a live read: SonarCloud keeps only a project's CURRENT
+   * state, so fetching it when a teacher opens an old run would describe the
+   * code as it is today rather than as it was when the mark was given.
+   */
+  quality?: PipelineQuality;
+}
+
+export interface PipelineQuality {
+  /** False when Sonar could not be read — the component was then excluded. */
+  measured: boolean;
+  pointsAwarded: number;
+  pointsPossible: number;
+  bugs: number;
+  vulnerabilities: number;
+  codeSmells: number;
+  /** A–E, or '?' when unmeasured. Display only — `debtRatio` carries the score. */
+  maintainability: string;
+  /**
+   * Technical debt ratio: remediation effort as a percentage of the estimated
+   * effort to write the project. What maintainability is graded on, because the
+   * A–E letter buckets 0–5% into one band that every small project falls in.
+   * Null when Sonar did not report it and the letter ladder was used instead.
+   */
+  debtRatio: number | null;
+  /** Duplicated lines within the student's own project, as a percentage. */
+  duplication: number;
+  ncloc: number;
 }
 
 export interface PipelineCheck {
@@ -727,7 +856,23 @@ export interface GithubWorkflowRunInfo {
   event: string;
   createdAt: string;
   url: string;
-  jobs: GithubWorkflowJob[]; // newest run only
+  jobs: GithubWorkflowJob[]; // newest run only — the rest load on expand
+  runNumber: number;
+  runAttempt: number;
+  /** The commit that triggered the run, carried on the run itself: a run's
+   *  commit is often outside the (separately paged) `commits` list. */
+  commitMessage: string;
+  commitAuthor: string;
+  actor: string;
+  startedAt: string | null;
+  updatedAt: string | null;
+}
+
+/** One run's jobs, loaded when that run is opened. */
+export interface GithubRunJobs {
+  live: boolean;
+  jobs: GithubWorkflowJob[];
+  error: string | null;
 }
 export interface GithubRepoActivity {
   live: boolean;

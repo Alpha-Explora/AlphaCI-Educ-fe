@@ -45,9 +45,16 @@ export interface Rubric {
   quality?: {
     maxCognitiveComplexity: number;
     maxDuplicationPercent: number;
+    /** Debt ratio at or below which maintainability scores in full. */
+    fullCreditDebtRatio?: number;
+    /** Debt ratio at or above which it scores nothing. Linear between. */
+    zeroCreditDebtRatio?: number;
+    /** The target shown to students; the debt ratio above carries the score. */
     minMaintainabilityRating: MaintainabilityRating;
     deductPerBug: number;
     deductPerVulnerability: number;
+    /** Charged on the excess above maxDuplicationPercent only. 0 = advisory. */
+    deductPerDuplicationPercent?: number;
   };
   hiddenTests?: {
     mode: HiddenTestMode;
@@ -148,6 +155,13 @@ export function rubricValueAt(rubric: Rubric | null, path: string): string | nul
  *
  * Deliberately phrased as the questions a student sees in their Actions log,
  * so a teacher explaining a result is using the same words the student read.
+ *
+ * ONE list, TWO audiences. `measures` and `note` address the teacher ("your
+ * tests, which the student cannot read"); `forStudent` addresses the student
+ * directly and says what to do about a failure. They live together so a stage
+ * cannot be changed for one audience and left stale for the other — the same
+ * reason the rubric documentation is generated from rubric.schema.json rather
+ * than written twice.
  */
 export const PIPELINE_STAGES = [
   {
@@ -158,6 +172,12 @@ export const PIPELINE_STAGES = [
     points: null,
     blocks: true,
     note: "Always stops the run when it fails — code that does not parse cannot be tested.",
+    forStudent: {
+      meaning:
+        "Your project is downloaded onto a fresh computer in the cloud, and it tries to install your dependencies and read your code. Nothing has been tested yet — this only checks that your project can start at all.",
+      whatToDo:
+        "If this fails, everything after it is skipped. Look for a typo that breaks the file, a package missing from package.json, or a file you forgot to commit. Fixing this first unblocks every other stage.",
+    },
   },
   {
     number: 2,
@@ -167,6 +187,12 @@ export const PIPELINE_STAGES = [
     points: "lint",
     blocks: false,
     note: "Usually set not to block, so a formatting slip does not cost a student their test results.",
+    forStudent: {
+      meaning:
+        "A style checker reads your code the way a picky reviewer would: inconsistent indentation, unused imports, variables named badly, lines that run too long.",
+      whatToDo:
+        "Most style problems can be fixed automatically. Try `npm run lint -- --fix` before you push. This stage normally does not stop the run, so you still get your test results.",
+    },
   },
   {
     number: 3,
@@ -176,6 +202,12 @@ export const PIPELINE_STAGES = [
     points: "quality",
     blocks: false,
     note: "Measures how well the code is built, not whether it works.",
+    forStudent: {
+      meaning:
+        "SonarCloud reads your code and estimates how long it would take to clean up everything questionable it found. It also measures how much of your code is copy-pasted from elsewhere in your own project. This is about how well the code is BUILT, not whether it works.",
+      whatToDo:
+        "Working code can still score badly here, and that is the point. The fastest wins are usually removing copy-pasted blocks by turning them into one function, and splitting any function that has grown too long to follow.",
+    },
   },
   {
     number: 4,
@@ -185,6 +217,12 @@ export const PIPELINE_STAGES = [
     points: "publicTests",
     blocks: true,
     note: "Coverage below target scales these points rather than zeroing them.",
+    forStudent: {
+      meaning:
+        "The tests in your own repository run, and the pipeline also measures coverage — how much of your code those tests actually execute.",
+      whatToDo:
+        "Run them locally first with `npm test`; a test that fails on your machine will fail here too. If coverage is low, the marks scale down rather than dropping to zero, so writing a few more tests always helps.",
+    },
   },
   {
     number: 5,
@@ -194,6 +232,12 @@ export const PIPELINE_STAGES = [
     points: "hiddenTests",
     blocks: false,
     note: "Runs in the student's pipeline (ci) or on AlphaCI's own infrastructure (secure).",
+    forStudent: {
+      meaning:
+        "Your teacher's own tests run against your code. You cannot read them, but you can see what your code did wrong when one fails — the input it was given and what it was expected to produce.",
+      whatToDo:
+        "These exist so that code which only satisfies the visible tests does not score full marks. Read the failure message, work out which case you have not handled, and fix the logic. Do not try to guess the tests.",
+    },
   },
   {
     number: 6,
@@ -203,6 +247,12 @@ export const PIPELINE_STAGES = [
     points: null,
     blocks: false,
     note: "Worth no points and never blocks. Raises a flag for you to review.",
+    forStudent: {
+      meaning:
+        "Your submission is compared against your classmates' for unusual similarity, and your commit history is checked for patterns like an entire project appearing in one commit.",
+      whatToDo:
+        "This is worth no marks and never stops your run. Committing your work in small steps as you go is the honest habit here — and it also makes this check look exactly the way it should.",
+    },
   },
   {
     number: 7,
@@ -212,5 +262,11 @@ export const PIPELINE_STAGES = [
     points: null,
     blocks: false,
     note: "Always runs, so a student gets a score even from a run that stopped early.",
+    forStudent: {
+      meaning:
+        "Every stage is collected into one scorecard showing what passed and what to fix. This always runs, even if your pipeline stopped at stage 1, so you never get a blank result.",
+      whatToDo:
+        "Your MARK is not shown here. Your teacher releases marks for the whole class once they have reviewed the runs — so use this page for the feedback, not for a score.",
+    },
   },
 ] as const;

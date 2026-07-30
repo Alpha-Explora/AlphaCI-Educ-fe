@@ -19,9 +19,10 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
+import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
 import { GradingPanel } from "@/components/domain/GradingPanel";
 import { PlagiarismCard } from "@/components/domain/PlagiarismCard";
-import { GithubActivityPanel } from "@/components/domain/GithubActivityPanel";
+import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { formatDate, formatDateTime, relativeDue } from "@/components/ui/format";
 
 export default function TeacherRepositoryPage() {
@@ -145,8 +146,10 @@ export default function TeacherRepositoryPage() {
               </Card>
             </div>
 
-            {/* ADDENDUM M — real commits / branches / CI runs from GitHub */}
-            <GithubActivityPanel repoId={d.repo.id} />
+            {/* ADDENDUM M — real GitHub Actions runs, one container per commit.
+                Same panel the student sees, so a teacher debugging "my pipeline
+                failed" is looking at the identical evidence they are. */}
+            <GithubActionsPanel repoId={d.repo.id} />
 
             {/* Plagiarism */}
             <PlagiarismCard flags={d.plagiarism} />
@@ -156,6 +159,19 @@ export default function TeacherRepositoryPage() {
               <h2 className="text-lg font-semibold text-[var(--text-strong)]">
                 CI/CD pipeline
               </h2>
+              {/*
+                Surfaced here rather than only in the server log, because the
+                consequence is invisible otherwise: the pipeline still runs and
+                still reports a mark, it just cannot measure code quality. Left
+                unsaid, a teacher would discover it at the end of term.
+              */}
+              {d.repo.sonarError && (
+                <Banner tone="warning">
+                  SonarCloud is not wired up for this repository, so code quality
+                  cannot be graded ({d.repo.sonarError}). Re-provision the
+                  repository to write its Sonar secrets again.
+                </Banner>
+              )}
               {d.runs.length === 0 ? (
                 <Banner tone="info">No pipeline runs recorded for this repository.</Banner>
               ) : (
@@ -167,8 +183,22 @@ export default function TeacherRepositoryPage() {
                   audience="teacher"
                   onTriggerRun={vm.triggerRun}
                   isTriggering={vm.isTriggeringRun}
+                  sonarDashboardUrl={d.repo.sonarDashboardUrl}
                 />
               )}
+
+              {/*
+                Teachers see the same panel as students, with one addition: when
+                a pipeline has failed, the override control appears. That is the
+                escape hatch for a broken hidden test or a Sonar outage near a
+                deadline, and it is recorded against the teacher who used it.
+              */}
+              <SubmitForReviewPanel
+                repoId={d.repo.id}
+                branches={d.branches}
+                audience="teacher"
+                isGroup={Boolean(d.assignment.isGroup)}
+              />
             </section>
 
             {/* Grading */}

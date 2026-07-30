@@ -134,10 +134,20 @@
           "title": "Maximum duplicated lines %",
           "description": "Copy-pasted blocks within the student's own submission. High duplication is a code-quality problem; it is not the cross-student similarity check, which is stage 6."
         },
+        "fullCreditDebtRatio": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Technical debt % for full maintainability marks",
+          "description": "SonarCloud's technical debt ratio: the estimated time to fix everything it found, as a percentage of the estimated time the project took to write. At or below this value, maintainability scores in full. This is the PRIMARY maintainability signal — it is graded instead of the A-E rating, because the A band alone spans 0-5%, which is the entire range a small student project occupies, so every submission scored the same no matter how much debt it carried."
+        },
+        "zeroCreditDebtRatio": {
+          "type": "number", "minimum": 0, "maximum": 100,
+          "title": "Technical debt % for zero maintainability marks",
+          "description": "At or above this debt ratio, maintainability scores nothing; between the two thresholds it scales linearly. Must be greater than the full-credit value, or the pipeline falls back to grading the coarse A-E rating instead."
+        },
         "minMaintainabilityRating": {
           "enum": ["A", "B", "C", "D", "E"],
           "title": "Minimum maintainability rating",
-          "description": "SonarCloud's A-E rating for how much work the code would take to fix relative to its size. A is best. Full marks at or above this rating, scaling down by 20% per grade below it."
+          "description": "The A-E rating shown to the student as their target. No longer carries the score — the debt ratio above does, since it moves continuously as issues are fixed while the letter can sit on 'A' all term. Still used as the fallback ladder (20% off per grade below) if a Sonar deployment does not report a debt ratio."
         },
         "deductPerBug": {
           "type": "number", "minimum": 0,
@@ -148,6 +158,11 @@
           "type": "number", "minimum": 0,
           "title": "Points deducted per vulnerability",
           "description": "Security-relevant findings, such as an injectable query or a hardcoded credential."
+        },
+        "deductPerDuplicationPercent": {
+          "type": "number", "minimum": 0,
+          "title": "Points deducted per % of duplication over the limit",
+          "description": "Charged only on the EXCESS above 'Maximum duplicated lines %', so 11% against a 10% limit costs one unit rather than eleven. Leave at 0 to keep the duplication limit advisory — it is then shown to the student but does not affect the mark."
         }
       }
     },

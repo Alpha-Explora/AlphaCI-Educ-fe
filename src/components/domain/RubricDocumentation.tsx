@@ -140,6 +140,99 @@ export function RubricDocumentation({
         </Card>
       ))}
 
+      {/*
+        The three cards below are hand-written, unlike everything above them,
+        because they describe pipeline BEHAVIOUR rather than a rubric field.
+        rubric.schema.json can document what `fullCreditDebtRatio` means; it has
+        nowhere to say "an unmeasured component is removed from the denominator".
+      */}
+      <Card className="p-5">
+        <SectionHeading
+          title="How a code quality score is reached"
+          subtitle="Stage 3 is graded on SonarCloud's continuous technical debt ratio, not on its A–E letter."
+        />
+        <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+          <p>
+            The familiar A–E maintainability rating is a rounding of that ratio,
+            and its <strong>A band spans 0–5%</strong> — which is the entire range
+            a small student project occupies. Graded on the letter, a careful
+            submission and a careless one both score full marks. Graded on the
+            ratio, they separate:
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                  <th className="py-2 pr-3 font-medium">A 500-line submission</th>
+                  <th className="py-2 pr-3 font-medium">Debt</th>
+                  <th className="py-2 pr-3 font-medium">Letter</th>
+                  <th className="py-2 font-medium">Quality marks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Careful — about 10 smells", "0.7%", "A", "100%"],
+                  ["Moderate — about 25 smells", "1.7%", "A", "97%"],
+                  ["Careless — about 50 smells", "3.5%", "A", "69%"],
+                  ["Poor — about 100 smells", "6.9%", "B", "17%"],
+                ].map(([profile, debt, letter, marks]) => (
+                  <tr
+                    key={profile}
+                    className="border-b border-slate-100 last:border-0 dark:border-slate-800"
+                  >
+                    <td className="py-2.5 pr-3">{profile}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{debt}</td>
+                    <td className="py-2.5 pr-3">{letter}</td>
+                    <td className="py-2.5 tabular-nums font-medium text-[var(--text-strong)]">
+                      {marks}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-500">
+            Shown as a share of the quality points available, because the absolute
+            figure depends on the assignment&apos;s own total. Bugs,
+            vulnerabilities and excess duplication are then deducted from this
+            result, and the component floors at zero.
+          </p>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <SectionHeading
+          title="When a stage cannot be measured"
+          subtitle="An unmeasured component is removed from the total — never scored as zero."
+        />
+        <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+          <p>
+            If SonarCloud is not configured for a repository, or an analysis does
+            not finish in time, stage 3 reports{" "}
+            <strong>not measured</strong> and its points leave the denominator.
+            A student graded this way is neither credited nor penalised for
+            infrastructure they do not control.
+          </p>
+          <p>
+            The two alternatives are both worse. Awarding the points in full — the
+            original behaviour — hides a broken setup behind a plausible mark, so
+            an assignment can go a whole term ungraded on quality without anyone
+            noticing. Scoring zero caps a student&apos;s grade because a token
+            expired.
+          </p>
+          <Banner tone="warning">
+            You will see this on a repository&apos;s page as a warning beside the
+            pipeline, and on each run&apos;s quality card. It is worth acting on:
+            re-provisioning the repository rewrites its Sonar secrets.
+          </Banner>
+          <p>
+            Hidden tests in <strong>secure</strong> mode are excluded the same way
+            while AlphaCI grades them separately, which is why a percentage can
+            appear before every stage has reported.
+          </p>
+        </div>
+      </Card>
+
       <Card className="p-5">
         <SectionHeading title="Reading a disputed result" />
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-slate-300">
