@@ -244,7 +244,14 @@ export interface Assignment {
   title: string; // "Python Calculator"
   description: string;
   templateGithubUrl: string;
-  dueDate: string;
+  /**
+   * The deadline, or absent when the teacher set none.
+   *
+   * Every reader must cope with that: `formatDate` renders "—" and
+   * `relativeDue` renders "" for a missing value, so the guard callers need is
+   * usually about not drawing an empty pill or a bare "Due —" label.
+   */
+  dueDate?: string;
   points: number; // total possible, e.g. 100
   isGroup: boolean; // group project vs solo
   createdAt: string;
@@ -649,6 +656,13 @@ export interface AuthLoginResponse {
 export interface PasswordLoginRequest {
   email: string;
   password: string;
+  /**
+   * Which door these credentials were typed at. OPTIONAL in the wire format —
+   * the API skips the check when it is absent — but both of this app's sign-in
+   * pages send it, because omitting it is what made a teacher's sign-in on the
+   * student page succeed and then strand her on an empty /student dashboard.
+   */
+  audience?: SignInAudience;
 }
 
 /**
@@ -656,6 +670,10 @@ export interface PasswordLoginRequest {
  * mismatch (a student's password at the staff door and vice versa) so that a
  * wrong-door attempt produces a clear "use the other page" message instead of
  * silently landing someone on a dashboard they can't use.
+ *
+ * TEACHER, ADMIN and SUPER_ADMIN all map to STAFF: the split is about which
+ * PAGE explains your situation, not about authority. Authority is the profile
+ * role, re-checked by the API on every request.
  */
 export type SignInAudience = "STUDENT" | "STAFF";
 
@@ -1032,10 +1050,18 @@ export interface CreateProjectInput {
   title: string;
   description: string;
   templateGithubUrl?: string; // optional starter template
-  dueDate: string; // ISO
+  /**
+   * ISO date, or omitted for a project with no deadline.
+   *
+   * Optional rather than `string | null`: the DTO is `@IsOptional()
+   * @IsISO8601()`, which rejects null as a malformed date. "No deadline" is
+   * therefore the absence of the key, not a null in it.
+   */
+  dueDate?: string;
   points: number; // default 100
   type: ProjectType;
-  isPrivate?: boolean; // ADDENDUM N — repo visibility; default PUBLIC (false)
+  // `isPrivate` is deliberately absent. Repositories are always PUBLIC and the
+  // wizard offers no visibility choice; the backend's default supplies it.
   studentIds?: string[]; // SOLO — which enrolled students get a repo
   groups?: CreateProjectGroup[]; // GROUP — the groups to form
   // ADDENDUM G — repo scaffold options

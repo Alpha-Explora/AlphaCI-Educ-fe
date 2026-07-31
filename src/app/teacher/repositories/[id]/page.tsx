@@ -61,7 +61,11 @@ export default function TeacherRepositoryPage() {
                   <RepoStatusPill status={d.repo.status} />
                   {d.assignment.isGroup && <GenericPill tone="info">Group project</GenericPill>}
                   <GenericPill>{d.assignment.points} pts</GenericPill>
-                  <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
+                  {/* Guarded: relativeDue returns "" with no deadline, and an
+                      empty pill is a coloured blob with nothing in it. */}
+                  {d.assignment.dueDate && (
+                    <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
+                  )}
                 </>
               }
               // No external repository link — grading happens against the
@@ -80,7 +84,9 @@ export default function TeacherRepositoryPage() {
                 <div className="mt-4 flex flex-wrap gap-6 border-t border-[var(--border-subtle)] pt-4 text-sm">
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Due</p>
-                    <p className="font-medium">{formatDate(d.assignment.dueDate)}</p>
+                    <p className="font-medium">
+                      {d.assignment.dueDate ? formatDate(d.assignment.dueDate) : "No deadline"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Submitted</p>

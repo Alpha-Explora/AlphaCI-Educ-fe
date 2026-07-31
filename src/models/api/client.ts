@@ -21,18 +21,32 @@ export class ApiError extends Error {
   readonly kind: "network" | "http";
   readonly status: number | null;
   readonly baseUrl: string;
+  /**
+   * Machine-readable cause, when the API chose to send one (`code` in the error
+   * body). Most endpoints do not, so this is usually null.
+   *
+   * It exists because a status alone is often too coarse to act on. A 403 from
+   * /auth/login can mean "wrong sign-in page", "account deactivated", or "these
+   * credentials have no profile here" — three situations with three different
+   * recoveries, and the only thing distinguishing them used to be the English
+   * sentence. Branching UI on prose means a copy edit silently breaks a
+   * behaviour, and nothing in the type system notices.
+   */
+  readonly code: string | null;
 
   constructor(
     message: string,
     kind: "network" | "http",
     status: number | null,
     baseUrl: string,
+    code: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
     this.baseUrl = baseUrl;
+    this.code = code;
   }
 
   get isNetworkError() {
@@ -120,14 +134,17 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    let code: string | null = null;
     try {
       const data = await res.json();
       if (data && typeof data.message === "string") message = data.message;
       else if (Array.isArray(data?.message)) message = data.message.join(", ");
+      // Optional and absent from most responses — see ApiError.code.
+      if (data && typeof data.code === "string") code = data.code;
     } catch {
       /* body wasn't JSON — keep default message */
     }
-    throw new ApiError(message, "http", res.status, API_BASE_URL);
+    throw new ApiError(message, "http", res.status, API_BASE_URL, code);
   }
 
   // 204 / empty body handling

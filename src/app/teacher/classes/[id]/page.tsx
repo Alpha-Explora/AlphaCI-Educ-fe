@@ -333,8 +333,14 @@ export default function ClassRosterPage() {
                         <p className="font-medium text-[var(--text-strong)]">
                           {a.points} pts
                         </p>
-                        <p>{relativeDue(a.dueDate)}</p>
-                        <p>Due {formatDate(a.dueDate)}</p>
+                        {a.dueDate ? (
+                          <>
+                            <p>{relativeDue(a.dueDate)}</p>
+                            <p>Due {formatDate(a.dueDate)}</p>
+                          </>
+                        ) : (
+                          <p>No due date</p>
+                        )}
                       </div>
                     </div>
                     <AssignmentSubmissions

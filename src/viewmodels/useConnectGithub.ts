@@ -13,7 +13,7 @@
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "./useSession";
-import { destinationFor, SIGN_IN_ROUTE } from "./authRoutes";
+import { destinationFor, STAFF_SIGN_IN_ROUTE } from "./authRoutes";
 
 export interface ConnectGithubVM {
   /** Hold the View until we know the session; prevents a flash of the wrong copy. */
@@ -43,7 +43,13 @@ export function useConnectGithub(): ConnectGithubVM {
   useEffect(() => {
     if (!isReady) return;
     if (!user) {
-      router.replace(SIGN_IN_ROUTE);
+      // The STAFF door, not the default one. Only staff can be on this page at
+      // all — students are turned away on the next line — so anyone who lands
+      // here signed out is a teacher or an admin whose session lapsed
+      // mid-link. Sending them to the student door would make them fail a
+      // sign-in before finding their own page, which is the exact loop this
+      // split exists to end.
+      router.replace(STAFF_SIGN_IN_ROUTE);
       return;
     }
     if (user.role === "STUDENT") router.replace(destinationFor(user.role));
@@ -58,7 +64,7 @@ export function useConnectGithub(): ConnectGithubVM {
   // Deliberately NOT postLoginDestination: that function routes people TO this
   // screen when they are unlinked, so calling it here would bounce them back and
   // make "skip" a no-op. Skipping means "go on with the role I already have".
-  let skipDestination = SIGN_IN_ROUTE;
+  let skipDestination = STAFF_SIGN_IN_ROUTE;
   if (user) skipDestination = destinationFor(user.role);
 
   const skip = useCallback(() => {

@@ -129,7 +129,11 @@ export default function StudentWorkspacePage() {
                     <GenericPill tone="info">Group project</GenericPill>
                   )}
                   <GenericPill>{d.assignment.points} pts</GenericPill>
-                  <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
+                  {/* Guarded: relativeDue returns "" with no deadline, and an
+                      empty pill is a coloured blob with nothing in it. */}
+                  {d.assignment.dueDate && (
+                    <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
+                  )}
                 </>
               }
               // No external repository link. Students reach their code through

@@ -41,10 +41,23 @@ import Link from "next/link";
 import { Brand } from "@/components/layout/Brand";
 import { cn } from "@/components/ui/cn";
 import { AuthScene } from "./AuthScene";
-import { AuthPromise, AuthHelp } from "./AuthAside";
+import { AuthPromise, AuthHelp, type AuthAsideCopy } from "./AuthAside";
 import { LanyardBadge } from "./LanyardBadge";
 import { RunReadout } from "./RunReadout";
-import { brand, badgeCopy } from "@/config/brand";
+import { brand, badgeCopy, authAside, staffAuthAside } from "@/config/brand";
+
+/**
+ * Which copy set the decorative columns use.
+ *
+ * Not derived from the route, deliberately: /signin/forgot-password and
+ * /auth/reset-password serve BOTH audiences from one page and cannot honestly
+ * pick either, so they take the default. A prop lets them abstain; a route
+ * lookup would force a wrong guess.
+ */
+const ASIDE_COPY: Record<"student" | "staff", AuthAsideCopy> = {
+  student: authAside,
+  staff: staffAuthAside,
+};
 
 export function AuthShell({
   eyebrow,
@@ -52,6 +65,7 @@ export function AuthShell({
   subheading,
   children,
   footer,
+  aside = "student",
 }: {
   /**
    * Small label above the welcome heading, e.g. "Password help". OPTIONAL,
@@ -67,7 +81,14 @@ export function AuthShell({
   children: React.ReactNode;
   /** Cross-link to the other door, at the foot of the card face. */
   footer?: React.ReactNode;
+  /**
+   * Whose story the two decorative columns tell. Defaults to "student" — the
+   * larger audience, and the right answer for the pages that serve both.
+   */
+  aside?: "student" | "staff";
 }) {
+  const asideCopy = ASIDE_COPY[aside];
+
   return (
     <AuthScene>
       <Link
@@ -156,7 +177,7 @@ export function AuthShell({
           aria-hidden="true"
           className="order-2 hidden xl:order-1 xl:block xl:justify-self-start xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
         >
-          <AuthPromise />
+          <AuthPromise copy={asideCopy} />
         </aside>
 
         <aside
@@ -164,7 +185,7 @@ export function AuthShell({
           className="order-3 hidden xl:block xl:justify-self-end xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
         >
           <RunReadout />
-          <AuthHelp />
+          <AuthHelp copy={asideCopy} />
         </aside>
       </main>
 
