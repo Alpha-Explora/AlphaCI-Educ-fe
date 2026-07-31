@@ -110,8 +110,17 @@ export const organizationsApi = {
     );
   },
 
-  addAdmin(id: string, payload: AddStaffRequest) {
-    return apiRequest<AddTeacherResponse>(`/organizations/${id}/admins`, {
+  /**
+   * Appoints an IT admin across EVERY laboratory — hence no organization id.
+   *
+   * The role was always platform-wide in effect (the API grants admins every
+   * lab when it resolves access), but the appointment used to invite them into
+   * just one laboratory's GitHub organization, so their access and their GitHub
+   * membership disagreed. The endpoint now sits above any one laboratory to
+   * match what the role actually is.
+   */
+  addAdmin(payload: AddStaffRequest) {
+    return apiRequest<AddTeacherResponse>("/organizations/admins", {
       method: "POST",
       body: payload,
     });

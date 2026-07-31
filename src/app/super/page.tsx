@@ -271,11 +271,13 @@ export default function SuperAdminConsolePage() {
           </>
         )}
       </StateBoundary>
+      {/* No lab list any more — an IT admin gets every laboratory, so the
+          dialog only needs to say how many that currently is. */}
       <AddLabAdminModal
         open={addAdminOpen}
         onClose={closeAddAdmin}
         vm={addAdminVm}
-        labs={vm.labs.map((l) => ({ orgId: l.orgId, orgName: l.orgName }))}
+        labCount={vm.labs.length}
       />
     </div>
   );
