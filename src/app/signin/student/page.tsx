@@ -1,12 +1,12 @@
-// VIEW LAYER — legacy sign-in door, now a permanent redirect to /signin.
+// VIEW LAYER — alias for the student door, which lives at /signin itself.
 //
-// There used to be two doors: staff signed in with GitHub, students with a
-// password. GitHub is no longer a login, so one form serves every role. This
-// file survives only so existing bookmarks, printed lab handouts and any link
-// still pointing here keep working instead of 404ing.
+// Not legacy cruft: printed lab handouts and school intranet pages say
+// "/signin/student" because it is the obvious counterpart to "/signin/staff",
+// and someone who knows the staff URL will guess this one. Redirecting costs a
+// file and saves a 404 for a URL people will keep typing.
 import { redirect } from "next/navigation";
-import { SIGN_IN_ROUTE } from "@/viewmodels/authRoutes";
+import { STUDENT_SIGN_IN_ROUTE } from "@/viewmodels/authRoutes";
 
-export default function LegacySignInRedirect() {
-  redirect(SIGN_IN_ROUTE);
+export default function StudentSignInAlias() {
+  redirect(STUDENT_SIGN_IN_ROUTE);
 }

@@ -13,22 +13,50 @@
 import type { SignInAudience, UserRole } from "@/models/types";
 
 /**
- * The single sign-in door.
+ * TWO DOORS, one credential mechanism.
  *
- * There used to be two (/signin/student and /signin/staff) because staff signed
- * in with GitHub and students with a password. GitHub is no longer a login — it
- * is an account LINK staff perform after signing in — so everyone now shares one
- * email + password form. The old paths still exist as redirects so bookmarks and
- * printed handouts keep working.
+ * The history is worth knowing before changing this. Originally there were two
+ * doors because staff signed in with GitHub and students with a password — two
+ * mechanisms, so two forms. GitHub stopped being a login (it is now an account
+ * LINK staff perform after signing in), which collapsed both doors into one.
+ *
+ * That single door is what we are undoing here, for a different reason than the
+ * one that created it. The mechanism really is identical now — both doors POST
+ * the same email and password to the same endpoint — but the SURROUNDING COPY
+ * cannot serve both audiences at once:
+ *
+ *   • A student's route to an account is self-registration, gated on the
+ *     school's email domain (STUDENT_EMAIL_DOMAINS, server-side). "Create an
+ *     account" belongs in front of them.
+ *   • Staff are invited by an IT admin and may hold ANY address — a personal
+ *     one, a district one, a contractor's. Nothing about the school domain
+ *     applies to them, and "create an account with your school email" is at
+ *     best noise and at worst reads as a refusal they have not yet hit.
+ *
+ * So: same lock, two labelled doors. The split is presentational, and the
+ * `audience` field the API still enforces is what keeps a wrong-door attempt
+ * from silently landing someone on a dashboard with none of their data.
  */
-export const SIGN_IN_ROUTE = "/signin";
+export const STUDENT_SIGN_IN_ROUTE = "/signin";
+export const STAFF_SIGN_IN_ROUTE = "/signin/staff";
+
+/**
+ * The door to use when the role is unknown — a session that expired, a guard
+ * bouncing an anonymous visitor, the landing page's call to action.
+ *
+ * The STUDENT door, because students outnumber staff by roughly a class at a
+ * time and it carries a visible link to the staff door. Sending everyone to a
+ * neutral chooser screen would tax the majority to spare the minority one
+ * click.
+ */
+export const SIGN_IN_ROUTE = STUDENT_SIGN_IN_ROUTE;
 
 /** Where staff attach their GitHub identity (and pick up their real role). */
 export const CONNECT_GITHUB_ROUTE = "/connect-github";
 
 export const SIGN_IN_ROUTES = {
-  student: SIGN_IN_ROUTE,
-  staff: SIGN_IN_ROUTE,
+  student: STUDENT_SIGN_IN_ROUTE,
+  staff: STAFF_SIGN_IN_ROUTE,
 } as const;
 
 /** Where each role lands once authenticated. */
@@ -67,17 +95,23 @@ export function canEnterArea(userRole: UserRole, areaRole: UserRole): boolean {
 /**
  * Which door a given role is expected to use.
  *
- * Vestigial now that there is one door — kept because the API still ACCEPTS an
- * audience from older clients and enforces it when present. Nothing in this app
- * sends one any more.
+ * Mirrors the server's rule in `assertAudienceMatches` exactly: STUDENT is its
+ * own audience, and every staff role — teacher, IT admin, platform operator —
+ * shares STAFF. Kept as a function rather than inlined so the two definitions
+ * of "who counts as staff" cannot drift apart in one place and not the other.
  */
 export function audienceFor(role: UserRole): SignInAudience {
   return role === "STUDENT" ? "STUDENT" : "STAFF";
 }
 
-/** The sign-in route for whoever holds this role. One door, so: always the same. */
-export function signInRouteFor(_role: UserRole): string {
-  return SIGN_IN_ROUTE;
+/** The sign-in route belonging to whoever holds this role. */
+export function signInRouteFor(role: UserRole): string {
+  return role === "STUDENT" ? STUDENT_SIGN_IN_ROUTE : STAFF_SIGN_IN_ROUTE;
+}
+
+/** The door that serves this audience. The inverse of `audienceFor`. */
+export function routeForAudience(audience: SignInAudience): string {
+  return audience === "STUDENT" ? STUDENT_SIGN_IN_ROUTE : STAFF_SIGN_IN_ROUTE;
 }
 
 /**

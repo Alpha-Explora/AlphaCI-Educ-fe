@@ -3,9 +3,13 @@
 // VIEWMODEL LAYER — Sign-in form
 //
 // Owns everything about the act of signing in: field state, validation, the
-// submit call, failure copy, and where to go on success. There is now ONE door
-// for every role — the audience split went away when GitHub stopped being a
-// login — so this hook no longer needs to know who is signing in.
+// submit call, failure copy, and where to go on success.
+//
+// TAKES AN AUDIENCE. Two pages render this hook — /signin for students,
+// /signin/staff for teachers and IT admins — and the only functional difference
+// between them is the `audience` passed in here. Everything else that differs
+// (labels, placeholder, whether "create an account" appears) is copy the View
+// supplies.
 //
 // The Views that use this hold NO logic: they render fields, spread the
 // returned handlers, and display `fieldErrors` / `formError`.
@@ -13,8 +17,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/models/api";
+import type { SignInAudience } from "@/models/types";
 import { useSession } from "./useSession";
-import { postLoginDestination } from "./authRoutes";
+import { postLoginDestination, routeForAudience } from "./authRoutes";
 import { brand } from "@/config/brand";
 
 export interface SignInFieldErrors {
@@ -34,9 +39,29 @@ export interface SignInVM {
   formError: string | null;
   /** Network-level failure gets a distinct banner: it isn't the user's fault. */
   isOffline: boolean;
+  /**
+   * Set when the API says these are real credentials for the OTHER door.
+   *
+   * Distinct from `formError` (which is also set, and carries the sentence)
+   * because this one has a fix the UI can offer as a link rather than as
+   * instructions: it holds the route of the door that WILL accept them. Null in
+   * every other failure, including a wrong password — we learn nothing about
+   * which door that account belongs to, and guessing would leak roster
+   * membership to anyone typing addresses at the form.
+   */
+  wrongDoorRoute: string | null;
   isSubmitting: boolean;
   submit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
+
+/**
+ * The API's machine-readable "right credentials, wrong page" code.
+ *
+ * Mirrors AuthService.assertAudienceMatches. If you rename it there, this stops
+ * matching and the UI degrades to showing the server's sentence with no link —
+ * which is the correct way for it to fail, but do rename both.
+ */
+const WRONG_DOOR_CODE = "WRONG_SIGN_IN_DOOR";
 
 // A pragmatic address check. Deliberately NOT an RFC-5322 regex: the only job
 // here is to catch a typo before a round-trip, and over-strict client patterns
@@ -65,9 +90,12 @@ function describeSignInFailure(error: unknown): string {
     case 401:
       return "That email and password don't match. Check for caps lock, then try again.";
     case 403:
-      // A deactivated account, or a Supabase login with no linked profile. The
-      // API's message is already specific and actionable — surface it verbatim.
-      // (The old "wrong door" case is gone: there is only one door now.)
+      // Three situations share this status: wrong sign-in page, a deactivated
+      // account, and a Supabase login with no linked profile. Every one of them
+      // arrives with a message that already names its own fix, so it is
+      // surfaced verbatim rather than flattened into house copy. The wrong-page
+      // case ALSO gets a link — see wrongDoorRoute — but the sentence stands on
+      // its own if that link never renders.
       return error.message;
     case 429:
       return "Too many attempts. Please wait a minute before trying again.";
@@ -76,7 +104,12 @@ function describeSignInFailure(error: unknown): string {
   }
 }
 
-export function useSignIn(): SignInVM {
+/**
+ * @param audience Which door this form is. Sent with the credentials so the API
+ *   can refuse a staff account typed into the student page (and vice versa)
+ *   instead of admitting it and landing the person on an empty dashboard.
+ */
+export function useSignIn(audience: SignInAudience): SignInVM {
   const router = useRouter();
   const { loginWithPassword } = useSession();
 
@@ -86,6 +119,7 @@ export function useSignIn(): SignInVM {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [wrongDoorRoute, setWrongDoorRoute] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Validation runs continuously, but visibility is gated on interaction —
@@ -134,6 +168,7 @@ export function useSignIn(): SignInVM {
       setSubmitAttempted(true);
       setFormError(null);
       setIsOffline(false);
+      setWrongDoorRoute(null);
 
       if (Object.keys(allErrors).length > 0) return;
 
@@ -143,6 +178,7 @@ export function useSignIn(): SignInVM {
           const { user } = await loginWithPassword({
             email: email.trim(),
             password,
+            audience,
           });
           // Clear the password from memory before navigating away.
           setPassword("");
@@ -150,13 +186,27 @@ export function useSignIn(): SignInVM {
         } catch (error) {
           setFormError(describeSignInFailure(error));
           setIsOffline(error instanceof ApiError && error.isNetworkError);
+          // The other door is whichever one this is not — the API has just
+          // confirmed the account exists and belongs there.
+          //
+          // The password is deliberately NOT carried across, and neither is the
+          // email. These run on shared lab machines: a URL holding a school
+          // address lands in browser history that the next person at the
+          // keyboard can read, and saving one person one retype is not worth
+          // that. They arrive at the correct door with empty fields.
+          const isWrongDoor =
+            error instanceof ApiError && error.code === WRONG_DOOR_CODE;
+          const otherDoor = routeForAudience(
+            audience === "STUDENT" ? "STAFF" : "STUDENT",
+          );
+          setWrongDoorRoute(isWrongDoor ? otherDoor : null);
           setIsSubmitting(false);
         }
         // No `finally`: on success we keep isSubmitting true so the button stays
         // disabled through the redirect instead of flicking back to "Sign in".
       })();
     },
-    [allErrors, email, loginWithPassword, password, router],
+    [allErrors, audience, email, loginWithPassword, password, router],
   );
 
   return {
@@ -168,6 +218,7 @@ export function useSignIn(): SignInVM {
     markTouched,
     formError,
     isOffline,
+    wrongDoorRoute,
     isSubmitting,
     submit,
   };

@@ -20,9 +20,11 @@ export const authApi = {
   /**
    * Real credential sign-in for EVERY role.
    *
-   * No `audience` is sent: there is one door now, so there is no door to
-   * mismatch. The API still accepts the field from older clients and enforces it
-   * when present, which is why removing it here is safe rather than breaking.
+   * `audience` names the door the credentials were typed at, and the API 403s a
+   * mismatch. That refusal is a FEATURE, not a restriction: without it a teacher
+   * who signs in on the student page is admitted and redirected to /student,
+   * which renders perfectly and contains none of her classes — a dead end that
+   * looks like a broken product rather than a wrong turn.
    */
   passwordLogin(credentials: PasswordLoginRequest) {
     return apiRequest<AuthLoginResponse>("/auth/login", {

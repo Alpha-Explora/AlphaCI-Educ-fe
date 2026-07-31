@@ -656,6 +656,13 @@ export interface AuthLoginResponse {
 export interface PasswordLoginRequest {
   email: string;
   password: string;
+  /**
+   * Which door these credentials were typed at. OPTIONAL in the wire format —
+   * the API skips the check when it is absent — but both of this app's sign-in
+   * pages send it, because omitting it is what made a teacher's sign-in on the
+   * student page succeed and then strand her on an empty /student dashboard.
+   */
+  audience?: SignInAudience;
 }
 
 /**
@@ -663,6 +670,10 @@ export interface PasswordLoginRequest {
  * mismatch (a student's password at the staff door and vice versa) so that a
  * wrong-door attempt produces a clear "use the other page" message instead of
  * silently landing someone on a dashboard they can't use.
+ *
+ * TEACHER, ADMIN and SUPER_ADMIN all map to STAFF: the split is about which
+ * PAGE explains your situation, not about authority. Authority is the profile
+ * role, re-checked by the API on every request.
  */
 export type SignInAudience = "STUDENT" | "STAFF";
 

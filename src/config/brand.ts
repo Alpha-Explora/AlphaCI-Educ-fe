@@ -62,7 +62,15 @@ export const landingCopy = {
   subline:
     "The classroom pipeline that runs your tests the moment you push, then shows you exactly which cases passed.",
   ctaLabel: "Sign in",
-  ctaHint: "Students, teachers and IT staff. Students need no GitHub account.",
+  /**
+   * Under the circled CTA, which goes to the STUDENT door. Names that audience
+   * so the quieter staff link below it has something to contrast with — a hint
+   * reading "students, teachers and IT staff" directly above a separate staff
+   * link would make the link look redundant when it is the opposite.
+   */
+  ctaHint: "For students. No GitHub account needed — your work is set up for you.",
+  /** The staff door, one line below. A signpost, not a second CTA. */
+  staffCtaLabel: "Teacher or IT staff? Sign in here",
   /** The pen-written aside next to the circled sign-in. Two or three words. */
   ctaAside: "start here",
   /** One line. It is a footnote, not a paragraph. */
@@ -148,6 +156,34 @@ export const authAside = {
   helpTitle: "Can't get in?",
   helpBody:
     "Your teacher or the IT office can reset your password and add you to a lab.",
+} as const;
+
+/**
+ * The same columns, beside the STAFF door.
+ *
+ * Same shape as `authAside` — deliberately, so AuthShell can take either
+ * without branching — but every line is re-aimed. The student version narrates
+ * a first push from VS Code, which is not what a teacher came here to do and
+ * not something she will do at all: staff never push to a student repository.
+ *
+ * The help line differs for the same reason and matters more. A student who
+ * cannot get in asks a teacher. A teacher who cannot get in has nobody above
+ * her in the product except IT — and if she has not been invited yet, no amount
+ * of retrying this form will help. Saying so is the only useful thing this
+ * column can do.
+ */
+export const staffAuthAside = {
+  stepsTitle: "What you can do here",
+  steps: [
+    "See every class you teach, and who is in them.",
+    "Watch each push get built, tested and marked.",
+    "Set the work, then read the results as they land.",
+  ],
+  helpTitle: "No account yet?",
+  helpBody:
+    "Staff accounts are created by your IT administrator, who sends an invitation by email. Ask them to add you, then set your password from that link.",
+  /** Overrides the student footnote, which tells the reader to ask a teacher. */
+  footnote: "Any address works here — it does not have to be a school one.",
 } as const;
 
 /**

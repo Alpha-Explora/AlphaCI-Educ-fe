@@ -38,7 +38,7 @@ import { PipelineRail } from "@/components/landing/PipelineRail";
 import { ChecksRow } from "@/components/landing/ChecksRow";
 import { useAuthNotice } from "@/viewmodels/useAuthNotice";
 import { useRedirectIfSignedIn } from "@/viewmodels/useRedirectIfSignedIn";
-import { SIGN_IN_ROUTE } from "@/viewmodels/authRoutes";
+import { SIGN_IN_ROUTE, STAFF_SIGN_IN_ROUTE } from "@/viewmodels/authRoutes";
 import { brand, landingCopy } from "@/config/brand";
 
 // Split once, at module scope: the greeting template never changes at runtime,
@@ -190,6 +190,24 @@ export default function LandingPage() {
                   only needs ordinary spacing. */}
               <p className="mt-1 max-w-[22rem] px-1 text-sm leading-relaxed text-[var(--text-muted)]">
                 {landingCopy.ctaHint}
+              </p>
+
+              {/* The staff door, one line down and deliberately quiet.
+                  The circled CTA above goes to the student door, which is
+                  right — students are most of the traffic and arrive here
+                  first. But staff arriving at the front page had no way to
+                  reach their own page except by signing in at the wrong one
+                  and being turned around, and a product whose teachers learn
+                  their URL by being refused is a product with a bad first
+                  day. Small type, not a second button: this is a signpost for
+                  a minority, not a competing call to action. */}
+              <p className="mt-3 max-w-[22rem] px-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                <Link
+                  href={STAFF_SIGN_IN_ROUTE}
+                  className="font-medium text-platform-600 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+                >
+                  {landingCopy.staffCtaLabel}
+                </Link>
               </p>
             </div>
           </div>
