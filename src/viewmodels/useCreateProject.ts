@@ -133,7 +133,10 @@ export function validateGroup(studentIds: string[]): GroupValidity {
 export function validateCreateProject(input: CreateProjectInput): string[] {
   const errors: string[] = [];
   if (!input.title.trim()) errors.push("Title is required.");
-  if (!input.dueDate) errors.push("Due date is required.");
+  // No due-date rule. A project without a deadline is legitimate — nothing is
+  // ever "overdue" and hidden tests set to reveal after the due date simply
+  // never reveal, which is what the backend's isPastDue already returns for an
+  // absent date.
   // Whole numbers only, matching CreateAssignmentDto's @IsInt(). The old
   // `isFinite` check let 33.5 through to a 400 from the API — reachable now
   // that the points picker has a free-text Custom option.
@@ -263,9 +266,13 @@ export function useLabSessionLimits(): LabSessionLimits {
   });
 
   return (
+    // Mirrors the server's own defaults in config/lab-session.config.ts
+    // (LAB_MAX_SESSION_HOURS, 3). Being wrong here is not cosmetic: the number
+    // is printed as "Maximum Nh, set by your IT administrator", so a stale
+    // fallback offers a ceiling the server would then clamp.
     query.data ?? {
-      defaultSessionHours: 8,
-      maxSessionHours: 8,
+      defaultSessionHours: 3,
+      maxSessionHours: 3,
       minSessionHours: 1,
       tokenLifetimeMinutes: 60,
       handoffEnabled: false,

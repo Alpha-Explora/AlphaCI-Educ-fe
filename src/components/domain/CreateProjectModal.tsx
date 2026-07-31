@@ -344,7 +344,11 @@ export function CreateProjectModal({
 
   // ADDENDUM G — scaffold options
   const [repoStructure, setRepoStructure] = useState<ProjectRepoStructure>("SINGLE");
-  const [isPrivate, setIsPrivate] = useState(false); // ADDENDUM N — default PUBLIC
+  // Visibility is no longer a choice — every student repository is PUBLIC.
+  // The wizard therefore sends nothing, and the backend's own default (ADDENDUM
+  // N, `isPrivate ?? false`) is what provisioning reads. Deliberately not sent
+  // as an explicit `isPrivate: false`: a value on the wire implies the caller
+  // had an opinion, and this one no longer can.
   const [stack, setStack] = useState<Stack>("nodejs");
   const [backendStack, setBackendStack] = useState<Stack>("nestjs");
   const [frontendStack, setFrontendStack] = useState<Stack>("nextjs");
@@ -393,7 +397,8 @@ export function CreateProjectModal({
     const errors: string[] = [];
     if (step === "details") {
       if (!title.trim()) errors.push("Title is required.");
-      if (!dueDate) errors.push("Due date is required.");
+      // Due date is deliberately absent — it is optional, and an empty one is
+      // a valid answer meaning "no deadline".
       // Whole numbers only — mirrors validateCreateProject, which mirrors the
       // DTO's @IsInt(). Reachable via the Custom points field.
       const pts = Number(points);
@@ -428,7 +433,6 @@ export function CreateProjectModal({
   }, [
     step,
     title,
-    dueDate,
     points,
     type,
     soloSelected,
@@ -471,10 +475,12 @@ export function CreateProjectModal({
     const base = {
       title: title.trim(),
       description: description.trim(),
-      dueDate,
+      // Omitted rather than sent as "" when the teacher leaves it blank: the
+      // DTO validates the shape of a date it is given, so an empty string is a
+      // malformed date, not an absent one.
+      ...(dueDate !== "" && { dueDate }),
       points: Number(points),
       coverageThreshold: coverage,
-      isPrivate,
       // Omitted entirely when left blank — see the sessionHours state comment.
       ...(sessionHours.trim() !== "" && { labSessionHours: Number(sessionHours) }),
       ...scaffold,
@@ -672,7 +678,11 @@ export function CreateProjectModal({
                     />
                   )}
                 </Field>
-                <Field label="Due date" required>
+                {/* Optional. Not every project has a deadline — ongoing
+                    practice work and self-paced labs are real cases, and
+                    forcing an invented date made "overdue" mean nothing on
+                    the projects that never had one. */}
+                <Field label="Due date" hint="Optional — leave blank for no deadline.">
                   {({ id }) => (
                     <Input
                       id={id}
@@ -950,45 +960,18 @@ export function CreateProjectModal({
                   )}
                 </div>
 
-                {/* Visibility — PUBLIC by default; teacher may set private */}
-                <div>
-                  <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-                    Repository visibility
-                  </span>
-                  <div
-                    role="tablist"
-                    aria-label="Repository visibility"
-                    className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
-                  >
-                    {(
-                      [
-                        [false, "🌐 Public"],
-                        [true, "🔒 Private"],
-                      ] as [boolean, string][]
-                    ).map(([value, label]) => (
-                      <button
-                        key={String(value)}
-                        type="button"
-                        role="tab"
-                        aria-selected={isPrivate === value}
-                        onClick={() => setIsPrivate(value)}
-                        className={cn(
-                          "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
-                          isPrivate === value
-                            ? "bg-white text-platform-700 shadow-sm"
-                            : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
-                    {isPrivate
-                      ? "Private — only invited collaborators can view these repositories."
-                      : "Public (default) — anyone can view; great for student portfolios."}
-                  </p>
-                </div>
+                {/*
+                  A "Repository visibility" Public/Private toggle used to sit
+                  here. Repositories are always PUBLIC now, so there is nothing
+                  left to choose.
+
+                  Worth knowing why that is the safe direction rather than the
+                  lazy one: SonarCloud's free plan covers public projects only
+                  (docs/SONARCLOUD_SETUP.md §4). Picking Private needed a paid
+                  plan, and without one `ensureProject` recorded a
+                  `repo.sonarError` and the code-quality component — 35% of the
+                  grade — came back unmeasured for the whole class.
+                */}
 
                 {/* Language + coverage (kept on one row for a tidy layout) */}
                 {repoStructure === "SINGLE" ? (

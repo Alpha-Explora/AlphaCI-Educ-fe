@@ -88,7 +88,9 @@ function AssignmentCard({ row, index }: { readonly row: Row; readonly index: num
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-[var(--text-muted)]">{relativeDue(assignment.dueDate)}</p>
+          <p className="text-xs text-[var(--text-muted)]">
+            {assignment.dueDate ? relativeDue(assignment.dueDate) : "No due date"}
+          </p>
           {repo && (
             <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-platform">
               Open workspace <span aria-hidden="true">→</span>
