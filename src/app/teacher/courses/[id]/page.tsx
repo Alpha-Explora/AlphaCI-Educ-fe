@@ -5,13 +5,11 @@
 // is pre-scoped to this course — there is no standalone create-class surface.
 // ============================================================================
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
 import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
 import {
   Button,
-  CardLink,
   EmptyState,
   GenericPill,
   SkeletonCard,
@@ -20,6 +18,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { CreateClassModal } from "@/components/domain/CreateClassModal";
+import { ClassCard } from "@/components/domain/ClassCard";
 
 export default function TeacherCoursePage() {
   const params = useParams<{ id: string }>();
@@ -112,48 +111,17 @@ export default function TeacherCoursePage() {
           </div>
         }
       >
+        {/* Each section carries whatever colour its teacher gave it — the
+            `sharedFromLabName` note keeps a borrowed section from reading as a
+            duplicate of the local one. See ClassCard. */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {(entry?.classes ?? []).map(({ classInfo: c, sharedFromLabName }, idx) => (
-            <Link
+            <ClassCard
               key={c.id}
-              href={`/teacher/classes/${c.id}`}
-              className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-            >
-              <CardLink
-                className="flex h-full flex-col p-5 animate-fade-up"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <GenericPill tone="info">Section {c.section}</GenericPill>
-                    <h3 className="mt-1 text-base font-semibold text-[var(--text-strong)]">
-                      {c.name}
-                    </h3>
-                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">{c.term}</p>
-                    {/* Same subject, different lab's course record — say where
-                        it came from so the card isn't mistaken for a duplicate. */}
-                    {sharedFromLabName && (
-                      <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                        From <span className="font-medium">{sharedFromLabName}</span>
-                      </p>
-                    )}
-                  </div>
-                  {c.pendingGrading > 0 && (
-                    <GenericPill tone="warning">{c.pendingGrading} to grade</GenericPill>
-                  )}
-                </div>
-
-                <div className="mt-auto flex gap-6 pt-5">
-                  <Stat label="Students" value={c.studentCount} />
-                  <Stat label="Assignments" value={c.assignmentCount} />
-                </div>
-
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-platform">
-                  Open section
-                  <span aria-hidden="true">→</span>
-                </span>
-              </CardLink>
-            </Link>
+              classInfo={c}
+              fromLabName={sharedFromLabName}
+              index={idx}
+            />
           ))}
         </div>
       </StateBoundary>

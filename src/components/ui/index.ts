@@ -3,6 +3,12 @@ export { cn } from "./cn";
 export { Avatar } from "./Avatar";
 export { GithubMark } from "./GithubMark";
 export { Card, CardLink } from "./Card";
+export {
+  CardDecor,
+  CARD_PATTERNS,
+  patternFor,
+  type CardPattern,
+} from "./CardDecor";
 export { Button } from "./Button";
 export { Input, Textarea, Select, Field } from "./Input";
 export { CopyButton } from "./CopyButton";

@@ -532,7 +532,7 @@ function JobList({
                     <span
                       className={cn(
                         failed
-                          ? "font-medium text-red-700 dark:text-red-400"
+                          ? "font-medium text-red-700"
                           : "text-[var(--text-muted)]",
                       )}
                     >
