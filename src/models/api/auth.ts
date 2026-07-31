@@ -64,6 +64,24 @@ export const authApi = {
     });
   },
 
+  /**
+   * The second half of a reset — and of every staff invitation.
+   *
+   * `accessToken` comes from the emailed link's FRAGMENT (`#access_token=…`),
+   * which browsers never transmit to a server. That is why the page has to read
+   * it and hand it back explicitly rather than the API just knowing.
+   *
+   * Resolves with `ok: false` and a readable message for an expired or
+   * already-used link. That is not an error to throw on: it is the ordinary
+   * outcome of opening yesterday's email, and the person needs to read it.
+   */
+  completePasswordReset(accessToken: string, password: string) {
+    return apiRequest<{ ok: boolean; message: string }>("/auth/complete-password-reset", {
+      method: "POST",
+      body: { accessToken, password },
+    });
+  },
+
   // Current session user (teacher via GitHub cookie, or student via bearer
   // token). Throws ApiError(http, 401) when logged out.
   me() {
