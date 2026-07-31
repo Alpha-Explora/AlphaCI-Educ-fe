@@ -7,19 +7,18 @@
 // Data/derivation live in the ViewModels (useTeacherCourseBoard).
 // ============================================================================
 import { useState } from "react";
-import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
 import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
 import {
   Button,
-  CardLink,
   EmptyState,
   SkeletonCard,
   Stat,
   StateBoundary,
-  GenericPill,
 } from "@/components/ui";
 import { CreateClassModal } from "@/components/domain/CreateClassModal";
+import { CourseCard } from "@/components/domain/CourseCard";
+import { ClassCard } from "@/components/domain/ClassCard";
 
 export default function TeacherDashboardPage() {
   const { user, selectedOrgId } = useSession();
@@ -76,64 +75,11 @@ export default function TeacherDashboardPage() {
           </div>
         }
       >
+        {/* The card itself — light-blue wash, per-course texture, shared-lab
+            footnote — lives in CourseCard so the dashboard stays layout. */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {board.entries.map((entry, idx) => (
-            <Link
-              key={entry.course.id}
-              href={`/teacher/courses/${entry.course.id}`}
-              className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-            >
-              <CardLink
-                className="flex h-full flex-col p-5 animate-fade-up"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <GenericPill tone="info">{entry.course.code}</GenericPill>
-                  {entry.pendingGrading > 0 && (
-                    <GenericPill tone="warning">
-                      {entry.pendingGrading} to grade
-                    </GenericPill>
-                  )}
-                </div>
-
-                <h2 className="mt-2 text-base font-semibold text-[var(--text-strong)]">
-                  {entry.course.title}
-                </h2>
-                {entry.course.description && (
-                  <p className="mt-1 line-clamp-2 text-sm text-[var(--text-muted)]">
-                    {entry.course.description}
-                  </p>
-                )}
-
-                <div className="mt-auto flex gap-6 pt-5">
-                  <Stat label="Classes" value={entry.classes.length} />
-                  <Stat label="Students" value={entry.studentCount} />
-                </div>
-
-                {/* Some of the sections counted above run in this lab but belong
-                    to another lab's copy of the course. Say so on the card, so
-                    the count and the section list agree once opened. */}
-                {(() => {
-                  const shared = entry.classes.filter((c) => c.sharedFromLabName);
-                  if (shared.length === 0) return null;
-                  const labNames = [
-                    ...new Set(shared.map((c) => c.sharedFromLabName as string)),
-                  ];
-                  return (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">
-                      Includes {shared.length}{" "}
-                      {shared.length === 1 ? "section" : "sections"} from{" "}
-                      {labNames.join(", ")}
-                    </p>
-                  );
-                })()}
-
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-platform">
-                  {entry.classes.length === 0 ? "Create first class" : "Open course"}
-                  <span aria-hidden="true">→</span>
-                </span>
-              </CardLink>
-            </Link>
+            <CourseCard key={entry.course.id} entry={entry} index={idx} />
           ))}
         </div>
       </StateBoundary>
@@ -159,41 +105,12 @@ export default function TeacherDashboardPage() {
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {board.sharedClasses.map(({ classInfo: c, owningLabName }, idx) => (
-              <Link
+              <ClassCard
                 key={c.id}
-                href={`/teacher/classes/${c.id}`}
-                className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-              >
-                <CardLink
-                  className="flex h-full flex-col p-5 animate-fade-up"
-                  style={{ animationDelay: `${idx * 50}ms` }}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <GenericPill tone="info">Section {c.section}</GenericPill>
-                    {c.pendingGrading > 0 && (
-                      <GenericPill tone="warning">{c.pendingGrading} to grade</GenericPill>
-                    )}
-                  </div>
-
-                  <h3 className="mt-1 text-base font-semibold text-[var(--text-strong)]">
-                    {c.name}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">{c.term}</p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    From <span className="font-medium">{owningLabName}</span>
-                  </p>
-
-                  <div className="mt-auto flex gap-6 pt-5">
-                    <Stat label="Students" value={c.studentCount} />
-                    <Stat label="Assignments" value={c.assignmentCount} />
-                  </div>
-
-                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-platform">
-                    Open section
-                    <span aria-hidden="true">→</span>
-                  </span>
-                </CardLink>
-              </Link>
+                classInfo={c}
+                fromLabName={owningLabName}
+                index={idx}
+              />
             ))}
           </div>
         </section>

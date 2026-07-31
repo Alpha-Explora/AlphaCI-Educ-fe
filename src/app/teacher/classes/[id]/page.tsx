@@ -30,7 +30,6 @@ import {
   Modal,
   ProgressBar,
   Skeleton,
-  Stat,
   StateBoundary,
   Tabs,
   type TabItem,
@@ -41,8 +40,7 @@ import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
 import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
-import { JoinCodeButton } from "@/components/domain/JoinCodeButton";
-import { MeetingLabsButton } from "@/components/domain/MeetingLabsButton";
+import { ClassOverviewTab } from "@/components/domain/ClassOverviewTab";
 import { formatDate, relativeDue } from "@/components/ui/format";
 
 type ClassTab = "overview" | "students" | "assignments" | "settings";
@@ -91,7 +89,6 @@ export default function ClassRosterPage() {
     labs,
     courses: teacherCourses.courses,
   });
-  const currentMeetingLabs = info?.meetingLabOrgIds ?? [];
 
   return (
     <div className="space-y-8">
@@ -137,46 +134,16 @@ export default function ClassRosterPage() {
       />
 
       {tab === "overview" && (
-        <div
-          id="class-panel-overview"
-          role="tabpanel"
-          aria-labelledby="class-tab-overview"
-          className="space-y-8"
-        >
-        {/* Rollup */}
-        {!roster.isLoading && !roster.error && roster.data && (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-5 shadow-card animate-fade-up sm:grid-cols-4 sm:max-w-2xl">
-            <Stat label="Students" value={roster.rollup.studentCount} tone="platform" />
-            <Stat label="Submitted" value={roster.rollup.submitted} tone="warning" />
-            <Stat label="Graded" value={roster.rollup.graded} tone="success" />
-            <Stat
-              label="Class avg"
-              value={roster.rollup.classAvg !== null ? `${roster.rollup.classAvg}%` : "—"}
-            />
-          </div>
-        )}
-
-        {/*
-          Both of these were full-width, permanently-expanded cards sitting
-          between the stats and the roster. They are now buttons that open the
-          same controls in a dialog: the join code is needed for a minute at the
-          start of a session, and the meeting labs about once a semester, so
-          neither earned a standing block above the work teachers came here to do.
-
-          The laboratories button is hidden when the teacher holds courses in only
-          one lab — there would be nothing to choose between.
-        */}
-        <div className="flex flex-wrap items-center gap-2 animate-fade-up">
-          {info && meetingLabs.options.length > 1 && (
-            <MeetingLabsButton
-              vm={meetingLabs}
-              selected={currentMeetingLabs}
-              owningOrgId={info.orgId}
-            />
-          )}
-          {classId && <JoinCodeButton classId={classId} />}
-        </div>
-        </div>
+        <ClassOverviewTab
+          classId={classId}
+          info={info}
+          roster={roster}
+          assignments={assignments}
+          meetingLabs={meetingLabs}
+          onCreateProject={() => setCreateOpen(true)}
+          onSeeStudents={() => setTab("students")}
+          onSeeAssignments={() => setTab("assignments")}
+        />
       )}
 
       {tab === "students" && (

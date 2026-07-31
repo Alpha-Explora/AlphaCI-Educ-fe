@@ -24,7 +24,7 @@ export function CicdExplainer({ className }: { className?: string }) {
           title="What is CI/CD?"
           subtitle="The short version: a robot reviewer that checks your work every time you push."
         />
-        <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+        <div className="mt-4 space-y-3 text-sm text-[var(--text-muted)]">
           <p>
             <strong className="text-[var(--text-strong)]">
               CI stands for Continuous Integration.
@@ -91,7 +91,7 @@ export function CicdExplainer({ className }: { className?: string }) {
                 <p className="text-sm font-medium text-[var(--text-strong)]">
                   {step.label}
                 </p>
-                <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                   {step.body}
                 </p>
               </div>
@@ -125,10 +125,10 @@ export function CicdExplainer({ className }: { className?: string }) {
                   <GenericPill tone="danger">Stops the run if it fails</GenericPill>
                 )}
               </div>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {stage.forStudent.meaning}
               </p>
-              <p className="mt-2 border-l-2 border-platform-100 pl-3 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-2 border-l-2 border-platform-100 pl-3 text-sm text-[var(--text-muted)]">
                 <span className="font-medium text-[var(--text-strong)]">
                   What to do:
                 </span>{" "}
@@ -146,11 +146,11 @@ export function CicdExplainer({ className }: { className?: string }) {
           subtitle="Stage 3 is the one students find most surprising, because working code can still score badly."
         />
         <dl className="mt-4 space-y-4 text-sm">
-          <div className="border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+          <div className="border-l-2 border-[var(--border-strong)] pl-4">
             <dt className="font-medium text-[var(--text-strong)]">
               Technical debt
             </dt>
-            <dd className="mt-1 text-slate-600 dark:text-slate-300">
+            <dd className="mt-1 text-[var(--text-muted)]">
               An estimate of how long it would take to fix everything
               questionable SonarCloud found, expressed as a percentage of how
               long it estimates your project took to write. Lower is better, and
@@ -158,9 +158,9 @@ export function CicdExplainer({ className }: { className?: string }) {
               between pushes.
             </dd>
           </div>
-          <div className="border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+          <div className="border-l-2 border-[var(--border-strong)] pl-4">
             <dt className="font-medium text-[var(--text-strong)]">Duplication</dt>
-            <dd className="mt-1 text-slate-600 dark:text-slate-300">
+            <dd className="mt-1 text-[var(--text-muted)]">
               How much of your code is copy-pasted from{" "}
               <strong>elsewhere in your own project</strong>. This is not the
               similarity check against your classmates — that is stage 6, and it
@@ -168,11 +168,11 @@ export function CicdExplainer({ className }: { className?: string }) {
               block into one function and calling it twice.
             </dd>
           </div>
-          <div className="border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+          <div className="border-l-2 border-[var(--border-strong)] pl-4">
             <dt className="font-medium text-[var(--text-strong)]">
               Bugs and vulnerabilities
             </dt>
-            <dd className="mt-1 text-slate-600 dark:text-slate-300">
+            <dd className="mt-1 text-[var(--text-muted)]">
               A &ldquo;bug&rdquo; here is code that will demonstrably misbehave —
               an unreachable branch, a comparison that can never be true — not a
               style opinion. A &ldquo;vulnerability&rdquo; is something with a
@@ -180,9 +180,9 @@ export function CicdExplainer({ className }: { className?: string }) {
               file.
             </dd>
           </div>
-          <div className="border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+          <div className="border-l-2 border-[var(--border-strong)] pl-4">
             <dt className="font-medium text-[var(--text-strong)]">Code smells</dt>
-            <dd className="mt-1 text-slate-600 dark:text-slate-300">
+            <dd className="mt-1 text-[var(--text-muted)]">
               Things that are not wrong but make code harder to work with later —
               a function doing too many jobs, a name that says nothing, a
               condition nested five levels deep. These are not deducted
@@ -201,7 +201,7 @@ export function CicdExplainer({ className }: { className?: string }) {
       {/* ── Fair-play notes ─────────────────────────────────────────────── */}
       <Card className="p-5">
         <SectionHeading title="Two things students always ask" />
-        <div className="mt-3 space-y-4 text-sm text-slate-600 dark:text-slate-300">
+        <div className="mt-3 space-y-4 text-sm text-[var(--text-muted)]">
           <div>
             <p className="font-medium text-[var(--text-strong)]">
               Why can&apos;t I see the hidden tests?
@@ -238,12 +238,12 @@ export function CicdExplainer({ className }: { className?: string }) {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+              <tr className="border-b border-[var(--border-subtle)] text-left">
                 <th className="py-2 pr-3 font-medium">What you see</th>
                 <th className="py-2 font-medium">What it usually means</th>
               </tr>
             </thead>
-            <tbody className="text-slate-600 dark:text-slate-300">
+            <tbody className="text-[var(--text-muted)]">
               {[
                 [
                   "Everything after stage 1 is skipped",
@@ -268,7 +268,7 @@ export function CicdExplainer({ className }: { className?: string }) {
               ].map(([symptom, cause]) => (
                 <tr
                   key={symptom}
-                  className="border-b border-slate-100 align-top last:border-0 dark:border-slate-800"
+                  className="border-b border-[var(--border-subtle)] align-top last:border-0"
                 >
                   <td className="py-3 pr-3 font-medium text-[var(--text-strong)]">
                     {symptom}

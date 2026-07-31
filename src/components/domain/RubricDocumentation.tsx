@@ -24,7 +24,7 @@ function StageTable({ rubric }: { rubric: Rubric | null }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+          <tr className="border-b border-[var(--border-strong)] text-left text-[var(--text-strong)]">
             <th className="py-2 pr-3 font-medium">Stage</th>
             <th className="py-2 pr-3 font-medium">What it measures</th>
             <th className="py-2 pr-3 font-medium">Points</th>
@@ -39,20 +39,20 @@ function StageTable({ rubric }: { rubric: Rubric | null }) {
             return (
               <tr
                 key={stage.id}
-                className="border-b border-slate-100 align-top last:border-0 dark:border-slate-800"
+                className="border-b border-[var(--border-subtle)] align-top last:border-0"
               >
                 <td className="py-3 pr-3">
                   <div className="font-medium">
                     {stage.number}. {stage.question}
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-500">{stage.id}</div>
+                  <div className="mt-0.5 text-xs text-[var(--text-muted)]">{stage.id}</div>
                 </td>
-                <td className="py-3 pr-3 text-slate-600 dark:text-slate-300">
+                <td className="py-3 pr-3 text-[var(--text-strong)]">
                   {stage.measures}
-                  <div className="mt-1 text-xs text-slate-500">{stage.note}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">{stage.note}</div>
                 </td>
                 <td className="py-3 pr-3 tabular-nums">
-                  {allocated ?? <span className="text-slate-400">—</span>}
+                  {allocated ?? <span className="text-[var(--text-muted)]">—</span>}
                 </td>
                 <td className="py-3">
                   <GenericPill tone={stage.blocks ? "danger" : "neutral"}>
@@ -100,7 +100,7 @@ export function RubricDocumentation({
         <Card key={section.key} className="p-5">
           <SectionHeading title={section.title} />
           {section.description && (
-            <p className="mt-1 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-1 whitespace-pre-line text-sm text-[var(--text-strong)]">
               {section.description}
             </p>
           )}
@@ -113,7 +113,7 @@ export function RubricDocumentation({
               return (
                 <div
                   key={field.path}
-                  className="border-l-2 border-slate-200 pl-4 dark:border-slate-700"
+                  className="border-l-2 border-platform-200 pl-4"
                 >
                   <dt className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{field.title}</span>
@@ -125,12 +125,12 @@ export function RubricDocumentation({
                       <GenericPill tone="info">{value}</GenericPill>
                     ) : null}
                     {field.choices && !locked && (
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-[var(--text-muted)]">
                         {field.choices.join(" · ")}
                       </span>
                     )}
                   </dt>
-                  <dd className="mt-1 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">
+                  <dd className="mt-1 whitespace-pre-line text-sm text-[var(--text-strong)]">
                     {field.description}
                   </dd>
                 </div>
@@ -151,7 +151,7 @@ export function RubricDocumentation({
           title="How a code quality score is reached"
           subtitle="Stage 3 is graded on SonarCloud's continuous technical debt ratio, not on its A–E letter."
         />
-        <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+        <div className="mt-3 space-y-3 text-sm text-[var(--text-strong)]">
           <p>
             The familiar A–E maintainability rating is a rounding of that ratio,
             and its <strong>A band spans 0–5%</strong> — which is the entire range
@@ -162,7 +162,7 @@ export function RubricDocumentation({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                <tr className="border-b border-[var(--border-strong)] text-left text-[var(--text-strong)]">
                   <th className="py-2 pr-3 font-medium">A 500-line submission</th>
                   <th className="py-2 pr-3 font-medium">Debt</th>
                   <th className="py-2 pr-3 font-medium">Letter</th>
@@ -178,7 +178,7 @@ export function RubricDocumentation({
                 ].map(([profile, debt, letter, marks]) => (
                   <tr
                     key={profile}
-                    className="border-b border-slate-100 last:border-0 dark:border-slate-800"
+                    className="border-b border-[var(--border-subtle)] last:border-0"
                   >
                     <td className="py-2.5 pr-3">{profile}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{debt}</td>
@@ -191,7 +191,7 @@ export function RubricDocumentation({
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[var(--text-muted)]">
             Shown as a share of the quality points available, because the absolute
             figure depends on the assignment&apos;s own total. Bugs,
             vulnerabilities and excess duplication are then deducted from this
@@ -205,7 +205,7 @@ export function RubricDocumentation({
           title="When a stage cannot be measured"
           subtitle="An unmeasured component is removed from the total — never scored as zero."
         />
-        <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+        <div className="mt-3 space-y-3 text-sm text-[var(--text-strong)]">
           <p>
             If SonarCloud is not configured for a repository, or an analysis does
             not finish in time, stage 3 reports{" "}
@@ -235,7 +235,7 @@ export function RubricDocumentation({
 
       <Card className="p-5">
         <SectionHeading title="Reading a disputed result" />
-        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-slate-300">
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-[var(--text-strong)]">
           <li>
             Every graded run records the exact pipeline revision that produced
             it, so a score can be reproduced later even though the pipeline is

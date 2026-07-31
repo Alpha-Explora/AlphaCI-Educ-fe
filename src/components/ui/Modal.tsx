@@ -82,12 +82,26 @@ export function Modal({
   const maxW = size === "md" ? "max-w-lg" : size === "xl" ? "max-w-3xl" : "max-w-2xl";
 
   return createPortal(
+    /*
+      Two elements, not one, so the panel can sit in the MIDDLE of the viewport
+      without a tall panel becoming unreachable.
+
+      Centring and scrolling fight each other in a single box: `items-center` on
+      the element that also owns the overflow pushes the top of an over-tall
+      child above the scroll origin, and no amount of scrolling brings it back.
+      So the outer element scrolls and the inner one centres — at `min-h-full`
+      it is exactly the viewport when the panel is short (centring applies) and
+      exactly the panel when the panel is tall (centring is a no-op and the
+      outer element scrolls normally).
+
+      The backdrop is `fixed` rather than `absolute` for the same reason: it is
+      a child of the SCROLLING element, so an absolute one would slide up and
+      leave the page bare behind a scrolled dialog.
+    */
     <div
       className={cn(
-        "fixed inset-0 z-50 flex justify-center p-4 sm:p-6",
-        fitViewport
-          ? "items-center overflow-hidden"
-          : "items-start overflow-y-auto",
+        "fixed inset-0 z-50",
+        fitViewport ? "overflow-hidden" : "overflow-y-auto",
       )}
       role="dialog"
       aria-modal="true"
@@ -98,44 +112,45 @@ export function Modal({
         type="button"
         aria-label="Close dialog"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-slate-900/40 backdrop-blur-[2px] animate-fade-in"
+        className="fixed inset-0 h-full w-full cursor-default bg-slate-900/40 backdrop-blur-[2px] animate-fade-in"
       />
-      {/* Panel */}
       <div
-        ref={panelRef}
-        tabIndex={-1}
         className={cn(
-          "relative w-full rounded-2xl border border-[var(--border-subtle)] bg-white shadow-card-hover outline-none animate-fade-up",
-          maxW,
-          fitViewport ? "flex max-h-full flex-col" : "my-8",
+          "relative flex min-h-full items-center justify-center p-4 sm:p-6",
+          fitViewport && "h-full",
         )}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text-strong)]">{title}</h2>
-            {description && (
-              <p className="mt-0.5 text-sm text-[var(--text-muted)]">{description}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-slate-100 hover:text-[var(--text-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-          >
-            <span aria-hidden="true" className="text-lg leading-none">
-              ✕
-            </span>
-          </button>
-        </div>
+        {/* Panel */}
         <div
+          ref={panelRef}
+          tabIndex={-1}
           className={cn(
-            fitViewport
-              ? "flex min-h-0 flex-1 flex-col"
-              : "px-6 py-5",
+            "relative w-full rounded-2xl border border-[var(--border-subtle)] bg-white shadow-card-hover outline-none animate-fade-up",
+            maxW,
+            fitViewport && "flex max-h-full flex-col",
           )}
         >
-          {children}
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-6 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-strong)]">{title}</h2>
+              {description && (
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">{description}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-slate-100 hover:text-[var(--text-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">
+                ✕
+              </span>
+            </button>
+          </div>
+          <div className={cn(fitViewport ? "flex min-h-0 flex-1 flex-col" : "px-6 py-5")}>
+            {children}
+          </div>
         </div>
       </div>
     </div>,

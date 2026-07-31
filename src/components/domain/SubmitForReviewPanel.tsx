@@ -200,7 +200,7 @@ function PullRequestRow({
           {r.blockers.map((b) => (
             <li
               key={b}
-              className="flex gap-2 text-sm text-slate-600 dark:text-slate-300"
+              className="flex gap-2 text-sm text-[var(--text-muted)]"
             >
               <span aria-hidden="true" className="text-amber-600">
                 !
@@ -353,7 +353,7 @@ function ReadinessChecklist({
           <span
             className={
               item.ok
-                ? "text-slate-600 dark:text-slate-300"
+                ? "text-[var(--text-muted)]"
                 : "text-[var(--text-muted)]"
             }
           >
