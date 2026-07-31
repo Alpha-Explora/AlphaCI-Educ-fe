@@ -770,6 +770,21 @@ export interface AddTeacherResponse {
     live: boolean;
     warning?: string;
   };
+  /**
+   * Every laboratory the appointment covered, and how each invitation went.
+   *
+   * A teacher has one entry — the lab that appointed her. An IT admin has one
+   * per laboratory, because that role spans all of them. `accessInvite` above
+   * is the summary; this is what lets the UI say WHICH laboratory failed, which
+   * is the only version an operator can act on.
+   */
+  labs: Array<{
+    orgId: string;
+    orgName: string;
+    invited: boolean;
+    alreadyMember: boolean;
+    error?: string;
+  }>;
   /** Whether a set-your-password email was sent. */
   passwordInviteSent: boolean;
 }
