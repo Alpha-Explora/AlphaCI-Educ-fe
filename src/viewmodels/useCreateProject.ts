@@ -15,6 +15,7 @@ import { assignmentsApi, classesApi, sessionApi } from "@/models/api";
 import type {
   Assignment,
   AssignmentRepository,
+  BranchStrategy,
   CreateProjectInput,
   LabSessionLimits,
   ProjectRepoStructure,
@@ -338,24 +339,40 @@ export function useLabSessionLimits(): LabSessionLimits {
   );
 }
 
-/**
- * The starter-project catalogue, filtered to the stack the teacher has chosen.
- *
- * Server-driven rather than a constant in this file, unlike STACK_OPTIONS: the
- * stack list is fixed by what the pipeline can build, whereas templates are
- * meant to keep being added, and a growing list mirrored in two repositories is
- * one that eventually disagrees with itself.
- *
- * The fallback is an EMPTY list, not an invented one. If the catalogue cannot be
- * fetched the picker disappears and the project is created with the server's
- * default template — a teacher briefly not seeing a choice is recoverable, a
- * teacher picking "Calendar" from a stale hardcoded list and receiving a
- * calculator is not.
- */
-export function useProjectTemplates(stack: Stack | undefined): {
+/** The id used when the catalogue offers nothing for this stack. Mirrors the server. */
+export const DEFAULT_TEMPLATE_ID = "calculator";
+
+export interface StarterSelection {
+  /** Starters offerable for the current stack, in teaching order. */
   options: ProjectTemplateOption[];
   isLoading: boolean;
-} {
+  /** The effective choice — never an id absent from `options`. */
+  selectedId: string | undefined;
+  /** The chosen starter itself, for the card and the gallery's opening pane. */
+  selected: ProjectTemplateOption | undefined;
+  /** What the project should be called if the teacher has not named it. */
+  suggestedTitle: string;
+  /** What it should be described as if the teacher has not described it. */
+  suggestedDescription: string;
+}
+
+/**
+ * Everything about choosing a starter, in one ViewModel.
+ *
+ * The View owns FORM state (title, points, the student list) — that is this
+ * wizard's established shape. What it must not own is DERIVED logic, and three
+ * pieces of it had leaked in: falling back when the chosen starter does not
+ * exist for the current language, resolving the id to the starter object, and
+ * deciding what to prefill the title and description with.
+ *
+ * All three are rules, not keystrokes, so they belong here. The View keeps only
+ * the two "has the teacher typed yet" flags and the effect that applies the
+ * suggestions to its own state.
+ */
+export function useStarterSelection(
+  stack: Stack | undefined,
+  chosenId: string,
+): StarterSelection {
   const query = useQuery({
     queryKey: ["assignments", "templates"],
     queryFn: () => assignmentsApi.templates(),
@@ -363,13 +380,62 @@ export function useProjectTemplates(stack: Stack | undefined): {
     retry: false,
   });
 
+  // Empty, not invented, when the catalogue cannot be fetched. The picker then
+  // hides itself and the server's own default applies — a teacher briefly not
+  // seeing a choice is recoverable; one picking "Calendar" from a stale list and
+  // receiving a calculator is not.
   const all = query.data ?? [];
   const options = stack ? all.filter((t) => t.supportedStacks.includes(stack)) : all;
-  return { options, isLoading: query.isLoading };
+
+  // The chosen starter may not exist for a language picked afterwards. Falling
+  // back stops the card showing a name the repository will not contain.
+  const selectedId = options.some((t) => t.id === chosenId)
+    ? chosenId
+    : options[0]?.id;
+  const selected = options.find((t) => t.id === selectedId);
+
+  return {
+    options,
+    isLoading: query.isLoading,
+    selectedId,
+    selected,
+    suggestedTitle: selected?.label ?? "",
+    suggestedDescription: selected?.summary ?? "",
+  };
 }
 
-/** The id used when the catalogue offers nothing for this stack. Mirrors the server. */
-export const DEFAULT_TEMPLATE_ID = "calculator";
+/**
+ * The CI/CD difficulty dial, phrased for a teacher rather than for git.
+ *
+ * Neither option lets a student push to a graded branch. `main` is protected in
+ * both, and a pull request the pipeline gates is the only way in — that is the
+ * product. What changes is whether there is a SECOND hop: a `uat` stage to
+ * promote through before main, which is what a real team runs and what a
+ * first-year meeting pull requests for the first time does not also need.
+ *
+ * MAIN_ONLY leads because it is the right default for the years with the most
+ * students; the server's own default is MAIN_UAT for backward compatibility
+ * with projects created before this existed, which is a different question.
+ */
+export const BRANCH_STRATEGY_OPTIONS: ReadonlyArray<{
+  value: BranchStrategy;
+  label: string;
+  flow: string;
+  hint: string;
+}> = [
+  {
+    value: "MAIN_ONLY",
+    label: "Simple",
+    flow: "branch → pull request → main",
+    hint: "One protected branch. Students still branch and open a pull request that the pipeline has to pass — there is just no release stage to promote through. Best for 1st and 2nd year.",
+  },
+  {
+    value: "MAIN_UAT",
+    label: "Full pipeline",
+    flow: "branch → pull request → uat → pull request → main",
+    hint: "Adds a uat release stage between their work and main, gated by the pipeline at both merges. This is how a real team ships. Best for senior years and capstones.",
+  },
+];
 
 // ---- ViewModel --------------------------------------------------------------
 

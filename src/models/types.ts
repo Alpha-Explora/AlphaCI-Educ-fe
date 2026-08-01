@@ -71,9 +71,18 @@ export interface ProjectTemplateOption {
   difficulty: number;
   /** Stacks this template can build. The picker hides it for anything else. */
   supportedStacks: Stack[];
+  /**
+   * Files a student's repository is created with, keyed by stack. Paths only —
+   * the server never sends content, so the gallery can show what a teacher gets
+   * without ever being a route to the answer key.
+   */
+  filesByStack: Record<string, string[]>;
 }
 
 export type ProjectRepoStructure = "SINGLE" | "SPLIT";
+
+/** How many promotion stages a project's pipeline has. Mirrors the server. */
+export type BranchStrategy = "MAIN_ONLY" | "MAIN_UAT";
 export type RepoComponent = "SINGLE" | "BACKEND" | "FRONTEND";
 
 // Ordered list of the 5 pipeline stages, for stable UI rendering.
