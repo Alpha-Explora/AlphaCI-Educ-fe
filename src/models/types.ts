@@ -79,6 +79,25 @@ export interface ProjectTemplateOption {
   filesByStack: Record<string, string[]>;
 }
 
+/**
+ * The reference solution for a project's starter — STAFF ONLY.
+ *
+ * One entry per repository shape the project creates: a SPLIT project has two
+ * languages and therefore two different solutions.
+ */
+export interface AnswerKeyBuild {
+  component: RepoComponent;
+  stack: string;
+  files: { path: string; content: string }[];
+}
+
+export interface AnswerKey {
+  assignmentId: string;
+  templateId: string;
+  templateLabel: string;
+  builds: AnswerKeyBuild[];
+}
+
 export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 
 /** How many promotion stages a project's pipeline has. Mirrors the server. */

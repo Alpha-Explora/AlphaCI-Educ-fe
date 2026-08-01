@@ -1,6 +1,7 @@
 // MODEL LAYER — Assignments resource
 import { apiRequest } from "./client";
 import type {
+  AnswerKey,
   Assignment,
   AssignmentRepository,
   ProjectTemplateOption,
@@ -17,6 +18,15 @@ export const assignmentsApi = {
    */
   templates() {
     return apiRequest<ProjectTemplateOption[]>(`/assignments/templates`);
+  },
+
+  /**
+   * The reference solution for this project's starter. STAFF ONLY — the server
+   * refuses anyone who does not teach the class, so this must never be called
+   * from a student surface.
+   */
+  answerKey(id: string) {
+    return apiRequest<AnswerKey>(`/assignments/${id}/answer-key`);
   },
 
   get(id: string) {
