@@ -83,10 +83,18 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
         <span aria-hidden="true">🚀</span> Start assignment in VS Code
       </Button>
 
+      {/* The permission prompt is named FIRST because it is the common case and
+          the old copy misdiagnosed it. VS Code asks "Allow … to open this URI?"
+          whenever a browser hands it a vscode:// link, and until that is
+          answered nothing happens at all — which read as "the extension is
+          broken" and sent people to reinstall software that was working. */}
       {vm.phase === "launching" && (
         <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Opening VS Code… If nothing happens, VS Code or the {brand.name} extension may not be
-          installed — use the <strong>manual steps below</strong>.
+          Opening VS Code… If VS Code asks{" "}
+          <strong>&ldquo;Allow {brand.name} to open this URI?&rdquo;</strong>, choose{" "}
+          <strong>Open</strong> — tick &ldquo;Do not ask me again&rdquo; and it will not ask
+          on this PC again. If nothing appears at all, VS Code or the {brand.name} extension
+          may not be installed — use the <strong>manual steps below</strong>.
         </p>
       )}
 

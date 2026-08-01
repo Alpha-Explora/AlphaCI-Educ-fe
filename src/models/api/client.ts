@@ -123,7 +123,10 @@ export async function apiRequest<T>(
       credentials: "include",
     });
   } catch (err) {
-    // fetch throws only on network-level failure (server down, DNS, CORS blocked)
+    // fetch throws on network-level failure (server down, DNS, CORS blocked) and
+    // on abort — including a caller's `AbortSignal.timeout`. Both mean "no answer
+    // came back", which is what the network message already tells the user, so
+    // they deliberately share a path.
     throw new ApiError(
       `Backend not reachable at ${API_BASE_URL}`,
       "network",
