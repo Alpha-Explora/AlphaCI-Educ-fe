@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
 import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
 import { GradingPanel } from "@/components/domain/GradingPanel";
+import { AnswerKeyPanel } from "@/components/domain/AnswerKeyPanel";
 import { PlagiarismCard } from "@/components/domain/PlagiarismCard";
 import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { formatDate, formatDateTime, relativeDue } from "@/components/ui/format";
@@ -239,8 +240,13 @@ export default function TeacherRepositoryPage() {
                   </Card>
                 )}
               </div>
-              <div className="order-1 lg:order-2">
+              <div className="order-1 space-y-5 lg:order-2">
                 <GradingPanel repo={d.repo} maxPoints={d.assignment.points} />
+                {/* Beneath the grading form, not above it: the mark is the job
+                    on this page, and the reference is what you reach for when
+                    the student's approach is unfamiliar. Collapsed by default —
+                    see AnswerKeyPanel for why that is deliberate. */}
+                <AnswerKeyPanel assignmentId={d.assignment.id} />
               </div>
             </section>
           </>
