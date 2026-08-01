@@ -17,6 +17,8 @@ import type {
   AssignmentRepository,
   CreateProjectInput,
   LabSessionLimits,
+  ProjectRepoStructure,
+  ProjectTemplateOption,
   ProvisionFailure,
   RepoOwnerMode,
   RepoScaffold,
@@ -112,6 +114,62 @@ export const BACKEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
 export const FRONTEND_STACK_OPTIONS = STACK_OPTIONS.filter((o) =>
   FRONTEND_STACKS.includes(o.value),
 );
+
+/**
+ * What the teacher is actually choosing when they set up a project.
+ *
+ * The API models this as `repoStructure: SINGLE | SPLIT` plus a language, which
+ * is the right shape for the server and the wrong one for the person filling in
+ * the form: "Single repo" does not tell a teacher that picking React there is
+ * how you set a frontend-only project. Naming the three real cases makes the
+ * frontend-only route findable instead of implied.
+ *
+ * BACKEND and FRONTEND both map to SINGLE — the difference is only which
+ * languages the picker then offers.
+ */
+export type ProjectShape = "BACKEND" | "FRONTEND" | "SPLIT";
+
+export const PROJECT_SHAPE_OPTIONS: ReadonlyArray<{
+  value: ProjectShape;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "BACKEND",
+    label: "Backend only",
+    hint: "One repository. An API or console project in Node, NestJS, Java, Python or PHP.",
+  },
+  {
+    value: "FRONTEND",
+    label: "Frontend only",
+    hint: "One repository. A React or Next.js interface, with component tests.",
+  },
+  {
+    value: "SPLIT",
+    label: "Backend + Frontend",
+    hint: "Two repositories per student or group, each with its own language.",
+  },
+];
+
+export function repoStructureForShape(shape: ProjectShape): ProjectRepoStructure {
+  return shape === "SPLIT" ? "SPLIT" : "SINGLE";
+}
+
+/** Which languages the single-repo picker offers for this half of the stack. */
+export function stackOptionsForShape(shape: ProjectShape) {
+  return shape === "FRONTEND" ? FRONTEND_STACK_OPTIONS : BACKEND_STACK_OPTIONS;
+}
+
+/**
+ * The language to fall back to when the shape changes.
+ *
+ * Switching to "Frontend only" while `stack` still says `python` would leave a
+ * select whose value is not in its own option list — which renders blank and
+ * submits the old value.
+ */
+export function defaultStackForShape(shape: ProjectShape): Stack {
+  return shape === "FRONTEND" ? "nextjs" : "nodejs";
+}
 
 // ---- Pure validation helpers (exported for inline hints in the View) --------
 
@@ -279,6 +337,39 @@ export function useLabSessionLimits(): LabSessionLimits {
     }
   );
 }
+
+/**
+ * The starter-project catalogue, filtered to the stack the teacher has chosen.
+ *
+ * Server-driven rather than a constant in this file, unlike STACK_OPTIONS: the
+ * stack list is fixed by what the pipeline can build, whereas templates are
+ * meant to keep being added, and a growing list mirrored in two repositories is
+ * one that eventually disagrees with itself.
+ *
+ * The fallback is an EMPTY list, not an invented one. If the catalogue cannot be
+ * fetched the picker disappears and the project is created with the server's
+ * default template — a teacher briefly not seeing a choice is recoverable, a
+ * teacher picking "Calendar" from a stale hardcoded list and receiving a
+ * calculator is not.
+ */
+export function useProjectTemplates(stack: Stack | undefined): {
+  options: ProjectTemplateOption[];
+  isLoading: boolean;
+} {
+  const query = useQuery({
+    queryKey: ["assignments", "templates"],
+    queryFn: () => assignmentsApi.templates(),
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+
+  const all = query.data ?? [];
+  const options = stack ? all.filter((t) => t.supportedStacks.includes(stack)) : all;
+  return { options, isLoading: query.isLoading };
+}
+
+/** The id used when the catalogue offers nothing for this stack. Mirrors the server. */
+export const DEFAULT_TEMPLATE_ID = "calculator";
 
 // ---- ViewModel --------------------------------------------------------------
 

@@ -53,6 +53,26 @@ export type Stack =
   | "java"
   | "python"
   | "php";
+/**
+ * A starter project a teacher can choose, as served by GET /assignments/templates.
+ *
+ * Fetched rather than hardcoded here, unlike STACK_OPTIONS. The stack list is
+ * pinned by the pipeline and changes when the pipeline does; templates are meant
+ * to keep growing, and mirroring a growing list in two repositories is how it
+ * ends up wrong in one of them.
+ */
+export interface ProjectTemplateOption {
+  id: string;
+  label: string;
+  summary: string;
+  /** What the student practises — shown as help text under the picker. */
+  teaches: string;
+  /** 1-5, rough teaching order. The API returns them already sorted by it. */
+  difficulty: number;
+  /** Stacks this template can build. The picker hides it for anything else. */
+  supportedStacks: Stack[];
+}
+
 export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 export type RepoComponent = "SINGLE" | "BACKEND" | "FRONTEND";
 
@@ -1085,6 +1105,15 @@ export interface CreateProjectInput {
   backendStack?: Stack; // SPLIT: backend repo stack (default 'nestjs')
   frontendStack?: Stack; // SPLIT: frontend repo stack (default 'nextjs')
   coverageThreshold?: number; // CI coverage gate, int 0..100 (default 80)
+  /**
+   * Which starter project the students' repositories are created with — one of
+   * the ids from GET /assignments/templates (default 'calculator').
+   *
+   * Independent of `stack`: the language and the exercise are separate choices.
+   * Every template ships tests that fully cover its own source, so picking one
+   * never constrains `coverageThreshold`.
+   */
+  template?: string;
   /**
    * How long a student's lab session may last, in hours. Omitted = server
    * default. NOT the GitHub token lifetime, which is fixed at 60 minutes.
