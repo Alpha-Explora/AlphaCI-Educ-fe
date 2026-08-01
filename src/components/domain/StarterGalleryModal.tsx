@@ -84,11 +84,12 @@ function StarterDetail({
           Files your students get
         </span>
         {files.length > 0 ? (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
             {files.map((path) => (
               <li
                 key={path}
-                className="font-mono text-xs text-[var(--text-strong)]"
+                className="truncate font-mono text-xs text-[var(--text-strong)]"
+                title={path}
               >
                 {path}
               </li>
@@ -151,7 +152,7 @@ export function StarterGalleryModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Starter projects" size="xl">
+    <Modal open={open} onClose={onClose} title="Starter projects" size="wide">
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-muted)]">
           <Spinner /> Loading starters…
@@ -161,12 +162,17 @@ export function StarterGalleryModal({
           No starters are available for this language yet.
         </p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-[minmax(0,18rem)_1fr]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
           {/* List */}
+          {/* Two-up. With nine starters a single column is a scroll; two
+              columns fit the whole catalogue in view, which is the point of a
+              gallery over a dropdown. One column below `lg`, where two would be
+              too cramped to read. */}
           <ul
             className={cn(
-              "space-y-2",
-              mobilePane === "detail" && "hidden sm:block",
+              "grid content-start gap-2 sm:grid-cols-2",
+              "max-h-[60vh] overflow-y-auto pr-1",
+              mobilePane === "detail" && "hidden lg:grid",
             )}
           >
             {starters.map((starter) => {
@@ -188,11 +194,16 @@ export function StarterGalleryModal({
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-[var(--text-strong)]">
+                      {/* Truncates rather than wraps: in a two-up grid a long
+                          name would otherwise push the pill onto its own line
+                          and make one card taller than its neighbour. */}
+                      <span className="truncate text-sm font-medium text-[var(--text-strong)]">
                         {starter.label}
                       </span>
                       {starter.id === selectedId && (
-                        <GenericPill tone="success">Selected</GenericPill>
+                        <span className="shrink-0">
+                          <GenericPill tone="success">Selected</GenericPill>
+                        </span>
                       )}
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
@@ -211,13 +222,16 @@ export function StarterGalleryModal({
           <div
             className={cn(
               "rounded-lg border border-[var(--border-subtle)] p-4",
-              mobilePane === "list" && "hidden sm:block",
+              // Stays put while the card grid scrolls next to it, so the
+              // comparison the gallery exists for stays on screen.
+              "lg:sticky lg:top-0 lg:max-h-[60vh] lg:overflow-y-auto",
+              mobilePane === "list" && "hidden lg:block",
             )}
           >
             <button
               type="button"
               onClick={() => setMobilePane("list")}
-              className="mb-3 text-xs font-medium text-platform-700 sm:hidden"
+              className="mb-3 text-xs font-medium text-platform-700 lg:hidden"
             >
               ← All starters
             </button>

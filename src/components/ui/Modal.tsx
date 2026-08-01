@@ -40,7 +40,8 @@ export function Modal({
   title: string;
   description?: string;
   children: ReactNode;
-  size?: "md" | "lg" | "xl";
+  /** `wide` is for two-pane content (a list beside a detail), not for long forms. */
+  size?: "md" | "lg" | "xl" | "wide";
   fitViewport?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -79,7 +80,23 @@ export function Modal({
 
   if (!open || !mounted) return null;
 
-  const maxW = size === "md" ? "max-w-lg" : size === "xl" ? "max-w-3xl" : "max-w-2xl";
+  /**
+   * `wide` exists for BROWSING, not for reading.
+   *
+   * The other three are reading widths — a form or a paragraph past roughly
+   * 3xl is harder to scan, not easier. A two-pane browser is the opposite
+   * case: it has a list AND a detail side by side, and at 3xl neither gets
+   * enough room, so the dialog grows downward into a tall narrow column and
+   * the user scrolls a list they should be able to see at a glance.
+   */
+  const maxW =
+    size === "md"
+      ? "max-w-lg"
+      : size === "xl"
+        ? "max-w-3xl"
+        : size === "wide"
+          ? "max-w-6xl"
+          : "max-w-2xl";
 
   return createPortal(
     /*
