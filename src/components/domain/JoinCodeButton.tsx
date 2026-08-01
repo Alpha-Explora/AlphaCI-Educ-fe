@@ -182,29 +182,51 @@ function JoinCodeDialog({
  * or writes it on the board at the start of a session, and the status beside it
  * answers "why can't they join?" without a click. Everything that MUTATES the
  * code stays in the dialog behind "Manage".
+ *
+ * `compact` is the same strip shrunk to sit inline on a toolbar row (it rides
+ * beside the class tabs) instead of eating a full-width band of the page. Same
+ * information, same actions — only the scale changes, so a teacher who learns
+ * it in one place recognises it in the other.
  */
-export function JoinCodeStrip({ classId }: Readonly<{ classId: string }>) {
+export function JoinCodeStrip({
+  classId,
+  compact = false,
+}: Readonly<{ classId: string; compact?: boolean }>) {
   const vm = useJoinCode(classId);
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-platform-200 bg-platform-50 px-4 py-3 animate-fade-up">
-        <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="text-lg">
+      <div
+        className={cn(
+          "flex flex-wrap items-center rounded-xl border border-platform-200 bg-platform-50 animate-fade-up",
+          compact
+            ? "gap-x-2.5 gap-y-1 px-2.5 py-1.5"
+            : "gap-x-4 gap-y-2 px-4 py-3",
+        )}
+      >
+        <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
+          <span aria-hidden="true" className={compact ? "text-sm" : "text-lg"}>
             🪧
           </span>
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Class join code
+          <div className={compact ? "flex items-baseline gap-2" : undefined}>
+            <p
+              className={cn(
+                "font-medium uppercase tracking-wide text-[var(--text-muted)]",
+                compact ? "text-[10px]" : "text-[11px]",
+              )}
+            >
+              {/* "Class" is redundant next to the class's own tabs. */}
+              {compact ? "Join code" : "Class join code"}
             </p>
             {vm.isLoading ? (
-              <Skeleton className="mt-1 h-6 w-32" />
+              <Skeleton className={compact ? "h-4 w-24" : "mt-1 h-6 w-32"} />
             ) : (
               <output
                 aria-label="Class join code"
                 className={cn(
-                  "font-mono text-xl font-bold tracking-[0.12em]",
+                  "font-mono font-bold tracking-[0.12em]",
+                  compact ? "text-sm" : "text-xl",
                   vm.canJoin ? "text-platform-800" : "text-[var(--text-muted)] line-through",
                 )}
               >
@@ -217,9 +239,9 @@ export function JoinCodeStrip({ classId }: Readonly<{ classId: string }>) {
         {vm.data && (
           <>
             <JoinStatusPill canJoin={vm.canJoin} isExpired={vm.isExpired} />
-            <span className="hidden flex-1 sm:block" />
-            <div className="flex items-center gap-2">
-              <CopyButton value={vm.data.code} label="Copy code" />
+            {!compact && <span className="hidden flex-1 sm:block" />}
+            <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
+              <CopyButton value={vm.data.code} label={compact ? "Copy" : "Copy code"} />
               <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
                 Manage…
               </Button>

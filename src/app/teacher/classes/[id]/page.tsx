@@ -41,6 +41,7 @@ import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { ClassOverviewTab } from "@/components/domain/ClassOverviewTab";
+import { JoinCodeStrip } from "@/components/domain/JoinCodeButton";
 import { formatDate, relativeDue } from "@/components/ui/format";
 
 type ClassTab = "overview" | "students" | "assignments" | "settings";
@@ -125,17 +126,20 @@ export default function ClassRosterPage() {
           it is visible whichever one is open. */}
       {del.error && !del.isConfirming && <Banner tone="error">{del.error}</Banner>}
 
+      {/* The join code rides the tab strip rather than sitting in Overview: it
+          is class-level, so it stays reachable from every tab, and the panel
+          below gets the full width back for the roster + projects container. */}
       <Tabs
         items={TABS}
         value={tab}
         onChange={setTab}
         label="Class sections"
         idPrefix="class"
+        trailing={classId && <JoinCodeStrip classId={classId} compact />}
       />
 
       {tab === "overview" && (
         <ClassOverviewTab
-          classId={classId}
           info={info}
           roster={roster}
           assignments={assignments}

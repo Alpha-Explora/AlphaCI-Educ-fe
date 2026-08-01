@@ -9,6 +9,11 @@
 //
 // Presentational only. The selected tab is owned by the caller, so the page can
 // decide whether it lives in component state or the URL.
+//
+// `trailing` parks page-level content on the right of the strip (the class join
+// code, for one). It is a SIBLING of the tablist, not a child: a tablist may
+// only contain tabs, so the border lives on the wrapper and the tablist keeps
+// itself pure.
 // ============================================================================
 import { useRef } from "react";
 import { cn } from "./cn";
@@ -26,6 +31,8 @@ export function Tabs<T extends string>({
   label,
   /** Prefix for the generated tab/panel ids — must match the panels' own. */
   idPrefix,
+  /** Optional content pinned to the right of the strip, outside the tablist. */
+  trailing,
   className,
 }: {
   items: ReadonlyArray<TabItem<T>>;
@@ -33,6 +40,7 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
   label: string;
   idPrefix: string;
+  trailing?: React.ReactNode;
   className?: string;
 }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -63,41 +71,50 @@ export function Tabs<T extends string>({
 
   return (
     <div
-      role="tablist"
-      aria-label={label}
-      onKeyDown={onKeyDown}
       className={cn(
-        "flex gap-1 border-b border-[var(--border-subtle)]",
+        // items-end keeps the tabs' bottom edge on the border, so the active
+        // tab's -mb-px underline still overlaps it once trailing content makes
+        // the row taller than the tabs themselves.
+        "flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-[var(--border-subtle)]",
         className,
       )}
     >
-      {items.map((item) => {
-        const selected = item.id === value;
-        return (
-          <button
-            key={item.id}
-            ref={(el) => {
-              refs.current[item.id] = el;
-            }}
-            type="button"
-            role="tab"
-            id={`${idPrefix}-tab-${item.id}`}
-            aria-selected={selected}
-            aria-controls={`${idPrefix}-panel-${item.id}`}
-            // Only the selected tab is reachable by Tab; arrows do the rest.
-            tabIndex={selected ? 0 : -1}
-            onClick={() => onChange(item.id)}
-            className={cn(
-              "-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform",
-              selected
-                ? "border-platform text-platform-700"
-                : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:text-[var(--text-strong)]",
-            )}
-          >
-            {item.label}
-          </button>
-        );
-      })}
+      <div
+        role="tablist"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        className="flex gap-1"
+      >
+        {items.map((item) => {
+          const selected = item.id === value;
+          return (
+            <button
+              key={item.id}
+              ref={(el) => {
+                refs.current[item.id] = el;
+              }}
+              type="button"
+              role="tab"
+              id={`${idPrefix}-tab-${item.id}`}
+              aria-selected={selected}
+              aria-controls={`${idPrefix}-panel-${item.id}`}
+              // Only the selected tab is reachable by Tab; arrows do the rest.
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onChange(item.id)}
+              className={cn(
+                "-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform",
+                selected
+                  ? "border-platform text-platform-700"
+                  : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:text-[var(--text-strong)]",
+              )}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {trailing && <div className="pb-2">{trailing}</div>}
     </div>
   );
 }
