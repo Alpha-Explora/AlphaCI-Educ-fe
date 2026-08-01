@@ -42,7 +42,8 @@ import {
   BACKEND_STACK_OPTIONS,
   FRONTEND_STACK_OPTIONS,
   DEFAULT_TEMPLATE_ID,
-  useProjectTemplates,
+  useStarterSelection,
+  BRANCH_STRATEGY_OPTIONS,
   PROJECT_SHAPE_OPTIONS,
   repoStructureForShape,
   stackOptionsForShape,
@@ -50,6 +51,7 @@ import {
   type ProjectShape,
 } from "@/viewmodels/useCreateProject";
 import type {
+  BranchStrategy,
   ClassCohort,
   CreateProjectInput,
   ProjectRepoStructure,
@@ -71,6 +73,7 @@ import {
   cn,
 } from "@/components/ui";
 import { ProvisionResultSummary } from "./ProvisionResultSummary";
+import { StarterGalleryModal } from "./StarterGalleryModal";
 
 interface GroupDraft {
   id: string;
@@ -400,13 +403,12 @@ export function CreateProjectModal({
   // decision that has not been made yet, so the picker stays out of that shape
   // rather than quietly applying a backend template to a frontend repo.
   const [template, setTemplate] = useState<string>(DEFAULT_TEMPLATE_ID);
-  const templates = useProjectTemplates(repoStructure === "SPLIT" ? undefined : stack);
-  // The chosen template may not exist for a language picked afterwards. Falling
-  // back keeps the select from showing a blank value that submits a template the
-  // stack cannot build.
-  const templateChoice =
-    templates.options.some((t) => t.id === template) ? template : templates.options[0]?.id;
-  const selectedTemplate = templates.options.find((t) => t.id === templateChoice);
+  // All starter logic — fetching, the fallback when the chosen one does not
+  // exist for this language, and what to prefill the title with — lives in the
+  // ViewModel. This View only holds form state and renders.
+  const starters = useStarterSelection(repoStructure === "SPLIT" ? undefined : stack, template);
+  const templateChoice = starters.selectedId;
+  const selectedTemplate = starters.selected;
 
   /**
    * Name and describe the project from the starter the teacher picked.
@@ -418,14 +420,26 @@ export function CreateProjectModal({
    * for good — silently overwriting a typed title on a later change of mind
    * would be far worse than not filling it at all.
    */
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
+  /**
+   * How many promotion stages this project's pipeline has.
+   *
+   * MAIN_ONLY is the first-year setting: main is still protected and a pull
+   * request is still the only way in — there is simply no uat to promote
+   * through. MAIN_UAT adds the stage a real team runs.
+   */
+  const [branchStrategy, setBranchStrategy] = useState<BranchStrategy>("MAIN_ONLY");
+
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
 
+  const { suggestedTitle, suggestedDescription } = starters;
   useEffect(() => {
-    if (!selectedTemplate) return;
-    if (!titleTouched) setTitle(selectedTemplate.label);
-    if (!descriptionTouched) setDescription(selectedTemplate.summary);
-  }, [selectedTemplate, titleTouched, descriptionTouched]);
+    if (!suggestedTitle) return;
+    if (!titleTouched) setTitle(suggestedTitle);
+    if (!descriptionTouched) setDescription(suggestedDescription);
+  }, [suggestedTitle, suggestedDescription, titleTouched, descriptionTouched]);
 
   const step = STEPS[stepIndex].id;
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -544,31 +558,42 @@ export function CreateProjectModal({
               choices while hiding why the list just got shorter.
               Hidden when the catalogue is empty (the request failed) — an empty
               select is a dead control that still looks operable. */}
-          {templates.options.length > 0 && (
-            <Field label="Starter project" required>
-              {({ id }) => (
-                <>
-                  <Select
-                    id={id}
-                    value={templateChoice ?? ""}
-                    onChange={(e) => setTemplate(e.target.value)}
-                  >
-                    {templates.options.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label} — {t.summary}
-                      </option>
-                    ))}
-                  </Select>
+          {/* A card, not a dropdown.
+              What a class builds for a fortnight is worth more than one line of
+              option text, and the gallery behind this button shows the files the
+              repository is created with — which a <select> cannot. The card
+              still states the current answer, so the common case (accept the
+              default) needs no clicks at all. */}
+          {starters.options.length > 0 && (
+            <div>
+              <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                Starter project <span aria-hidden="true" className="text-rose-500">*</span>
+              </span>
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-strong)]">
+                    {selectedTemplate?.label ?? "None available"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    {selectedTemplate?.summary}
+                  </p>
                   {selectedTemplate && (
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Teaches: {selectedTemplate.teaches} Every starter ships
-                      passing tests that fully cover its own code, so it will not
-                      fail the coverage gate you set on the Repository step.
+                    <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                      Teaches: {selectedTemplate.teaches}
                     </p>
                   )}
-                </>
-              )}
-            </Field>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setGalleryOpen(true)}
+                  className="shrink-0"
+                >
+                  Browse starters
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -698,6 +723,7 @@ export function CreateProjectModal({
       ...(dueDate !== "" && { dueDate }),
       points: Number(points),
       coverageThreshold: coverage,
+      branchStrategy,
       // Omitted entirely when left blank — see the sessionHours state comment.
       ...(sessionHours.trim() !== "" && { labSessionHours: Number(sessionHours) }),
       ...scaffold,
@@ -745,6 +771,7 @@ export function CreateProjectModal({
   const blockingErrors = showStepErrors ? stepErrors : vm.validationErrors;
 
   return (
+    <>
     <Modal
       open={open}
       onClose={handleClose}
@@ -1151,6 +1178,50 @@ export function CreateProjectModal({
             {/* ADDENDUM G — repository scaffold options */}
             {step === "repository" && (
               <div className="space-y-4">
+                {/* Pipeline depth — the CI/CD difficulty dial, and the reason
+                    a 1st-year and a capstone can share this product. Sits above
+                    the coverage gate because it decides the SHAPE of the
+                    workflow; coverage only decides how strict one stage is. */}
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                    Pipeline
+                  </span>
+                  <div
+                    role="tablist"
+                    aria-label="Pipeline"
+                    className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
+                  >
+                    {BRANCH_STRATEGY_OPTIONS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={branchStrategy === value}
+                        onClick={() => setBranchStrategy(value)}
+                        className={cn(
+                          "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
+                          branchStrategy === value
+                            ? "bg-white text-platform-700 shadow-sm"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const tier = BRANCH_STRATEGY_OPTIONS.find((o) => o.value === branchStrategy);
+                    return (
+                      <>
+                        <p className="mt-1.5 font-mono text-xs text-[var(--text-strong)]">
+                          {tier?.flow}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">{tier?.hint}</p>
+                      </>
+                    );
+                  })()}
+                </div>
+
                 {/* Coverage gate. Stays here rather than with the language on
                     step 1: it is a grading THRESHOLD, not part of choosing the
                     project, and every starter is written to pass whatever it is
@@ -1283,6 +1354,24 @@ export function CreateProjectModal({
           </div>
         </form>
       )}
-    </Modal>
+      </Modal>
+
+      {/* A SIBLING of the wizard, not a child of it: a dialog nested inside a
+          scrolling container inherits that container's clipping, and the
+          gallery is the taller of the two. Only mounted while open, so its
+          two-pane state resets between visits instead of reopening on whatever
+          was last previewed. */}
+      {galleryOpen && (
+        <StarterGalleryModal
+          open
+          onClose={() => setGalleryOpen(false)}
+          starters={starters.options}
+          isLoading={starters.isLoading}
+          stack={stack}
+          selectedId={templateChoice}
+          onSelect={setTemplate}
+        />
+      )}
+    </>
   );
 }
