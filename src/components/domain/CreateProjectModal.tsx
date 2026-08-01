@@ -13,12 +13,20 @@
 // the viewport, and the progress bar and actions stay pinned while the middle
 // section is the only thing that can ever scroll.
 //
-// Step order follows what depends on what: the details name the project, the
-// student selection decides how many repositories exist, and the repository
-// setup describes what each one contains — which is also why the repo-name
-// preview can only be shown last.
+// Step order follows what depends on what:
+//   1. Project    — WHAT they are building (backend/frontend/both, language,
+//                   starter project), then the title, description and points
+//                   that describe it. The starter leads because everything
+//                   after it is a description OF it: a teacher was previously
+//                   asked to name a project on step 1 that they did not choose
+//                   until step 3, and the title and description now arrive
+//                   prefilled from the starter so the job is to CONFIGURE it.
+//   2. Students   — decides how many repositories exist.
+//   3. Repository — the coverage gate, the lab-session window, and the repo-name
+//                   preview, which can only be shown once the title and the
+//                   student selection are both known.
 // ============================================================================
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useCreateProject,
   useLabSessionLimits,
@@ -74,8 +82,11 @@ const nextGroupId = () => `g${++groupSeq}`;
 
 type StepId = "details" | "students" | "repository";
 
+// The id stays "details" — it keys validation and the step body, and renaming
+// it would touch several places to say the same thing. Only the LABEL moved,
+// because the step now leads with the starter project rather than the title.
 const STEPS: ReadonlyArray<{ id: StepId; label: string }> = [
-  { id: "details", label: "Details" },
+  { id: "details", label: "Project" },
   { id: "students", label: "Students" },
   { id: "repository", label: "Repository" },
 ];
@@ -397,8 +408,172 @@ export function CreateProjectModal({
     templates.options.some((t) => t.id === template) ? template : templates.options[0]?.id;
   const selectedTemplate = templates.options.find((t) => t.id === templateChoice);
 
+  /**
+   * Name and describe the project from the starter the teacher picked.
+   *
+   * The point of a template is that the teacher CONFIGURES rather than composes:
+   * choosing "Calculator" and then typing the word "Calculator" into an empty
+   * Title is work the wizard can do. Both fields follow the picker until the
+   * teacher edits one, at which point their text is theirs and prefill stops
+   * for good — silently overwriting a typed title on a later change of mind
+   * would be far worse than not filling it at all.
+   */
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [descriptionTouched, setDescriptionTouched] = useState(false);
+
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    if (!titleTouched) setTitle(selectedTemplate.label);
+    if (!descriptionTouched) setDescription(selectedTemplate.summary);
+  }, [selectedTemplate, titleTouched, descriptionTouched]);
+
   const step = STEPS[stepIndex].id;
   const isLastStep = stepIndex === STEPS.length - 1;
+
+  /**
+   * WHAT the students are building — the first thing the teacher decides.
+   *
+   * This used to live on the Repository step, last, next to the coverage gate.
+   * Wrong way round: the starter project is what the assignment IS, and the
+   * title, description and points are all descriptions OF it. A teacher had to
+   * invent a title on step 1 for a project they did not choose until step 3.
+   * (The original wizard did have a "Starter template URL" field here — it was
+   * removed because nothing read it, not because the position was wrong.)
+   *
+   * Extracted as an element rather than moved inline so the step body stays
+   * readable; it is one block used in one place.
+   */
+  const projectSetupSection = (
+    <div className="space-y-4">
+      <div>
+        <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+          What are they building?
+        </span>
+        <div
+          role="tablist"
+          aria-label="What are they building?"
+          className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
+        >
+          {PROJECT_SHAPE_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={shape === value}
+              onClick={() => chooseShape(value)}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
+                shape === value
+                  ? "bg-white text-platform-700 shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {/* The hint carries the consequence the label cannot: how many
+            repositories this creates, and what a student will find in them. */}
+        <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+          {PROJECT_SHAPE_OPTIONS.find((o) => o.value === shape)?.hint}
+        </p>
+        {shape === "SPLIT" && (
+          <p className="mt-1 text-xs text-amber-600">
+            2 repos per {type === "GROUP" ? "group" : "student"} will be created
+            (backend + frontend).
+          </p>
+        )}
+      </div>
+
+      {shape === "SPLIT" ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Backend language" required>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={backendStack}
+                onChange={(e) => setBackendStack(e.target.value as Stack)}
+              >
+                {BACKEND_STACK_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Frontend language" required>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={frontendStack}
+                onChange={(e) => setFrontendStack(e.target.value as Stack)}
+              >
+                {FRONTEND_STACK_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Field label="Language" required>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={stack}
+                onChange={(e) => setStack(e.target.value as Stack)}
+              >
+                {/* Only this half's languages. Offering all seven and letting a
+                    teacher pick PHP for a "frontend" project would scaffold a
+                    repository the pipeline cannot build a UI from. */}
+                {stackOptionsForShape(shape).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          {/* Its own row under the language, not beside it: the options CHANGE
+              with the language, and side by side implies two independent
+              choices while hiding why the list just got shorter.
+              Hidden when the catalogue is empty (the request failed) — an empty
+              select is a dead control that still looks operable. */}
+          {templates.options.length > 0 && (
+            <Field label="Starter project" required>
+              {({ id }) => (
+                <>
+                  <Select
+                    id={id}
+                    value={templateChoice ?? ""}
+                    onChange={(e) => setTemplate(e.target.value)}
+                  >
+                    {templates.options.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label} — {t.summary}
+                      </option>
+                    ))}
+                  </Select>
+                  {selectedTemplate && (
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Teaches: {selectedTemplate.teaches} Every starter ships
+                      passing tests that fully cover its own code, so it will not
+                      fail the coverage gate you set on the Repository step.
+                    </p>
+                  )}
+                </>
+              )}
+            </Field>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const namePreview = useMemo(
     () =>
@@ -698,13 +873,24 @@ export function CreateProjectModal({
               more students than fit. */}
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {step === "details" && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-5">
+                {projectSetupSection}
+
+                {/* Everything below DESCRIBES the project chosen above, which is
+                    why it sits after it. Title and description arrive prefilled
+                    from the starter so the common case is "accept and move on";
+                    both stay editable and stop being touched the moment the
+                    teacher types. */}
+                <div className="grid gap-4 border-t border-[var(--border-subtle)] pt-5 sm:grid-cols-2">
                 <Field label="Title" required className="sm:col-span-2">
                   {({ id }) => (
                     <Input
                       id={id}
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={(e) => {
+                        setTitleTouched(true);
+                        setTitle(e.target.value);
+                      }}
                       placeholder="e.g. Python Calculator"
                     />
                   )}
@@ -715,7 +901,10 @@ export function CreateProjectModal({
                       id={id}
                       rows={3}
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(e) => {
+                        setDescriptionTouched(true);
+                        setDescription(e.target.value);
+                      }}
                       placeholder="What students need to build…"
                     />
                   )}
@@ -750,6 +939,7 @@ export function CreateProjectModal({
                   could not deliver. The DTO and column are still there and
                   still accept a value; nothing in this app sets one.
                 */}
+                </div>
               </div>
             )}
 
@@ -961,166 +1151,15 @@ export function CreateProjectModal({
             {/* ADDENDUM G — repository scaffold options */}
             {step === "repository" && (
               <div className="space-y-4">
-                {/* Structure toggle */}
-                <div>
-                  <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-                    What are they building?
-                  </span>
-                  <div
-                    role="tablist"
-                    aria-label="What are they building?"
-                    className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
-                  >
-                    {PROJECT_SHAPE_OPTIONS.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        role="tab"
-                        aria-selected={shape === value}
-                        onClick={() => chooseShape(value)}
-                        className={cn(
-                          "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
-                          shape === value
-                            ? "bg-white text-platform-700 shadow-sm"
-                            : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  {/* The hint carries the consequence the label cannot: how many
-                      repositories this creates, and what a student will find in
-                      them. Always shown, so switching tabs answers the question
-                      rather than only warning about one of the three. */}
-                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
-                    {PROJECT_SHAPE_OPTIONS.find((o) => o.value === shape)?.hint}
-                  </p>
-                  {shape === "SPLIT" && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      2 repos per {type === "GROUP" ? "group" : "student"} will be
-                      created (backend + frontend).
-                    </p>
-                  )}
-                </div>
-
-                {/*
-                  A "Repository visibility" Public/Private toggle used to sit
-                  here. Repositories are always PUBLIC now, so there is nothing
-                  left to choose.
-
-                  Worth knowing why that is the safe direction rather than the
-                  lazy one: SonarCloud's free plan covers public projects only
-                  (docs/SONARCLOUD_SETUP.md §4). Picking Private needed a paid
-                  plan, and without one `ensureProject` recorded a
-                  `repo.sonarError` and the code-quality component — 35% of the
-                  grade — came back unmeasured for the whole class.
-                */}
-
-                {/* Language + coverage (kept on one row for a tidy layout) */}
-                {repoStructure === "SINGLE" ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Language" required>
-                      {({ id }) => (
-                        <Select
-                          id={id}
-                          value={stack}
-                          onChange={(e) => setStack(e.target.value as Stack)}
-                        >
-                          {/* Only this half's languages. Offering all seven and
-                              letting the teacher pick PHP for a "frontend"
-                              project would scaffold a repository the pipeline
-                              cannot build a UI from. */}
-                          {stackOptionsForShape(shape).map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </Select>
-                      )}
-                    </Field>
-                    <CoverageField
-                      label="Minimum test coverage (%)"
-                      value={coverage}
-                      onChange={setCoverage}
-                    />
-                  </div>
-                ) : null}
-
-                {/* Starter project.
-                    Its own row under the language, not beside it, because the
-                    options CHANGE with the language — sitting them side by side
-                    implies two independent choices and hides why the list just
-                    became shorter.
-                    Hidden entirely when the catalogue is empty (SPLIT, or the
-                    request failed): an empty select is a dead control that
-                    still looks operable. */}
-                {repoStructure === "SINGLE" && templates.options.length > 0 && (
-                  <Field label="Starter project" required>
-                    {({ id }) => (
-                      <>
-                        <Select
-                          id={id}
-                          value={templateChoice ?? ""}
-                          onChange={(e) => setTemplate(e.target.value)}
-                        >
-                          {templates.options.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.label} — {t.summary}
-                            </option>
-                          ))}
-                        </Select>
-                        {selectedTemplate && (
-                          <p className="mt-1 text-xs text-[var(--text-muted)]">
-                            Teaches: {selectedTemplate.teaches} Every starter ships
-                            passing tests that fully cover its own code, so it will
-                            not fail the coverage gate you set above.
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </Field>
-                )}
-
-                {repoStructure === "SPLIT" ? (
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <Field label="Backend language" required>
-                      {({ id }) => (
-                        <Select
-                          id={id}
-                          value={backendStack}
-                          onChange={(e) => setBackendStack(e.target.value as Stack)}
-                        >
-                          {BACKEND_STACK_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </Select>
-                      )}
-                    </Field>
-                    <Field label="Frontend language" required>
-                      {({ id }) => (
-                        <Select
-                          id={id}
-                          value={frontendStack}
-                          onChange={(e) => setFrontendStack(e.target.value as Stack)}
-                        >
-                          {FRONTEND_STACK_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </Select>
-                      )}
-                    </Field>
-                    <CoverageField
-                      label="Min. coverage (%)"
-                      value={coverage}
-                      onChange={setCoverage}
-                    />
-                  </div>
-                ) : null}
+                {/* Coverage gate. Stays here rather than with the language on
+                    step 1: it is a grading THRESHOLD, not part of choosing the
+                    project, and every starter is written to pass whatever it is
+                    set to. */}
+                <CoverageField
+                  label="Minimum test coverage (%)"
+                  value={coverage}
+                  onChange={setCoverage}
+                />
 
                 {/* Lab session length.
                     Sits with the repository settings because it governs how
