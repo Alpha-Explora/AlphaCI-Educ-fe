@@ -31,9 +31,15 @@ import {
   DEFAULT_POINTS,
   POINTS_OPTIONS,
   rubricSplitsEvenly,
-  STACK_OPTIONS,
   BACKEND_STACK_OPTIONS,
   FRONTEND_STACK_OPTIONS,
+  DEFAULT_TEMPLATE_ID,
+  useProjectTemplates,
+  PROJECT_SHAPE_OPTIONS,
+  repoStructureForShape,
+  stackOptionsForShape,
+  defaultStackForShape,
+  type ProjectShape,
 } from "@/viewmodels/useCreateProject";
 import type {
   ClassCohort,
@@ -343,13 +349,30 @@ export function CreateProjectModal({
   const [groups, setGroups] = useState<GroupDraft[]>([]);
 
   // ADDENDUM G — scaffold options
-  const [repoStructure, setRepoStructure] = useState<ProjectRepoStructure>("SINGLE");
+  // What the teacher is choosing: a backend-only project, a frontend-only one,
+  // or both halves. `repoStructure` is DERIVED — the API only distinguishes one
+  // repo from two, and which half a single repo is doing is carried by `stack`.
+  const [shape, setShape] = useState<ProjectShape>("BACKEND");
+  const repoStructure: ProjectRepoStructure = repoStructureForShape(shape);
   // Visibility is no longer a choice — every student repository is PUBLIC.
   // The wizard therefore sends nothing, and the backend's own default (ADDENDUM
   // N, `isPrivate ?? false`) is what provisioning reads. Deliberately not sent
   // as an explicit `isPrivate: false`: a value on the wire implies the caller
   // had an opinion, and this one no longer can.
   const [stack, setStack] = useState<Stack>("nodejs");
+
+  /**
+   * Changing the shape has to move the language with it.
+   *
+   * Left alone, switching to "Frontend only" keeps `stack: 'python'` — a value
+   * absent from the frontend option list, so the select renders blank and
+   * submits Python anyway. Resetting to that half's default is the only way the
+   * control and the value cannot disagree.
+   */
+  function chooseShape(next: ProjectShape) {
+    setShape(next);
+    if (next !== "SPLIT") setStack(defaultStackForShape(next));
+  }
   const [backendStack, setBackendStack] = useState<Stack>("nestjs");
   const [frontendStack, setFrontendStack] = useState<Stack>("nextjs");
   // A number, not a string: the picker can only yield values from
@@ -360,6 +383,19 @@ export function CreateProjectModal({
   // expressed an opinion follows the policy if the operator later changes it.
   const limits = useLabSessionLimits();
   const [sessionHours, setSessionHours] = useState("");
+
+  // Starter project. Only meaningful for SINGLE — a SPLIT project scaffolds two
+  // repositories with different languages, and "one template across both" is a
+  // decision that has not been made yet, so the picker stays out of that shape
+  // rather than quietly applying a backend template to a frontend repo.
+  const [template, setTemplate] = useState<string>(DEFAULT_TEMPLATE_ID);
+  const templates = useProjectTemplates(repoStructure === "SPLIT" ? undefined : stack);
+  // The chosen template may not exist for a language picked afterwards. Falling
+  // back keeps the select from showing a blank value that submits a template the
+  // stack cannot build.
+  const templateChoice =
+    templates.options.some((t) => t.id === template) ? template : templates.options[0]?.id;
+  const selectedTemplate = templates.options.find((t) => t.id === templateChoice);
 
   const step = STEPS[stepIndex].id;
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -471,7 +507,13 @@ export function CreateProjectModal({
     const scaffold =
       repoStructure === "SPLIT"
         ? { repoStructure, backendStack, frontendStack }
-        : { repoStructure, stack };
+        : {
+            repoStructure,
+            stack,
+            // Omitted when the catalogue is unavailable, so the server's own
+            // default applies rather than this component guessing at one.
+            ...(templateChoice && { template: templateChoice }),
+          };
     const base = {
       title: title.trim(),
       description: description.trim(),
@@ -922,28 +964,23 @@ export function CreateProjectModal({
                 {/* Structure toggle */}
                 <div>
                   <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-                    Repository structure
+                    What are they building?
                   </span>
                   <div
                     role="tablist"
-                    aria-label="Repository structure"
-                    className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
+                    aria-label="What are they building?"
+                    className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
                   >
-                    {(
-                      [
-                        ["SINGLE", "Single repo"],
-                        ["SPLIT", "Backend + Frontend"],
-                      ] as [ProjectRepoStructure, string][]
-                    ).map(([value, label]) => (
+                    {PROJECT_SHAPE_OPTIONS.map(({ value, label }) => (
                       <button
                         key={value}
                         type="button"
                         role="tab"
-                        aria-selected={repoStructure === value}
-                        onClick={() => setRepoStructure(value)}
+                        aria-selected={shape === value}
+                        onClick={() => chooseShape(value)}
                         className={cn(
                           "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
-                          repoStructure === value
+                          shape === value
                             ? "bg-white text-platform-700 shadow-sm"
                             : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
                         )}
@@ -952,8 +989,15 @@ export function CreateProjectModal({
                       </button>
                     ))}
                   </div>
-                  {repoStructure === "SPLIT" && (
-                    <p className="mt-1.5 text-xs text-amber-600">
+                  {/* The hint carries the consequence the label cannot: how many
+                      repositories this creates, and what a student will find in
+                      them. Always shown, so switching tabs answers the question
+                      rather than only warning about one of the three. */}
+                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                    {PROJECT_SHAPE_OPTIONS.find((o) => o.value === shape)?.hint}
+                  </p>
+                  {shape === "SPLIT" && (
+                    <p className="mt-1 text-xs text-amber-600">
                       2 repos per {type === "GROUP" ? "group" : "student"} will be
                       created (backend + frontend).
                     </p>
@@ -983,7 +1027,11 @@ export function CreateProjectModal({
                           value={stack}
                           onChange={(e) => setStack(e.target.value as Stack)}
                         >
-                          {STACK_OPTIONS.map((o) => (
+                          {/* Only this half's languages. Offering all seven and
+                              letting the teacher pick PHP for a "frontend"
+                              project would scaffold a repository the pipeline
+                              cannot build a UI from. */}
+                          {stackOptionsForShape(shape).map((o) => (
                             <option key={o.value} value={o.value}>
                               {o.label}
                             </option>
@@ -997,7 +1045,44 @@ export function CreateProjectModal({
                       onChange={setCoverage}
                     />
                   </div>
-                ) : (
+                ) : null}
+
+                {/* Starter project.
+                    Its own row under the language, not beside it, because the
+                    options CHANGE with the language — sitting them side by side
+                    implies two independent choices and hides why the list just
+                    became shorter.
+                    Hidden entirely when the catalogue is empty (SPLIT, or the
+                    request failed): an empty select is a dead control that
+                    still looks operable. */}
+                {repoStructure === "SINGLE" && templates.options.length > 0 && (
+                  <Field label="Starter project" required>
+                    {({ id }) => (
+                      <>
+                        <Select
+                          id={id}
+                          value={templateChoice ?? ""}
+                          onChange={(e) => setTemplate(e.target.value)}
+                        >
+                          {templates.options.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label} — {t.summary}
+                            </option>
+                          ))}
+                        </Select>
+                        {selectedTemplate && (
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            Teaches: {selectedTemplate.teaches} Every starter ships
+                            passing tests that fully cover its own code, so it will
+                            not fail the coverage gate you set above.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </Field>
+                )}
+
+                {repoStructure === "SPLIT" ? (
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label="Backend language" required>
                       {({ id }) => (
@@ -1035,7 +1120,7 @@ export function CreateProjectModal({
                       onChange={setCoverage}
                     />
                   </div>
-                )}
+                ) : null}
 
                 {/* Lab session length.
                     Sits with the repository settings because it governs how

@@ -1,8 +1,24 @@
 // MODEL LAYER — Assignments resource
 import { apiRequest } from "./client";
-import type { Assignment, AssignmentRepository, ProvisionResult } from "../types";
+import type {
+  Assignment,
+  AssignmentRepository,
+  ProjectTemplateOption,
+  ProvisionResult,
+} from "../types";
 
 export const assignmentsApi = {
+  /**
+   * The starter projects a teacher may choose from, newest catalogue first-hand
+   * from the server rather than mirrored in this repo.
+   *
+   * Returned already ordered by teaching difficulty, and each entry carries the
+   * stacks it supports so the picker can hide combinations that do not exist.
+   */
+  templates() {
+    return apiRequest<ProjectTemplateOption[]>(`/assignments/templates`);
+  },
+
   get(id: string) {
     return apiRequest<Assignment>(`/assignments/${id}`);
   },
