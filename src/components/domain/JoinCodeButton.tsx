@@ -209,7 +209,13 @@ export function JoinCodeStrip({
           <span aria-hidden="true" className={compact ? "text-sm" : "text-lg"}>
             🪧
           </span>
-          <div className={compact ? "flex items-baseline gap-2" : undefined}>
+          <div
+            className={
+              // wrap, not a rigid row: in a toolbar the label and code sit side
+              // by side, in the narrow rail the code drops below it.
+              compact ? "flex flex-wrap items-baseline gap-x-2" : undefined
+            }
+          >
             <p
               className={cn(
                 "font-medium uppercase tracking-wide text-[var(--text-muted)]",
@@ -225,7 +231,12 @@ export function JoinCodeStrip({
               <output
                 aria-label="Class join code"
                 className={cn(
-                  "font-mono font-bold tracking-[0.12em]",
+                  // nowrap: the code is one token a teacher reads aloud. In the
+                  // class rail there is not room for "Join code" and the code
+                  // on one line, and without this it broke at its own hyphen
+                  // into "AT1234-" / "TIVL5". Let the flex row wrap instead —
+                  // the code moves to its own line whole.
+                  "whitespace-nowrap font-mono font-bold tracking-[0.12em]",
                   compact ? "text-sm" : "text-xl",
                   vm.canJoin ? "text-platform-800" : "text-[var(--text-muted)] line-through",
                 )}
