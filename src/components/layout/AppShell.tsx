@@ -34,7 +34,7 @@
 // labels are in the DOM either way (opacity, not `hidden`), so a screen reader
 // reads the nav normally whatever the visual state.
 // ============================================================================
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
@@ -90,6 +90,18 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
 
+  // Set when a nav item is clicked, cleared when the pointer leaves the rail.
+  //
+  // Clicking a link navigates but does NOT move the mouse, so the rail stays
+  // hovered — and an expanded rail is 256px of panel sitting on top of the page
+  // you just asked for. Suppressing hover until the pointer leaves means the
+  // click reads as "take me there", not "take me there and stay in the way".
+  //
+  // It gates ONLY the hover classes. Keyboard focus keeps the rail open through
+  // its own :has(:focus-visible) rule, so a Tab user who presses Enter still has
+  // a readable nav afterwards.
+  const [hoverSuppressed, setHoverSuppressed] = useState(false);
+
   const isStaff = isStaffRole(role);
   // A platform operator is admitted to the IT-Admin area too (see canEnterArea).
   const mayEnter = user ? canEnterArea(user.role, role) : false;
@@ -120,6 +132,16 @@ export function AppShell({
   const home = `/${role.toLowerCase()}`;
   const isActive = (href: string) =>
     pathname === href || (href !== home && pathname.startsWith(href));
+
+  // Every label in the rail: invisible while collapsed, revealed with it. The
+  // text stays in the DOM (opacity, not `hidden`) so screen readers read the
+  // nav normally whatever the visual state, and so expanding reveals the labels
+  // instead of re-flowing the rail's contents.
+  const revealWithRail = cn(
+    "opacity-0 transition-opacity duration-150",
+    "group-has-[:focus-visible]/rail:opacity-100",
+    !hoverSuppressed && "group-hover/rail:opacity-100",
+  );
 
   function signOut() {
     logout();
@@ -233,11 +255,35 @@ export function AppShell({
             "group/rail fixed bottom-0 left-0 top-16 z-30 hidden w-14 flex-col overflow-hidden",
             "border-r border-[var(--border-subtle)] bg-white",
             "transition-[width,box-shadow] duration-200 ease-out lg:flex",
-            "hover:w-64 focus-within:w-64",
-            "hover:shadow-xl focus-within:shadow-xl",
+            // :has(:focus-visible), NOT :focus-within.
+            //
+            // A click on a nav link FOCUSES it, and :focus-within cannot tell a
+            // click from a Tab press — so every click latched the rail open,
+            // overlaying the page until you clicked somewhere else to blur it.
+            // :focus-visible is the browser's own answer to that distinction:
+            // it is withheld after a pointer click and set on keyboard focus,
+            // so the rail still opens for Tab users and no longer sticks open
+            // for mouse users. This one is never suppressed.
+            "has-[:focus-visible]:w-64 has-[:focus-visible]:shadow-xl",
+            // Dropped for the rest of this hover, so a click doesn't leave the
+            // panel parked on top of the page it just opened.
+            !hoverSuppressed && "hover:w-64 hover:shadow-xl",
           )}
+          // pointerleave, not mouseleave: it also fires for pen and touch, so a
+          // lab tablet can't strand the rail in the suppressed state.
+          onPointerLeave={() => setHoverSuppressed(false)}
         >
-          <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="Primary">
+          {/* overflow-x-hidden is REQUIRED, not tidying. `overflow-y-auto`
+              alone leaves overflow-x computed to `auto` as well (the axes
+              cannot disagree once one of them scrolls), and the labels are
+              opacity-0 rather than hidden — so they still lay out ~200px wide
+              inside a 56px rail and raised a horizontal scrollbar along its
+              foot. Clipping x is also what makes the collapse read as a reveal
+              rather than as truncation. */}
+          <nav
+            className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden p-2"
+            aria-label="Primary"
+          >
             {nav.map((item) => {
               const active = isActive(item.href);
               return (
@@ -245,6 +291,7 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
+                  onClick={() => setHoverSuppressed(true)}
                   className={cn(
                     // h-10 + the icon box pinned at 40px means the glyph sits on
                     // the same x whether the panel is 56px or 256px wide, so
@@ -258,7 +305,12 @@ export function AppShell({
                   <span className="grid w-10 shrink-0 place-items-center">
                     <NavIcon name={item.icon} />
                   </span>
-                  <span className="truncate whitespace-nowrap pr-3 opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
+                  <span
+                    className={cn(
+                      "truncate whitespace-nowrap pr-3",
+                      revealWithRail,
+                    )}
+                  >
                     {item.label}
                   </span>
                 </Link>
@@ -271,7 +323,12 @@ export function AppShell({
               already carries the brand. */}
           <div className="flex h-12 shrink-0 items-center gap-2.5 border-t border-[var(--border-subtle)] px-3">
             <BrandMark size={20} />
-            <span className="truncate whitespace-nowrap text-xs font-medium text-[var(--text-muted)] opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
+            <span
+              className={cn(
+                "truncate whitespace-nowrap text-xs font-medium text-[var(--text-muted)]",
+                revealWithRail,
+              )}
+            >
               {ROLE_LABEL[role]} workspace
             </span>
           </div>
