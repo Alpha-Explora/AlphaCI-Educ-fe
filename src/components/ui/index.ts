@@ -14,6 +14,11 @@ export { Input, Textarea, Select, Field } from "./Input";
 export { CopyButton } from "./CopyButton";
 export { Modal } from "./Modal";
 export { Tabs, type TabItem } from "./Tabs";
+export {
+  SideTabs,
+  type SideTabItem,
+  type SideTabGroup,
+} from "./SideTabs";
 export { Spinner } from "./Spinner";
 export { Banner } from "./Banner";
 export { EmptyState } from "./EmptyState";

@@ -5,11 +5,16 @@
 // Consumes useClassRoster + useClassAssignments. Navigation to grading happens
 // via AssignmentSubmissions rows.
 //
-// Split across two tabs. Overview is the teaching surface — who is enrolled and
+// Split across four sections, reached from a SIDE panel rather than a strip of
+// tabs above the content. Overview is the teaching surface — who is enrolled and
 // what they have submitted. Settings holds the section's configuration and the
 // danger zone; Delete class used to sit in the page header's top-right, one
 // stray click away from destroying a term of marked work, which is not a
 // standing it earns next to a roster you open every day.
+//
+// The panel is grouped rather than flat (CLASS / PEOPLE / WORK / CONFIGURATION)
+// so the four entries read as a map of what a section HAS, and so the grouping
+// keeps working as sections are added — a flat list of seven would not.
 // ============================================================================
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -31,8 +36,8 @@ import {
   ProgressBar,
   Skeleton,
   StateBoundary,
-  Tabs,
-  type TabItem,
+  SideTabs,
+  type SideTabGroup,
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
@@ -46,11 +51,11 @@ import { formatDate, relativeDue } from "@/components/ui/format";
 
 type ClassTab = "overview" | "students" | "assignments" | "settings";
 
-const TABS: ReadonlyArray<TabItem<ClassTab>> = [
-  { id: "overview", label: "Overview" },
-  { id: "students", label: "Student progress" },
-  { id: "assignments", label: "Assignments" },
-  { id: "settings", label: "Settings" },
+const TAB_GROUPS: ReadonlyArray<SideTabGroup<ClassTab>> = [
+  { heading: "Class", items: [{ id: "overview", label: "Overview" }] },
+  { heading: "People", items: [{ id: "students", label: "Student progress" }] },
+  { heading: "Work", items: [{ id: "assignments", label: "Assignments" }] },
+  { heading: "Configuration", items: [{ id: "settings", label: "Settings" }] },
 ];
 
 export default function ClassRosterPage() {
@@ -126,323 +131,335 @@ export default function ClassRosterPage() {
           it is visible whichever one is open. */}
       {del.error && !del.isConfirming && <Banner tone="error">{del.error}</Banner>}
 
-      {/* The join code rides the tab strip rather than sitting in Overview: it
-          is class-level, so it stays reachable from every tab, and the panel
-          below gets the full width back for the roster + projects container. */}
-      <Tabs
-        items={TABS}
-        value={tab}
-        onChange={setTab}
-        label="Class sections"
-        idPrefix="class"
-        trailing={classId && <JoinCodeStrip classId={classId} compact />}
-      />
+      {/* Side panel + the open section, as two columns on desktop and stacked
+          below lg (a 224px rail beside a roster table does not fit a tablet).
 
-      {tab === "overview" && (
-        <ClassOverviewTab
-          info={info}
-          roster={roster}
-          assignments={assignments}
-          meetingLabs={meetingLabs}
-          onCreateProject={() => setCreateOpen(true)}
-          onSeeStudents={() => setTab("students")}
-          onSeeAssignments={() => setTab("assignments")}
+          The join code rides the panel's foot rather than sitting in Overview:
+          it is class-level, so it stays reachable from every section, and the
+          content column keeps its full width for the roster + projects. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
+        <SideTabs
+          groups={TAB_GROUPS}
+          value={tab}
+          onChange={setTab}
+          label="Class sections"
+          idPrefix="class"
+          title={info?.code ?? "Class"}
+          subtitle={info?.name}
+          footer={classId && <JoinCodeStrip classId={classId} compact />}
         />
-      )}
 
-      {tab === "students" && (
-        <div
-          id="class-panel-students"
-          role="tabpanel"
-          aria-labelledby="class-tab-students"
-          className="space-y-8"
-        >
-          {/* Roster table */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-              Student progress
-            </h2>
-            <StateBoundary
-              isLoading={roster.isLoading}
-              error={roster.error}
-              onRetry={roster.refetch}
-              isEmpty={(roster.data?.students.length ?? 0) === 0}
-              emptyFallback={
-                <EmptyState
-                  icon="👥"
-                  title="No students enrolled"
-                  description="Students enrolled via SSO/SCIM will appear here."
-                />
-              }
-              loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
+        {/* min-w-0 or the roster's min-w-[640px] table refuses to shrink and
+            pushes the whole row wider than the viewport instead of scrolling
+            inside its own overflow container. */}
+        <div className="min-w-0 flex-1 space-y-8">
+          {tab === "overview" && (
+            <ClassOverviewTab
+              info={info}
+              roster={roster}
+              assignments={assignments}
+              meetingLabs={meetingLabs}
+              onCreateProject={() => setCreateOpen(true)}
+              onSeeStudents={() => setTab("students")}
+              onSeeAssignments={() => setTab("assignments")}
+            />
+          )}
+
+          {tab === "students" && (
+            <div
+              id="class-panel-students"
+              role="tabpanel"
+              aria-labelledby="class-tab-students"
+              className="space-y-8"
             >
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--border-subtle)] bg-slate-50/70 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
-                        <th scope="col" className="px-4 py-3 font-medium">
-                          Student
-                        </th>
-                        <th scope="col" className="px-4 py-3 font-medium">
-                          Repos
-                        </th>
-                        <th scope="col" className="px-4 py-3 font-medium">
-                          Submitted
-                        </th>
-                        <th scope="col" className="px-4 py-3 font-medium">
-                          Graded
-                        </th>
-                        <th scope="col" className="px-4 py-3 font-medium">
-                          Avg grade
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {roster.data?.students.map((s) => (
-                        <tr key={s.id} className="transition-colors hover:bg-slate-50/60">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar name={s.fullName} color={s.avatarColor} size="sm" />
-                              <div className="min-w-0">
-                                <p className="truncate font-medium text-[var(--text-strong)]">
-                                  {s.fullName}
-                                </p>
-                                <p className="truncate text-xs text-[var(--text-muted)]">
-                                  {s.personalGithubUsername
-                                    ? `@${s.personalGithubUsername}`
-                                    : "Lab-only (zero-footprint)"}
-                                </p>
-                              </div>
+              {/* Roster table */}
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                  Student progress
+                </h2>
+                <StateBoundary
+                  isLoading={roster.isLoading}
+                  error={roster.error}
+                  onRetry={roster.refetch}
+                  isEmpty={(roster.data?.students.length ?? 0) === 0}
+                  emptyFallback={
+                    <EmptyState
+                      icon="👥"
+                      title="No students enrolled"
+                      description="Students enrolled via SSO/SCIM will appear here."
+                    />
+                  }
+                  loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
+                >
+                  <Card className="overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px] text-sm">
+                        <thead>
+                          <tr className="border-b border-[var(--border-subtle)] bg-slate-50/70 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                            <th scope="col" className="px-4 py-3 font-medium">
+                              Student
+                            </th>
+                            <th scope="col" className="px-4 py-3 font-medium">
+                              Repos
+                            </th>
+                            <th scope="col" className="px-4 py-3 font-medium">
+                              Submitted
+                            </th>
+                            <th scope="col" className="px-4 py-3 font-medium">
+                              Graded
+                            </th>
+                            <th scope="col" className="px-4 py-3 font-medium">
+                              Avg grade
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border-subtle)]">
+                          {roster.data?.students.map((s) => (
+                            <tr key={s.id} className="transition-colors hover:bg-slate-50/60">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar name={s.fullName} color={s.avatarColor} size="sm" />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-[var(--text-strong)]">
+                                      {s.fullName}
+                                    </p>
+                                    <p className="truncate text-xs text-[var(--text-muted)]">
+                                      {s.personalGithubUsername
+                                        ? `@${s.personalGithubUsername}`
+                                        : "Lab-only (zero-footprint)"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
+                                {s.repoCount}
+                              </td>
+                              <td className="px-4 py-3 tabular-nums">{s.submittedCount}</td>
+                              <td className="px-4 py-3 tabular-nums">{s.gradedCount}</td>
+                              <td className="px-4 py-3">
+                                {s.avgGrade !== null ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-9 shrink-0 font-semibold tabular-nums text-[var(--text-strong)]">
+                                      {s.avgGrade}%
+                                    </span>
+                                    <ProgressBar
+                                      value={s.avgGrade}
+                                      tone={
+                                        s.avgGrade >= 80
+                                          ? "success"
+                                          : s.avgGrade >= 60
+                                            ? "platform"
+                                            : "warning"
+                                      }
+                                      className="w-24"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-[var(--text-muted)]">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </StateBoundary>
+              </section>
+            </div>
+          )}
+
+          {tab === "assignments" && (
+            <div
+              id="class-panel-assignments"
+              role="tabpanel"
+              aria-labelledby="class-tab-assignments"
+              className="space-y-8"
+            >
+              {/* Assignments + submissions */}
+              <section className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                    Assignments &amp; submissions
+                  </h2>
+                  <Button size="sm" onClick={() => setCreateOpen(true)}>
+                    <span aria-hidden="true">＋</span> Create project
+                  </Button>
+                </div>
+                <StateBoundary
+                  isLoading={assignments.isLoading}
+                  error={assignments.error}
+                  isEmpty={assignments.assignments.length === 0}
+                  emptyFallback={
+                    <EmptyState
+                      icon="📝"
+                      title="No assignments yet"
+                      description="Create an assignment to generate per-student repositories."
+                    />
+                  }
+                  loadingFallback={<Skeleton className="h-40 w-full rounded-xl" />}
+                >
+                  <div className="space-y-5">
+                    {assignments.assignments.map((a) => (
+                      <Card key={a.id} className="overflow-hidden animate-fade-up">
+                        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base font-semibold text-[var(--text-strong)]">
+                                {a.title}
+                              </h3>
+                              {a.isGroup && <GenericPill tone="info">Group</GenericPill>}
+                              {a.closedAt && <GenericPill tone="warning">🔒 Closed</GenericPill>}
                             </div>
-                          </td>
-                          <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
-                            {s.repoCount}
-                          </td>
-                          <td className="px-4 py-3 tabular-nums">{s.submittedCount}</td>
-                          <td className="px-4 py-3 tabular-nums">{s.gradedCount}</td>
-                          <td className="px-4 py-3">
-                            {s.avgGrade !== null ? (
-                              <div className="flex items-center gap-2">
-                                <span className="w-9 shrink-0 font-semibold tabular-nums text-[var(--text-strong)]">
-                                  {s.avgGrade}%
-                                </span>
-                                <ProgressBar
-                                  value={s.avgGrade}
-                                  tone={
-                                    s.avgGrade >= 80
-                                      ? "success"
-                                      : s.avgGrade >= 60
-                                        ? "platform"
-                                        : "warning"
-                                  }
-                                  className="w-24"
-                                />
-                              </div>
+                            <p className="mt-0.5 line-clamp-1 text-sm text-[var(--text-muted)]">
+                              {a.description}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-[var(--text-muted)]">
+                            <p className="font-medium text-[var(--text-strong)]">
+                              {a.points} pts
+                            </p>
+                            {a.dueDate ? (
+                              <>
+                                <p>{relativeDue(a.dueDate)}</p>
+                                <p>Due {formatDate(a.dueDate)}</p>
+                              </>
                             ) : (
-                              <span className="text-[var(--text-muted)]">—</span>
+                              <p>No due date</p>
                             )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+                        <AssignmentSubmissions
+                          assignmentId={a.id}
+                          points={a.points}
+                          usersById={usersById}
+                        />
+                        <div className="space-y-4 px-5 pb-4">
+                          <HiddenTestsPanel assignmentId={a.id} />
+                          <GradeReleaseControl
+                            assignmentId={a.id}
+                            releasedAt={a.gradesReleasedAt}
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-slate-50/60 px-5 py-3">
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {a.isGroup
+                              ? `Creates one shared GitHub repository per group in Section ${info?.section ?? "this section"}.`
+                              : `Creates one GitHub repository per selected student in Section ${info?.section ?? "this section"}.`}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {a.closedAt ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={assignments.isSettingClosed && assignments.closingId === a.id}
+                                onClick={() => assignments.setProjectClosed(a.id, false)}
+                              >
+                                Reopen
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                loading={assignments.isSettingClosed && assignments.closingId === a.id}
+                                onClick={() => assignments.setProjectClosed(a.id, true)}
+                              >
+                                <span aria-hidden="true">🔒</span> End project
+                              </Button>
+                            )}
+                            {confirmingDeleteId === a.id ? (
+                              <>
+                                <span className="text-xs text-red-700">
+                                  Delete &ldquo;{a.title}&rdquo; + its repos?
+                                </span>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  loading={assignments.isDeleting && assignments.deletingId === a.id}
+                                  onClick={() => assignments.deleteAssignment(a.id)}
+                                >
+                                  Delete
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setConfirmingDeleteId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:bg-red-50"
+                                onClick={() => setConfirmingDeleteId(a.id)}
+                              >
+                                <span aria-hidden="true">🗑</span> Delete
+                              </Button>
+                            )}
+                            <ProvisionRepositoriesButton assignmentId={a.id} />
+                          </div>
+                        </div>
+                        {assignments.deleteError && assignments.deletingId === a.id && (
+                          <p className="border-t border-[var(--border-subtle)] bg-red-50 px-5 py-2 text-sm text-red-700">
+                            {assignments.deleteError}
+                          </p>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </StateBoundary>
+              </section>
+            </div>
+          )}
+
+          {tab === "settings" && (
+            <div
+              id="class-panel-settings"
+              role="tabpanel"
+              aria-labelledby="class-tab-settings"
+              className="space-y-8"
+            >
+              <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">
+                <h2 className="text-base font-semibold text-[var(--text-strong)]">
+                  Danger zone
+                </h2>
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                  Actions here affect this section only. Your other sections and the
+                  course itself are untouched.
+                </p>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-strong)]">
+                      Delete this class
+                    </p>
+                    {/* Named rather than generic: "delete this class" is abstract
+                        until you see which section it means. */}
+                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                      Permanently deletes{" "}
+                      {info
+                        ? `${info.code} — Section ${info.section}`
+                        : "this section"}
+                      , its projects, and every student&rsquo;s submitted and graded
+                      work. This cannot be undone.
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    onClick={del.askToDelete}
+                    disabled={!info}
+                    className="shrink-0"
+                  >
+                    Delete class
+                  </Button>
                 </div>
               </Card>
-            </StateBoundary>
-          </section>
-        </div>
-      )}
-
-      {tab === "assignments" && (
-        <div
-          id="class-panel-assignments"
-          role="tabpanel"
-          aria-labelledby="class-tab-assignments"
-          className="space-y-8"
-        >
-          {/* Assignments + submissions */}
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                Assignments &amp; submissions
-              </h2>
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                <span aria-hidden="true">＋</span> Create project
-              </Button>
             </div>
-            <StateBoundary
-              isLoading={assignments.isLoading}
-              error={assignments.error}
-              isEmpty={assignments.assignments.length === 0}
-              emptyFallback={
-                <EmptyState
-                  icon="📝"
-                  title="No assignments yet"
-                  description="Create an assignment to generate per-student repositories."
-                />
-              }
-              loadingFallback={<Skeleton className="h-40 w-full rounded-xl" />}
-            >
-              <div className="space-y-5">
-                {assignments.assignments.map((a) => (
-                  <Card key={a.id} className="overflow-hidden animate-fade-up">
-                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-[var(--text-strong)]">
-                            {a.title}
-                          </h3>
-                          {a.isGroup && <GenericPill tone="info">Group</GenericPill>}
-                          {a.closedAt && <GenericPill tone="warning">🔒 Closed</GenericPill>}
-                        </div>
-                        <p className="mt-0.5 line-clamp-1 text-sm text-[var(--text-muted)]">
-                          {a.description}
-                        </p>
-                      </div>
-                      <div className="text-right text-xs text-[var(--text-muted)]">
-                        <p className="font-medium text-[var(--text-strong)]">
-                          {a.points} pts
-                        </p>
-                        {a.dueDate ? (
-                          <>
-                            <p>{relativeDue(a.dueDate)}</p>
-                            <p>Due {formatDate(a.dueDate)}</p>
-                          </>
-                        ) : (
-                          <p>No due date</p>
-                        )}
-                      </div>
-                    </div>
-                    <AssignmentSubmissions
-                      assignmentId={a.id}
-                      points={a.points}
-                      usersById={usersById}
-                    />
-                    <div className="space-y-4 px-5 pb-4">
-                      <HiddenTestsPanel assignmentId={a.id} />
-                      <GradeReleaseControl
-                        assignmentId={a.id}
-                        releasedAt={a.gradesReleasedAt}
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-slate-50/60 px-5 py-3">
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {a.isGroup
-                          ? `Creates one shared GitHub repository per group in Section ${info?.section ?? "this section"}.`
-                          : `Creates one GitHub repository per selected student in Section ${info?.section ?? "this section"}.`}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        {a.closedAt ? (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            loading={assignments.isSettingClosed && assignments.closingId === a.id}
-                            onClick={() => assignments.setProjectClosed(a.id, false)}
-                          >
-                            Reopen
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            loading={assignments.isSettingClosed && assignments.closingId === a.id}
-                            onClick={() => assignments.setProjectClosed(a.id, true)}
-                          >
-                            <span aria-hidden="true">🔒</span> End project
-                          </Button>
-                        )}
-                        {confirmingDeleteId === a.id ? (
-                          <>
-                            <span className="text-xs text-red-700">
-                              Delete &ldquo;{a.title}&rdquo; + its repos?
-                            </span>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              loading={assignments.isDeleting && assignments.deletingId === a.id}
-                              onClick={() => assignments.deleteAssignment(a.id)}
-                            >
-                              Delete
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setConfirmingDeleteId(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:bg-red-50"
-                            onClick={() => setConfirmingDeleteId(a.id)}
-                          >
-                            <span aria-hidden="true">🗑</span> Delete
-                          </Button>
-                        )}
-                        <ProvisionRepositoriesButton assignmentId={a.id} />
-                      </div>
-                    </div>
-                    {assignments.deleteError && assignments.deletingId === a.id && (
-                      <p className="border-t border-[var(--border-subtle)] bg-red-50 px-5 py-2 text-sm text-red-700">
-                        {assignments.deleteError}
-                      </p>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            </StateBoundary>
-          </section>
+          )}
         </div>
-      )}
-
-      {tab === "settings" && (
-        <div
-          id="class-panel-settings"
-          role="tabpanel"
-          aria-labelledby="class-tab-settings"
-          className="space-y-8"
-        >
-          <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">
-            <h2 className="text-base font-semibold text-[var(--text-strong)]">
-              Danger zone
-            </h2>
-            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-              Actions here affect this section only. Your other sections and the
-              course itself are untouched.
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text-strong)]">
-                  Delete this class
-                </p>
-                {/* Named rather than generic: "delete this class" is abstract
-                    until you see which section it means. */}
-                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                  Permanently deletes{" "}
-                  {info
-                    ? `${info.code} — Section ${info.section}`
-                    : "this section"}
-                  , its projects, and every student&rsquo;s submitted and graded
-                  work. This cannot be undone.
-                </p>
-              </div>
-              <Button
-                variant="danger"
-                onClick={del.askToDelete}
-                disabled={!info}
-                className="shrink-0"
-              >
-                Delete class
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      </div>
 
       {/*
         Destructive, permanent and cascading, so it is confirmed rather than
