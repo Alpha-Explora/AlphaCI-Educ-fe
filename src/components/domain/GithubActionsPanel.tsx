@@ -22,7 +22,7 @@
 // Data/polling live in useRepoActivity; per-run jobs load on expand via
 // useWorkflowRunJobs, so a page showing ten runs still costs one request.
 // ============================================================================
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRepoActivity } from "@/viewmodels/useRepoActivity";
 import { useWorkflowRunJobs } from "@/viewmodels/useWorkflowRunJobs";
 import type {
@@ -169,7 +169,7 @@ export function GithubActionsPanel({
   branch,
 }: {
   readonly repoId: string;
-  /** Initial branch filter. Empty/undefined lists runs from every branch. */
+  /** Which branch to open on. Defaults to the repository's default branch. */
   readonly branch?: string | null;
 }) {
   // Owned here, not by the page: this filter only ever narrows this list, and
@@ -177,6 +177,25 @@ export function GithubActionsPanel({
   const [branchFilter, setBranchFilter] = useState<string>(branch ?? "");
   const vm = useRepoActivity(repoId, branchFilter || null);
   const a = vm.data;
+
+  // ONE BRANCH AT A TIME. There is no "all branches" choice any more.
+  //
+  // Every-branch was the default, and it interleaved commits from main, test
+  // and uat into one list ordered only by time — so the same work appeared
+  // several times over as it was promoted, and "did this branch pass?", which
+  // is the actual question, could not be read off the page at all. A branch is
+  // the unit a pipeline runs on; it is the unit this list should show.
+  //
+  // The first branch list to arrive picks the opening branch, since it is not
+  // known before the fetch. Guarded on branchFilter, so it never overrides a
+  // teacher's choice on a later refetch.
+  useEffect(() => {
+    if (branchFilter || !a?.branches.length) return;
+    const opening =
+      a.branches.find((b) => b.name === a.defaultBranch)?.name ??
+      a.branches[0].name;
+    setBranchFilter(opening);
+  }, [a?.branches, a?.defaultBranch, branchFilter]);
 
   const groups = a ? groupByCommit(a.commits, a.workflowRuns) : [];
   const hasRuns = (a?.workflowRuns.length ?? 0) > 0;
@@ -217,26 +236,28 @@ export function GithubActionsPanel({
           >
             Branch
           </label>
-          <Select
-            id="actions-branch-filter"
-            className="w-auto min-w-[12rem]"
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-          >
-            <option value="">All branches</option>
-            {a.branches.map((b) => (
-              <option key={b.name} value={b.name}>
-                {b.name}
-                {b.name === a.defaultBranch ? " (default)" : ""}
-                {b.protected ? " · protected" : ""}
-              </option>
-            ))}
-          </Select>
-          {branchFilter && (
-            <Button variant="ghost" size="sm" onClick={() => setBranchFilter("")}>
-              Clear
-            </Button>
-          )}
+          {/* Sized by a wrapper, not by a class on the control: Select's own
+              base style is w-full, and `cn` concatenates rather than resolving
+              Tailwind conflicts, so a w-auto passed in here loses and the
+              picker stretched across the card for three short branch names. */}
+          <div className="w-64 max-w-full">
+            <Select
+              id="actions-branch-filter"
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+            >
+              {a.branches.map((b) => (
+                <option key={b.name} value={b.name}>
+                  {b.name}
+                  {b.name === a.defaultBranch ? " (default)" : ""}
+                  {b.protected ? " · protected" : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {/* No "Clear": with no all-branches option there is nothing to clear
+              back TO, and a button that reselects the default branch is just
+              the default branch, one row above. */}
         </div>
       )}
 
