@@ -169,6 +169,12 @@ function PullRequestRow({
   const [showDiff, setShowDiff] = useState(false);
   const r = pr.readiness;
 
+  // "Failed" and "never arrived" need different words. Telling a teacher to
+  // override a failing pipeline, when the pipeline passed on GitHub and only
+  // the report did not reach this server, describes the wrong incident — and
+  // it is the one they are most likely to have to act on.
+  const noResult = r.pipeline.status === "none";
+
   return (
     <li className="rounded-lg border border-[var(--border-subtle)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -248,7 +254,7 @@ function PullRequestRow({
 
         {audience === "teacher" && r.needsTeacher && (
           <Button variant="secondary" onClick={() => setShowOverride((v) => !v)}>
-            Override the failing pipeline
+            {noResult ? "Merge without a pipeline result" : "Override the failing pipeline"}
           </Button>
         )}
 
@@ -271,8 +277,10 @@ function PullRequestRow({
       {audience === "teacher" && showOverride && (
         <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
           <p className="text-xs text-amber-900">
-            This merges a commit whose pipeline did not pass. It is recorded
-            against your account with the reason below. It does{" "}
+            {noResult
+              ? "This merges a commit AlphaCI holds no pipeline result for. Check the run on GitHub first — this does not mean the checks passed, only that nothing was reported here."
+              : "This merges a commit whose pipeline did not pass."}{" "}
+            It is recorded against your account with the reason below. It does{" "}
             <strong>not</strong> bypass peer review.
           </p>
           <Field label="Reason">
@@ -282,7 +290,11 @@ function PullRequestRow({
                 rows={2}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. hidden test 3 was broken; fixed for the next assignment"
+                placeholder={
+                  noResult
+                    ? "e.g. checks green on GitHub, results not reaching AlphaCI — reporting URL being fixed"
+                    : "e.g. hidden test 3 was broken; fixed for the next assignment"
+                }
               />
             )}
           </Field>

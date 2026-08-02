@@ -136,16 +136,22 @@ export default function ClassRosterPage() {
 
           The join code rides the panel's foot rather than sitting in Overview:
           it is class-level, so it stays reachable from every section, and the
-          content column keeps its full width for the roster + projects. */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
+          content column keeps its full width for the roster + projects.
+
+          items-start, and it is load-bearing. A flex row stretches its children
+          to the tallest one, so the rail — now that it is a filled panel and
+          not a transparent column — was being drawn as tall as whatever tab was
+          open: a long blue block with an empty tail on Assignments, a short one
+          on Settings. The rail's height is its own contents, on every tab. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
         <SideTabs
           groups={TAB_GROUPS}
           value={tab}
           onChange={setTab}
           label="Class sections"
           idPrefix="class"
-          title={info?.code ?? "Class"}
-          subtitle={info?.name}
+          // No title/subtitle: the page header a few pixels above already reads
+          // "AT1234 — AlphaTest", and the rail repeated both.
           footer={classId && <JoinCodeStrip classId={classId} compact />}
         />
 
