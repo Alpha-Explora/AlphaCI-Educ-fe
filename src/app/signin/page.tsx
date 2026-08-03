@@ -78,16 +78,20 @@ export default function SignInPage() {
         // A teacher following it landed back here with a fresh password and the
         // same student-shaped screen.
         <div className="space-y-2">
+          {/* Was: "Students: create an account with your school email — your
+              workspace is set up on your first sign-in." Two clauses and a
+              promise, in 8pt type, at the bottom of a card whose reader is
+              trying to find the password field. The dropped half is not lost —
+              the create-account page says it, which is the page it is about. */}
           <p>
-            Students:{" "}
+            New here?{" "}
             <Link
               href="/signin/create-account"
               className="font-medium text-platform-600 underline-offset-2 hover:underline"
             >
-              create an account
+              Create an account
             </Link>{" "}
-            with your school email — your workspace is set up on your first
-            sign-in.
+            with your school email.
           </p>
           <p>
             Teacher or IT staff?{" "}
