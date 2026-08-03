@@ -203,24 +203,34 @@ export function GithubActionsPanel({
   const vm = useRepoActivity(repoId, branchFilter || null);
   const a = vm.data;
 
-  // ONE BRANCH AT A TIME. There is no "all branches" choice any more.
+  // MASTER → DETAIL, not an accordion.
   //
-  // Every-branch was the default, and it interleaved commits from main, test
-  // and uat into one list ordered only by time — so the same work appeared
-  // several times over as it was promoted, and "did this branch pass?", which
-  // is the actual question, could not be read off the page at all. A branch is
-  // the unit a pipeline runs on; it is the unit this list should show.
+  // Rows used to expand in place. That is a reasonable pattern and the wrong one
+  // here: GitHub opens a run on its own page, and this panel exists so a student
+  // who cannot open GitHub still learns to read the real thing. An expander also
+  // put a run's jobs and steps inside a list row, so the deeper you looked the
+  // narrower the column got.
   //
-  // The first branch list to arrive picks the opening branch, since it is not
-  // known before the fetch. Guarded on branchFilter, so it never overrides a
-  // teacher's choice on a later refetch.
-  useEffect(() => {
-    if (branchFilter || !a?.branches.length) return;
-    const opening =
-      a.branches.find((b) => b.name === a.defaultBranch)?.name ??
-      a.branches[0].name;
-    setBranchFilter(opening);
-  }, [a?.branches, a?.defaultBranch, branchFilter]);
+  // The id, not the run object: `useRepoActivity` polls, so holding the object
+  // would pin a stale copy — a run that finished while open would keep rendering
+  // as running. Looked up fresh from the current payload on every render instead.
+  const [openRunId, setOpenRunId] = useState<number | null>(null);
+  const openRun = a?.workflowRuns.find((r) => r.id === openRunId) ?? null;
+
+  // ALL BRANCHES BY DEFAULT — `""` means unfiltered, and the API omits the
+  // branch parameter for it.
+  //
+  // This panel used to force a single branch and auto-select the default one on
+  // first load. The reasoning was that a branch is the unit a pipeline runs on,
+  // so interleaving main/uat/feature runs made "did THIS branch pass?" hard to
+  // read. In practice it did something worse: a student who had just pushed a
+  // feature branch opened Actions, saw the runs for `main`, and concluded their
+  // push had not run. GitHub shows every run and offers branch as a FILTER, and
+  // the reason it gets away with that is the reason this now does too — each row
+  // names its own branch, so the interleaving is legible rather than ambiguous.
+  //
+  // `branch` prop still honoured: a caller that opens this on a specific branch
+  // gets that branch pre-filtered.
 
   const groups = a ? groupByCommit(a.commits, a.workflowRuns) : [];
   const hasRuns = (a?.workflowRuns.length ?? 0) > 0;
@@ -245,8 +255,7 @@ export function GithubActionsPanel({
             {vm.isFetching && <Spinner size="sm" className="text-platform" />}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Every push runs the pipeline. Each commit below shows what ran on it —
-            open a run to see its jobs and steps.
+            Every push runs the pipeline. Open a run to see its jobs and steps.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -282,6 +291,10 @@ export function GithubActionsPanel({
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
             >
+              {/* First, and the default. A filter whose neutral position is
+                  "everything" is the one a student can use without first knowing
+                  which branch they are looking for. */}
+              <option value="">All branches</option>
               {a.branches.map((b) => (
                 <option key={b.name} value={b.name}>
                   {b.name}
@@ -291,9 +304,6 @@ export function GithubActionsPanel({
               ))}
             </Select>
           </div>
-          {/* No "Clear": with no all-branches option there is nothing to clear
-              back TO, and a button that reselects the default branch is just
-              the default branch, one row above. */}
         </div>
       )}
 
@@ -325,7 +335,33 @@ export function GithubActionsPanel({
         </Banner>
       )}
 
-      {a?.live && !a.error && (
+      {/* An opened run REPLACES the list, the way GitHub's run page replaces its
+          Actions list. Rendered before the list block so the two can never be on
+          screen together, and the branch filter above stays visible so returning
+          lands on the same filtered list you left. */}
+      {a?.live && !a.error && openRun && (
+        <div className="mt-5">
+          <RunDetail repoId={repoId} run={openRun} onBack={() => setOpenRunId(null)} />
+        </div>
+      )}
+
+      {/* An id that is set but no longer in the payload: the run aged out of the
+          most recent 10 while it was open. Say so rather than silently showing
+          the list again, which reads as the click having been ignored. */}
+      {a?.live && !a.error && openRunId !== null && !openRun && (
+        <Banner tone="info" className="mt-4">
+          That run is no longer in this repository&rsquo;s recent activity.{" "}
+          <button
+            type="button"
+            onClick={() => setOpenRunId(null)}
+            className="font-medium underline underline-offset-2"
+          >
+            Back to all runs
+          </button>
+        </Banner>
+      )}
+
+      {a?.live && !a.error && !openRun && openRunId === null && (
         <div className="mt-5">
           {groups.length === 0 ? (
             <Banner tone="info">
@@ -339,8 +375,8 @@ export function GithubActionsPanel({
               {!hasRuns && (
                 <Banner tone="warning" className="mb-4">
                   Your commits arrived, but no workflow has run on them. The
-                  pipeline file may be missing from this branch, or Actions may be
-                  turned off for this repository — tell your teacher.
+                  pipeline file may be missing, or Actions may be turned off for
+                  this repository — tell your teacher.
                 </Banner>
               )}
               {/* FLAT, NEWEST FIRST — GitHub's own shape.
@@ -360,15 +396,11 @@ export function GithubActionsPanel({
                 </p>
               </div>
               <ul className="divide-y divide-[var(--border-subtle)]">
-                {allRuns.map((run, index) => (
+                {allRuns.map((run) => (
                   <RunRow
                     key={`${run.id}-${run.runAttempt}`}
-                    repoId={repoId}
                     run={run}
-                    // Only the newest run opens by itself: "what did my last push
-                    // do" is the question this page is opened with, and its jobs
-                    // already came down with the activity payload.
-                    defaultOpen={index === 0}
+                    onOpen={() => setOpenRunId(run.id)}
                   />
                 ))}
               </ul>
@@ -416,41 +448,26 @@ export function GithubActionsPanel({
 // ---------------------------------------------------------------------------
 
 function RunRow({
-  repoId,
   run,
-  defaultOpen,
+  onOpen,
 }: {
-  repoId: string;
   run: GithubWorkflowRunInfo;
-  defaultOpen: boolean;
+  onOpen: () => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const running = isRunning(run);
 
-  // The newest run's jobs already arrived with the activity payload. Fetching
-  // them again on expand would be a second request for bytes we hold.
-  const hasInlineJobs = run.jobs.length > 0;
-  const lazy = useWorkflowRunJobs(repoId, run.id, {
-    enabled: open && !hasInlineJobs,
-    isRunning: running,
-  });
-
-  const jobs = hasInlineJobs ? run.jobs : lazy.data?.jobs ?? [];
   // Only for a finished run. `updatedAt` moves while a run is still going, so
   // computing it live would print "took 0s" against a queued run and a shrinking
   // half-truth against a running one.
   const duration = running
     ? null
     : formatDuration(run.startedAt ?? run.createdAt, run.updatedAt);
-  const panelId = `run-${run.id}-detail`;
 
   return (
     <li>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={panelId}
+        onClick={onOpen}
         className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-[var(--bg-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
       >
         <RunStatusIcon run={run} />
@@ -491,43 +508,114 @@ function RunRow({
           {duration && <span className="whitespace-nowrap">{duration}</span>}
         </span>
 
-        <span
-          aria-hidden="true"
-          className={cn(
-            "shrink-0 text-xs text-[var(--text-muted)] transition-transform",
-            open && "rotate-90",
-          )}
-        >
-          ▶
+        {/* Points right, and stays right. It used to rotate to mark an expanded
+            row; the row no longer expands, so it means "opens" — the same thing
+            it means in every other list in the product. */}
+        <span aria-hidden="true" className="shrink-0 text-xs text-[var(--text-muted)]">
+          ›
         </span>
       </button>
-
-      {open && (
-        <div
-          id={panelId}
-          className="border-t border-[var(--border-subtle)] px-4 py-3"
-        >
-          {lazy.isLoading && <Skeleton className="h-16 w-full rounded-lg" />}
-
-          {lazy.error && (
-            <p className="text-sm text-[var(--text-muted)]">
-              Couldn&rsquo;t load this run&rsquo;s steps
-              {lazy.error.isNetworkError ? " — the backend didn't answer." : "."}
-            </p>
-          )}
-
-          {/* A server-side problem GitHub reported (an expired run, usually)
-              comes back as a successful response carrying `error`. */}
-          {lazy.data?.error && (
-            <p className="text-sm text-[var(--text-muted)]">{lazy.data.error}</p>
-          )}
-
-          {!lazy.isLoading && !lazy.error && !lazy.data?.error && (
-            <JobList jobs={jobs} running={running} />
-          )}
-        </div>
-      )}
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// One run, opened — GitHub's run page
+// ---------------------------------------------------------------------------
+
+/**
+ * The jobs and steps of a single run, with a way back to the list.
+ *
+ * Laid out like the page GitHub sends you to when you click a run: the run's own
+ * title and number as the heading, a summary strip of the facts that describe it
+ * (status, duration, branch, trigger, commit), then the jobs. A student who
+ * learns this screen can read the real one.
+ */
+function RunDetail({
+  repoId,
+  run,
+  onBack,
+}: {
+  repoId: string;
+  run: GithubWorkflowRunInfo;
+  onBack: () => void;
+}) {
+  const running = isRunning(run);
+
+  // The newest run's jobs already arrived with the activity payload; fetching
+  // them again would be a second request for bytes already held.
+  const hasInlineJobs = run.jobs.length > 0;
+  const lazy = useWorkflowRunJobs(repoId, run.id, {
+    enabled: !hasInlineJobs,
+    isRunning: running,
+  });
+  const jobs = hasInlineJobs ? run.jobs : lazy.data?.jobs ?? [];
+
+  const duration = running
+    ? null
+    : formatDuration(run.startedAt ?? run.createdAt, run.updatedAt);
+
+  const facts: Array<{ label: string; value: React.ReactNode }> = [
+    { label: "Status", value: runLabel(run) },
+    { label: "Total duration", value: duration ?? "—" },
+    { label: "Branch", value: <span className="font-mono text-xs">{run.branch}</span> },
+    { label: "Triggered by", value: describeTrigger(run) },
+  ];
+
+  return (
+    <div>
+      {/* Back FIRST in the DOM, so a keyboard user lands on the way out before
+          being walked through the jobs they just left. */}
+      <Button variant="ghost" size="sm" onClick={onBack} className="mb-3">
+        ← All runs
+      </Button>
+
+      <div className="flex items-start gap-3">
+        <RunStatusIcon run={run} />
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-[var(--text-strong)]">
+            {run.commitMessage || run.name}
+          </h3>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            {run.name}
+            {run.runNumber > 0 && ` #${run.runNumber}`}
+            {run.runAttempt > 1 && ` · attempt ${run.runAttempt}`}
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 sm:grid-cols-4">
+        {facts.map((f) => (
+          <div key={f.label} className="min-w-0">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              {f.label}
+            </dt>
+            <dd className="mt-0.5 truncate text-sm text-[var(--text-strong)]">{f.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mt-4">
+        {lazy.isLoading && <Skeleton className="h-24 w-full rounded-lg" />}
+
+        {lazy.error && (
+          <p className="text-sm text-[var(--text-muted)]">
+            Couldn&rsquo;t load this run&rsquo;s steps
+            {lazy.error.isNetworkError ? " — the backend didn't answer." : "."}
+          </p>
+        )}
+
+        {/* A server-side problem GitHub reported (an expired run, usually) comes
+            back as a successful response carrying `error`. */}
+        {lazy.data?.error && (
+          <p className="text-sm text-[var(--text-muted)]">{lazy.data.error}</p>
+        )}
+
+        {!lazy.isLoading && !lazy.error && !lazy.data?.error && (
+          <JobList jobs={jobs} running={running} />
+        )}
+      </div>
+    </div>
   );
 }
 
