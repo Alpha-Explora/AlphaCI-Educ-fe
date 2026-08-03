@@ -20,7 +20,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardsApi } from "@/models/api";
-import type { ClassCohort, StudentDashboard } from "@/models/types";
+import type { ClassAccessState, ClassCohort, StudentDashboard } from "@/models/types";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
 
@@ -29,6 +29,15 @@ type AssignmentRow = StudentDashboard["assignments"][number];
 /** One class, with its own work. The unit the hub is now built from. */
 export interface ClassSection {
   classInfo: ClassCohort;
+  /**
+   * Whether the class is accepting work right now, as the SERVER computed it.
+   *
+   * Read from the payload rather than derived from `classInfo.schedule` here: the
+   * derivation would use the browser's clock, and the hub would then unlock a
+   * class the API still refuses. Absent for a class the server sent no state for,
+   * which is treated as open — the same fallback as having no schedule.
+   */
+  access: ClassAccessState | null;
   /** Still to do, or done but not yet graded. */
   active: AssignmentRow[];
   /** Graded or archived — kept, but out of the way. */
@@ -50,9 +59,30 @@ export interface StudentDashboardVM {
   totalAssignments: number;
 }
 
-// "Past" = repo has been graded/archived; everything else is still active work.
+/** A single repository is finished when it has been graded or archived. */
+function repoIsPast(entry: AssignmentRow["repos"][number]): boolean {
+  return entry.repo.status === "GRADED" || entry.repo.status === "ARCHIVED";
+}
+
+/**
+ * Whether a project belongs in "Past" rather than in the student's to-do grid.
+ *
+ * TRIVIAL FOR ONE REPO, A REAL CHOICE FOR TWO. A SPLIT project has a backend and
+ * a frontend that are graded independently, so "is this project finished" stops
+ * being a lookup and becomes a rule — and the rule decides what a student is
+ * told they still owe.
+ *
+ * `every` is the conservative reading: while either half is still open, the
+ * project stays in the to-do grid. The alternative — `some`, i.e. one graded
+ * half retires the card — would file a project as done while the student still
+ * has a frontend to write, which is the one mistake this list must not make.
+ *
+ * An unprovisioned project (no repos at all) is NOT past. `every` on an empty
+ * array is `true`, which would quietly hide brand-new work — the length guard is
+ * the whole reason this is not a one-liner.
+ */
 function isPast(row: AssignmentRow): boolean {
-  return row.repo?.status === "GRADED" || row.repo?.status === "ARCHIVED";
+  return row.repos.length > 0 && row.repos.every(repoIsPast);
 }
 
 export function useStudentDashboard(studentId: string | null): StudentDashboardVM {
@@ -75,6 +105,10 @@ export function useStudentDashboard(studentId: string | null): StudentDashboardV
       else byClass.set(row.classId, [row]);
     }
 
+    const accessByClass = new Map(
+      (query.data?.access ?? []).map((state) => [state.classId, state]),
+    );
+
     // Driven by `classes`, not by the assignments: a class a student has joined
     // but which has no work yet must still appear, or joining a class would
     // look like it silently failed.
@@ -82,6 +116,7 @@ export function useStudentDashboard(studentId: string | null): StudentDashboardV
       const rowsForClass = byClass.get(classInfo.id) ?? [];
       return {
         classInfo,
+        access: accessByClass.get(classInfo.id) ?? null,
         active: rowsForClass.filter((r) => !isPast(r)),
         past: rowsForClass.filter(isPast),
         total: rowsForClass.length,

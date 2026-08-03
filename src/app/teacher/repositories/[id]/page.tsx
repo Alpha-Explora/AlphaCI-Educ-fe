@@ -36,6 +36,7 @@ import { AnswerKeyPanel } from "@/components/domain/AnswerKeyPanel";
 import { PlagiarismCard } from "@/components/domain/PlagiarismCard";
 import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { formatDate, formatDateTime, relativeDue } from "@/components/ui/format";
+import { pointsPerRepo } from "@/models/points";
 
 type RepoTab = "overview" | "pipeline" | "review" | "grading";
 
@@ -329,7 +330,7 @@ export default function TeacherRepositoryPage() {
                               label="Recorded grade"
                               value={
                                 d.repo.grade !== null
-                                  ? `${d.repo.grade}/${d.assignment.points}`
+                                  ? `${d.repo.grade}/${pointsPerRepo(d.assignment)}`
                                   : "—"
                               }
                               tone={d.repo.grade !== null ? "success" : "default"}
@@ -380,7 +381,15 @@ export default function TeacherRepositoryPage() {
                         </Card>
 
                         <div className="order-1 lg:order-2">
-                          <GradingPanel repo={d.repo} maxPoints={d.assignment.points} />
+                          {/* This repository's share, not the project's total.
+                              With the project total the input accepted 100 for a
+                              half worth 50 and the server rejected the save —
+                              a validation error the teacher could not act on,
+                              because nothing on screen said 50 was the limit. */}
+                          <GradingPanel
+                            repo={d.repo}
+                            maxPoints={pointsPerRepo(d.assignment)}
+                          />
                         </div>
                       </div>
 

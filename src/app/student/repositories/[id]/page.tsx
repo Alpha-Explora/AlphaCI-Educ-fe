@@ -43,6 +43,7 @@ import { StartAssignmentPanel } from "@/components/domain/StartAssignmentPanel";
 import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { StudentGradesCard } from "@/components/domain/StudentGradesCard";
 import { relativeDue } from "@/components/ui/format";
+import { pointsPerRepo } from "@/models/points";
 
 /**
  * Split by MOMENT, not by data source.
@@ -89,7 +90,9 @@ export default function StudentWorkspacePage() {
   // Submission action reuses the grading VM's submit mutation.
   const submission = useGrading({
     repoId,
-    maxPoints: d?.assignment.points ?? 100,
+    // This repository's share of the project, so a SPLIT half is bounded by
+    // what it is actually worth. See models/points.ts.
+    maxPoints: d ? pointsPerRepo(d.assignment) : 100,
     initialGrade: d?.repo.grade ?? null,
     initialFeedback: d?.repo.teacherFeedback ?? null,
     status: d?.repo.status,

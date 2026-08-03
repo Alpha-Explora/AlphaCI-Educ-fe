@@ -206,6 +206,40 @@ export interface CourseWithInstructors extends Course {
   classCount: number;
 }
 
+/**
+ * A class's weekly meeting window, in PHILIPPINE TIME (Asia/Manila, UTC+8, and
+ * no daylight saving — the offset is the same all year).
+ *
+ * One time range applied to a set of weekdays. `days` uses JavaScript's
+ * numbering, `0` = Sunday … `6` = Saturday, which is what `Date.getDay()`
+ * returns — so it can be compared directly, but remember Sunday sorts FIRST
+ * numerically and belongs LAST in a school week when displayed.
+ */
+export interface ClassSchedule {
+  days: number[];
+  /** "HH:MM", 24-hour. */
+  startTime: string;
+  /** "HH:MM", exclusive — a 10:00 end means 10:00 is already over. */
+  endTime: string;
+}
+
+/**
+ * Whether a class is accepting work right now, as computed by the SERVER.
+ *
+ * Deliberately not derived in the browser from `ClassCohort.schedule`: that would
+ * use the CLIENT's clock, so a lab PC with a wrong date — or a student who sets
+ * one — would unlock the class on screen. This is the same answer the server's
+ * own gates use, so the UI cannot promise something the API then refuses.
+ */
+export interface ClassAccessState {
+  classId: string;
+  inSession: boolean;
+  /** "Mon, Wed · 08:00–10:00 (Philippine time)", or null when unscheduled. */
+  window: string | null;
+  /** ISO instant the class next opens; null when open now or unscheduled. */
+  opensAt: string | null;
+}
+
 export interface ClassCohort {
   id: string;
   orgId: string;
@@ -225,6 +259,14 @@ export interface ClassCohort {
    * between labs from becoming two records with two gradebooks.
    */
   meetingLabOrgIds?: string[];
+  /**
+   * When this class meets, in PHILIPPINE TIME. Absent = always open.
+   *
+   * While it is set, students may only ACT on this class's projects during the
+   * window — start a session, take a token, submit. Reading is never blocked.
+   * Enforced on the server; this copy drives the Settings form and the labels.
+   */
+  schedule?: ClassSchedule;
   createdAt: string;
   // ADDENDUM D — magic join code (teacher writes it on the whiteboard)
   magicJoinCode: string; // e.g. "CS101-XYZ"
@@ -300,8 +342,26 @@ export interface Assignment {
    * usually about not drawing an empty pill or a bare "Due —" label.
    */
   dueDate?: string;
-  points: number; // total possible, e.g. 100
+  /**
+   * Total possible for the PROJECT, e.g. 100 — not per repository.
+   *
+   * On a SPLIT project the two halves are worth half of this each. Never divide
+   * a mark by this field directly; use `pointsPerRepo` from models/points.ts,
+   * which is the mirror of the rule the server validates against.
+   */
+  points: number;
   isGroup: boolean; // group project vs solo
+  /**
+   * SINGLE (default) or SPLIT — whether this project provisions one repository
+   * per student/group or two (`-be` and `-fe`).
+   *
+   * The server has always sent this; the UI simply never modelled it, which is
+   * why nothing here could tell a full-stack project from a single-repo one and
+   * every grade denominator quietly used the project total. Optional because a
+   * project created before split projects existed has no such field, and absent
+   * means SINGLE.
+   */
+  repoStructure?: "SINGLE" | "SPLIT";
   createdAt: string;
   // ADDENDUM L — set when a teacher ENDS (closes) the project. When present,
   // students can't start a lab session, get a token, or submit. null = open.
@@ -565,16 +625,35 @@ export interface TeacherDashboard {
   >;
 }
 
+/** One repository a student can actually open, with its own last run. */
+export interface StudentDashboardRepo {
+  repo: AssignmentRepository;
+  latestRun: PipelineRun | null;
+}
+
 export interface StudentDashboard {
   student: SystemUser;
   // ADDENDUM D — every class the student is enrolled in (multi-class hub)
   classes: ClassCohort[];
+  /** One entry per class in `classes` — whether it is in session right now. */
+  access: ClassAccessState[];
   assignments: Array<{
     assignment: Assignment;
     className: string;
     classId: string; // ADDENDUM D — lets the hub filter by selected class
-    repo: AssignmentRepository | null;
-    latestRun: PipelineRun | null;
+    /**
+     * EVERY repository this student holds for the assignment — one for a SINGLE
+     * project, TWO for a SPLIT one, ordered BACKEND then FRONTEND.
+     *
+     * Replaced `repo` + `latestRun`. The singular pair could not represent a
+     * SPLIT project at all: the server was picking one of the two repositories
+     * with `.find()` and dropping the other, so a student's frontend repo was
+     * provisioned and authorised but had no route into it from this UI. See the
+     * matching note in the backend's domain/types.ts.
+     *
+     * Empty until repositories are provisioned.
+     */
+    repos: StudentDashboardRepo[];
   }>;
 }
 
