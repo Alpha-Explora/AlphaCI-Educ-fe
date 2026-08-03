@@ -66,6 +66,31 @@ function runTone(run: GithubWorkflowRunInfo): Tone {
 }
 
 /** GitHub's own words, de-snake-cased: "in progress", "success", "failure". */
+/**
+ * GitHub's second-line phrasing: "Commit 4f8b3d7 pushed by alphaci[bot]",
+ * "Pull request #2 opened by LloydLim1", "Manually run by …".
+ *
+ * Reconstructed rather than read from the API, because GitHub does not send this
+ * sentence — it composes it from `event` + `actor` + the head sha in its own UI.
+ * Matching the wording matters more than it looks: a student who learns to read
+ * this row here can read the real Actions tab unaided, which is the entire reason
+ * this panel exists.
+ */
+function describeTrigger(run: GithubWorkflowRunInfo): string {
+  const who = run.actor || run.commitAuthor;
+  const by = who ? ` by ${who}` : "";
+
+  if (run.event === "pull_request") return `Pull request${by}`;
+  if (run.event === "workflow_dispatch") return `Manually run${by}`;
+  if (run.event === "schedule") return "Scheduled";
+  if (run.event === "push") {
+    const sha = run.sha ? ` ${run.sha.slice(0, 7)}` : "";
+    return `Commit${sha} pushed${by}`;
+  }
+  // An event this build has not met yet still reads sensibly rather than blank.
+  return `${run.event || "Run"}${by}`;
+}
+
 function runLabel(run: GithubWorkflowRunInfo): string {
   const raw = isRunning(run) ? run.status : run.conclusion ?? "completed";
   return raw.replace(/_/g, " ");
@@ -200,6 +225,17 @@ export function GithubActionsPanel({
   const groups = a ? groupByCommit(a.commits, a.workflowRuns) : [];
   const hasRuns = (a?.workflowRuns.length ?? 0) > 0;
 
+  // Newest first, by run number then by creation. `runNumber` alone is not enough:
+  // a re-run keeps its number and only `runAttempt`/`createdAt` move, so two
+  // attempts of one run would sort arbitrarily against each other.
+  const allRuns = [...(a?.workflowRuns ?? [])].sort(
+    (x, y) => y.runNumber - x.runNumber || time(y.createdAt) - time(x.createdAt),
+  );
+
+  // Pushes that triggered nothing. Derived from the commit grouping, which is now
+  // used ONLY for this — the visible list is flat, like GitHub's.
+  const commitsWithoutRuns = groups.filter((g) => g.runs.length === 0);
+
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -307,103 +343,71 @@ export function GithubActionsPanel({
                   turned off for this repository — tell your teacher.
                 </Banner>
               )}
-              <ul className="space-y-4">
-                {groups.map((group, index) => (
-                  <CommitRunGroup
-                    key={group.sha}
+              {/* FLAT, NEWEST FIRST — GitHub's own shape.
+                  This replaced a commit-grouped list (one container per commit,
+                  its runs nested inside). That grouping was built to make the
+                  causal link explicit for a beginner — "I pushed, therefore this
+                  ran" — but it cost the thing a run list is for: scanning. Every
+                  provisioning commit got a container, so six scaffold commits
+                  pushed the run that mattered off the screen, and the same commit
+                  message was then printed twice, once as the container and once on
+                  the run inside it.
+                  The causal link survives on the row: the commit message is the
+                  headline and "Commit <sha> pushed by <actor>" is the subtitle. */}
+              <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border-subtle)] pb-2">
+                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                  {allRuns.length} workflow {allRuns.length === 1 ? "run" : "runs"}
+                </p>
+              </div>
+              <ul className="divide-y divide-[var(--border-subtle)]">
+                {allRuns.map((run, index) => (
+                  <RunRow
+                    key={`${run.id}-${run.runAttempt}`}
                     repoId={repoId}
-                    group={group}
-                    // Only the newest commit's newest run opens by itself:
-                    // "what did my last push do" is the question this page is
-                    // opened with, and its jobs already came down with the list.
-                    openNewestRun={index === 0}
+                    run={run}
+                    // Only the newest run opens by itself: "what did my last push
+                    // do" is the question this page is opened with, and its jobs
+                    // already came down with the activity payload.
+                    defaultOpen={index === 0}
                   />
                 ))}
               </ul>
+
+              {/* Kept, deliberately, and demoted. GitHub never shows a commit that
+                  triggered nothing — it lists runs, so a push with no run is simply
+                  absent. For a student that absence is indistinguishable from CI
+                  being slow, and it is a real failure: the workflow file is missing
+                  from the branch, or Actions is off. So it stays, as a footnote
+                  under the runs instead of as containers among them. */}
+              {commitsWithoutRuns.length > 0 && (
+                <details className="mt-4 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
+                  <summary className="cursor-pointer text-xs text-[var(--text-muted)]">
+                    {commitsWithoutRuns.length}{" "}
+                    {commitsWithoutRuns.length === 1 ? "push" : "pushes"} ran no
+                    workflow
+                  </summary>
+                  <ul className="mt-2 space-y-1.5">
+                    {commitsWithoutRuns.map((c) => (
+                      <li key={c.sha} className="text-xs text-[var(--text-muted)]">
+                        <span className="font-mono">{c.sha.slice(0, 7)}</span>
+                        {" · "}
+                        <span className="text-[var(--text-strong)]">
+                          {c.message || "(no commit message)"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    A push with no run usually means the pipeline file is missing
+                    from that branch, or Actions is turned off for this repository.
+                  </p>
+                </details>
+              )}
             </>
           )}
         </div>
       )}
     </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// One commit, and the runs it triggered
-// ---------------------------------------------------------------------------
-
-function CommitRunGroup({
-  repoId,
-  group,
-  openNewestRun,
-}: {
-  repoId: string;
-  group: CommitGroup;
-  openNewestRun: boolean;
-}) {
-  const ran = group.runs.length > 0;
-
-  return (
-    <li className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
-      {/*
-        Commit header — the cause. Tinted so the runs beneath it read as
-        consequences of this row rather than as siblings of it.
-
-        A commit that triggered nothing is the WHOLE container, one row tall,
-        with its note inline: a repository is provisioned with half a dozen
-        scaffold commits, and giving each of those the full two-part treatment
-        buried the runs that matter under a wall of "nothing happened".
-      */}
-      <div
-        className={cn(
-          "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 bg-[var(--bg-subtle)] px-4 py-3",
-          ran && "border-b border-[var(--border-subtle)]",
-        )}
-      >
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[var(--text-strong)]">
-            {group.message || "(no commit message)"}
-          </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-[var(--text-muted)]">
-            <span className="font-mono">{group.sha.slice(0, 7)}</span>
-            <span aria-hidden="true">·</span>
-            <span>{group.author}</span>
-            {group.branch && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="font-mono">{group.branch}</span>
-              </>
-            )}
-            {group.date && (
-              <>
-                <span aria-hidden="true">·</span>
-                <time dateTime={group.date} title={formatDateTime(group.date)}>
-                  {relativeTime(group.date)}
-                </time>
-              </>
-            )}
-          </p>
-        </div>
-        {!ran && (
-          <p className="shrink-0 text-xs text-[var(--text-muted)]">
-            No workflow ran on this commit
-          </p>
-        )}
-      </div>
-
-      {ran && (
-        <ul className="divide-y divide-[var(--border-subtle)]">
-          {group.runs.map((run, index) => (
-            <RunRow
-              key={run.id}
-              repoId={repoId}
-              run={run}
-              defaultOpen={openNewestRun && index === 0}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
   );
 }
 
@@ -450,30 +454,47 @@ function RunRow({
         className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-[var(--bg-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
       >
         <RunStatusIcon run={run} />
+
+        {/* GitHub's two-line row. The COMMIT MESSAGE leads, because that is what
+            a student recognises as "the thing I did"; the workflow identity moves
+            to the second line as `AlphaCI #4: <event> by <actor>`, which is
+            exactly GitHub's own phrasing and the vocabulary they will meet again. */}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-[var(--text-strong)]">
-            {run.name}
-            {run.runNumber > 0 && (
-              <span className="ml-1.5 font-normal text-[var(--text-muted)]">
-                #{run.runNumber}
-              </span>
-            )}
-            {run.runAttempt > 1 && (
-              <span className="ml-1.5 font-normal text-[var(--text-muted)]">
-                (attempt {run.runAttempt})
-              </span>
-            )}
+            {run.commitMessage || run.name}
           </span>
-          <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-            {runLabel(run)}
-            {run.event && ` · triggered by ${run.event}`}
-            {duration && ` · took ${duration}`}
+          <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+            {run.name}
+            {run.runNumber > 0 && ` #${run.runNumber}`}
+            {": "}
+            {describeTrigger(run)}
+            {run.runAttempt > 1 && ` (attempt ${run.runAttempt})`}
           </span>
         </span>
+
+        {/* Branch, then time and duration — GitHub's right-hand column. Hidden
+            below sm: on a phone this is four competing pieces of metadata beside
+            a message that has already been truncated to make room for them. */}
+        <span className="hidden shrink-0 items-center gap-3 text-xs text-[var(--text-muted)] sm:flex">
+          {run.branch && (
+            <span className="max-w-[10rem] truncate rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono text-[11px] text-[var(--text-strong)]">
+              {run.branch}
+            </span>
+          )}
+          <time
+            dateTime={run.createdAt}
+            title={formatDateTime(run.createdAt)}
+            className="whitespace-nowrap"
+          >
+            {relativeTime(run.createdAt)}
+          </time>
+          {duration && <span className="whitespace-nowrap">{duration}</span>}
+        </span>
+
         <span
           aria-hidden="true"
           className={cn(
-            "text-xs text-[var(--text-muted)] transition-transform",
+            "shrink-0 text-xs text-[var(--text-muted)] transition-transform",
             open && "rotate-90",
           )}
         >
