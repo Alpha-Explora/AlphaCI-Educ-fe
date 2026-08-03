@@ -215,6 +215,20 @@ export interface CourseWithInstructors extends Course {
  * returns — so it can be compared directly, but remember Sunday sorts FIRST
  * numerically and belongs LAST in a school week when displayed.
  */
+/**
+ * The branches the graded pipeline runs on, and therefore the only branches a
+ * marking view should list.
+ *
+ * Mirrors PROTECTED_BRANCHES in the backend's domain/types.ts. `uat` is present
+ * only on projects whose branchStrategy is MAIN_UAT; a MAIN_ONLY project simply
+ * has no such branch, so filtering by this list handles both without asking.
+ *
+ * Deliberately matched by NAME, not by GitHub's `protected` flag: the flag can be
+ * absent on a freshly provisioned repository or in simulated mode, and these two
+ * names ARE the product's definition of a graded branch.
+ */
+export const GRADED_BRANCHES: readonly string[] = ["main", "uat"];
+
 export interface ClassSchedule {
   days: number[];
   /** "HH:MM", 24-hour. */

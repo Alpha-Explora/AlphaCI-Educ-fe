@@ -94,9 +94,18 @@ export function PipelineStages({
                     <p className="text-xs text-[var(--text-muted)]">{meta.blurb}</p>
                   </div>
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)] ring-1 ring-inset ring-[var(--border-subtle)]">
-                  {group.pointsAwarded}/{group.pointsPossible} pts
-                </span>
+                {/* Shown only when there is a mark to show.
+                    `pointsPossible === 0` covers both cases that produce it, and
+                    both used to render the same meaningless "0/0 pts": the server
+                    withholding the arithmetic until the teacher publishes grades,
+                    and a stage the pipeline genuinely awarded no points for. A
+                    student staring at "0/0 pts" on every stage reads it as having
+                    scored nothing, which is a worse lie than saying nothing. */}
+                {group.pointsPossible > 0 && (
+                  <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)] ring-1 ring-inset ring-[var(--border-subtle)]">
+                    {group.pointsAwarded}/{group.pointsPossible} pts
+                  </span>
+                )}
               </div>
               <ul className="divide-y divide-[var(--border-subtle)]">
                 {group.checks.map((check) => (
