@@ -40,14 +40,11 @@ import {
   type SideTabGroup,
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
-import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
-import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
-import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
-import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
+import { TeacherProjectList } from "@/components/domain/TeacherProjectList";
+import { ClassScheduleCard } from "@/components/domain/ClassScheduleCard";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { ClassOverviewTab } from "@/components/domain/ClassOverviewTab";
 import { JoinCodeStrip } from "@/components/domain/JoinCodeButton";
-import { formatDate, relativeDue } from "@/components/ui/format";
 
 type ClassTab = "overview" | "students" | "assignments" | "settings";
 
@@ -68,7 +65,6 @@ export default function ClassRosterPage() {
   const teacherCourses = useTeacherCourses(user?.id ?? null);
   const roster = useClassRoster(classId);
   const assignments = useClassAssignments(classId);
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [tab, setTab] = useState<ClassTab>("overview");
 
   // Build a userId → SystemUser map so submission rows can show owner names.
@@ -305,116 +301,12 @@ export default function ClassRosterPage() {
                   }
                   loadingFallback={<Skeleton className="h-40 w-full rounded-xl" />}
                 >
-                  <div className="space-y-5">
-                    {assignments.assignments.map((a) => (
-                      <Card key={a.id} className="overflow-hidden animate-fade-up">
-                        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-base font-semibold text-[var(--text-strong)]">
-                                {a.title}
-                              </h3>
-                              {a.isGroup && <GenericPill tone="info">Group</GenericPill>}
-                              {a.closedAt && <GenericPill tone="warning">🔒 Closed</GenericPill>}
-                            </div>
-                            <p className="mt-0.5 line-clamp-1 text-sm text-[var(--text-muted)]">
-                              {a.description}
-                            </p>
-                          </div>
-                          <div className="text-right text-xs text-[var(--text-muted)]">
-                            <p className="font-medium text-[var(--text-strong)]">
-                              {a.points} pts
-                            </p>
-                            {a.dueDate ? (
-                              <>
-                                <p>{relativeDue(a.dueDate)}</p>
-                                <p>Due {formatDate(a.dueDate)}</p>
-                              </>
-                            ) : (
-                              <p>No due date</p>
-                            )}
-                          </div>
-                        </div>
-                        <AssignmentSubmissions
-                          assignmentId={a.id}
-                          points={a.points}
-                          usersById={usersById}
-                        />
-                        <div className="space-y-4 px-5 pb-4">
-                          <HiddenTestsPanel assignmentId={a.id} />
-                          <GradeReleaseControl
-                            assignmentId={a.id}
-                            releasedAt={a.gradesReleasedAt}
-                          />
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-slate-50/60 px-5 py-3">
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {a.isGroup
-                              ? `Creates one shared GitHub repository per group in Section ${info?.section ?? "this section"}.`
-                              : `Creates one GitHub repository per selected student in Section ${info?.section ?? "this section"}.`}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {a.closedAt ? (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                loading={assignments.isSettingClosed && assignments.closingId === a.id}
-                                onClick={() => assignments.setProjectClosed(a.id, false)}
-                              >
-                                Reopen
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                loading={assignments.isSettingClosed && assignments.closingId === a.id}
-                                onClick={() => assignments.setProjectClosed(a.id, true)}
-                              >
-                                <span aria-hidden="true">🔒</span> End project
-                              </Button>
-                            )}
-                            {confirmingDeleteId === a.id ? (
-                              <>
-                                <span className="text-xs text-red-700">
-                                  Delete &ldquo;{a.title}&rdquo; + its repos?
-                                </span>
-                                <Button
-                                  variant="danger"
-                                  size="sm"
-                                  loading={assignments.isDeleting && assignments.deletingId === a.id}
-                                  onClick={() => assignments.deleteAssignment(a.id)}
-                                >
-                                  Delete
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setConfirmingDeleteId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:bg-red-50"
-                                onClick={() => setConfirmingDeleteId(a.id)}
-                              >
-                                <span aria-hidden="true">🗑</span> Delete
-                              </Button>
-                            )}
-                            <ProvisionRepositoriesButton assignmentId={a.id} />
-                          </div>
-                        </div>
-                        {assignments.deleteError && assignments.deletingId === a.id && (
-                          <p className="border-t border-[var(--border-subtle)] bg-red-50 px-5 py-2 text-sm text-red-700">
-                            {assignments.deleteError}
-                          </p>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
+                  <TeacherProjectList
+                    assignments={assignments.assignments}
+                    sectionLabel={info?.section ?? "this section"}
+                    usersById={usersById}
+                    vm={assignments}
+                  />
                 </StateBoundary>
               </section>
             </div>
@@ -427,6 +319,11 @@ export default function ClassRosterPage() {
               aria-labelledby="class-tab-settings"
               className="space-y-8"
             >
+              {/* Configuration first, destruction last. The danger zone used to
+                  be the only thing on this tab, so it opened on a red card;
+                  ordinary settings belong above it. */}
+              <ClassScheduleCard classId={classId} schedule={info?.schedule} />
+
               <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">
                 <h2 className="text-base font-semibold text-[var(--text-strong)]">
                   Danger zone

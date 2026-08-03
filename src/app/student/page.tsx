@@ -60,6 +60,7 @@ import {
 } from "@/components/ui";
 import { JoinClassModal } from "@/components/domain/JoinClassModal";
 import { relativeDue } from "@/components/ui/format";
+import { manilaMoment } from "@/models/manila";
 
 type Row = StudentDashboard["assignments"][number];
 
@@ -78,21 +79,90 @@ function scoreTone(score: number | null | undefined): string {
   return "text-amber-600";
 }
 
+/** What a student calls each half of a SPLIT project. */
+const COMPONENT_LABEL: Record<string, string> = {
+  BACKEND: "Backend",
+  FRONTEND: "Frontend",
+};
+
+/**
+ * One openable repository, inside a project card.
+ *
+ * ITS OWN LINK, and that is the structural point of this whole card. A SPLIT
+ * project has two repositories and each needs its own destination, so the card
+ * can no longer BE a link the way it used to — a second target inside an <a> is
+ * invalid HTML and unreachable by keyboard. The card is a plain <article> now
+ * and each row here is the anchor.
+ *
+ * Every row carries its own status and score rather than rolling the two halves
+ * into one figure. A backend at 92% next to an untouched frontend does not
+ * average to anything a student can act on; what they need to know is which half
+ * to open.
+ */
+function RepoRow({ entry }: { readonly entry: Row["repos"][number] }) {
+  const { repo, latestRun } = entry;
+  const label = COMPONENT_LABEL[repo.component ?? "SINGLE"];
+
+  return (
+    <Link
+      href={`/student/repositories/${repo.id}`}
+      className="group/row block rounded-lg border border-[var(--border-subtle)] bg-slate-50/70 p-3 transition-colors hover:border-platform-300 hover:bg-platform-50/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+    >
+      <div className="flex items-center justify-between gap-2">
+        {/* Only a SPLIT half is named. A SINGLE repo would be labelled "Single",
+            which is a word about the data model, not about the student's work. */}
+        {label ? (
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            {label}
+          </span>
+        ) : (
+          <span className="text-xs font-medium text-[var(--text-muted)]">Workspace</span>
+        )}
+        <span
+          className={cn("text-sm font-semibold tabular-nums", scoreTone(latestRun?.score))}
+        >
+          {latestRun?.score != null ? `${latestRun.score}%` : "—"}
+        </span>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <RepoStatusPill status={repo.status} />
+        {latestRun && <PipelineStatusPill status={latestRun.status} />}
+      </div>
+
+      <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-platform-700">
+        <span>Open</span>
+        <span
+          aria-hidden="true"
+          className="transition-transform duration-200 group-hover/row:translate-x-0.5"
+        >
+          →
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 /**
  * One project, as an inner container.
  *
  * Drawn on white with a brand hairline down its left edge. That edge is the only
- * colour it borrows from the panel: the score below stays on the SEMANTIC scale
+ * colour it borrows from the panel: the scores inside stay on the SEMANTIC scale
  * (green pass / amber fail), because the brand hue must never be what tells a
  * student whether their build passed.
+ *
+ * ONE CARD PER PROJECT, however many repositories it has. A SPLIT project is one
+ * piece of homework with one title and one deadline; listing its halves as two
+ * cards would turn a class of five projects into ten, and imply two due dates
+ * where the teacher set one.
  */
 function AssignmentCard({ row, index }: { readonly row: Row; readonly index: number }) {
-  const { assignment, repo, latestRun } = row;
-  const inner = (
+  const { assignment, repos } = row;
+
+  return (
     <article
       className={cn(
-        "group/card relative flex h-full flex-col overflow-hidden rounded-xl border border-platform-200 bg-white p-5 shadow-card",
-        "transition-all duration-200 hover:-translate-y-0.5 hover:border-platform-300 hover:shadow-card-hover",
+        "relative flex h-full flex-col overflow-hidden rounded-xl border border-platform-200 bg-white p-5 shadow-card",
         "animate-fade-up",
       )}
       style={{ animationDelay: `${index * 50}ms` }}
@@ -117,55 +187,25 @@ function AssignmentCard({ row, index }: { readonly row: Row; readonly index: num
         {assignment.description}
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {repo ? (
-          <RepoStatusPill status={repo.status} />
-        ) : (
+      {repos.length === 0 ? (
+        <div className="mt-4">
           <GenericPill>Not started</GenericPill>
-        )}
-        {latestRun && <PipelineStatusPill status={latestRun.status} />}
-      </div>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-2.5">
+          {repos.map((entry) => (
+            <RepoRow key={entry.repo.id} entry={entry} />
+          ))}
+        </div>
+      )}
 
-      <div className="mt-auto flex items-end justify-between gap-3 pt-5">
-        <div>
-          <p className="text-xs text-[var(--text-muted)]">Latest CI score</p>
-          <p
-            className={cn(
-              "text-2xl font-semibold tabular-nums",
-              scoreTone(latestRun?.score),
-            )}
-          >
-            {latestRun?.score != null ? `${latestRun.score}%` : "—"}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-[var(--text-muted)]">
-            {assignment.dueDate ? relativeDue(assignment.dueDate) : "No due date"}
-          </p>
-          {repo && (
-            <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-platform-700">
-              <span>Open workspace</span>
-              <span
-                aria-hidden="true"
-                className="transition-transform duration-200 group-hover/card:translate-x-0.5"
-              >
-                →
-              </span>
-            </span>
-          )}
-        </div>
-      </div>
+      {/* ONE deadline for the project, at the foot, below every half. It used to
+          sit beside the single repo's score; on a SPLIT card that position would
+          make it look like the deadline of whichever half it landed next to. */}
+      <p className="mt-auto pt-4 text-xs text-[var(--text-muted)]">
+        {assignment.dueDate ? relativeDue(assignment.dueDate) : "No due date"}
+      </p>
     </article>
-  );
-
-  if (!repo) return inner;
-  return (
-    <Link
-      href={`/student/repositories/${repo.id}`}
-      className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
-    >
-      {inner}
-    </Link>
   );
 }
 
@@ -185,7 +225,11 @@ function ClassPanel({
   readonly section: ClassSection;
   readonly index: number;
 }) {
-  const { classInfo, active, past, total } = section;
+  const { classInfo, access, active, past, total } = section;
+
+  // Closed only when the server says so. Never derived from the browser's clock —
+  // a lab PC with a wrong date would otherwise unlock a class the API refuses.
+  const locked = access ? !access.inSession : false;
 
   let standing = "Nothing yet";
   if (active.length > 0) standing = `${active.length} to do`;
@@ -225,9 +269,33 @@ function ClassPanel({
             {classInfo.name}
           </h2>
           <span className="text-xs text-[var(--text-muted)]">{classInfo.term}</span>
+          {locked && <GenericPill tone="warning">🔒 Outside class hours</GenericPill>}
         </div>
         <p className="text-xs font-medium text-[var(--text-muted)]">{standing}</p>
       </header>
+
+      {/* WHY THE PROJECTS STILL RENDER BELOW THIS. A closed class could have been
+          hidden outright, which enforces harder — and tells a student checking
+          their work at home nothing at all. They cannot distinguish "it is
+          Tuesday" from "I was unenrolled" or "my teacher deleted it", so the
+          panel stays and says which it is. Reading the brief and last week's
+          results was never the thing worth restricting; starting work is, and
+          that is refused by the server. */}
+      {locked && access && (
+        <div className="relative mx-5 mb-1 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3">
+          <p className="text-sm font-medium text-amber-900">
+            This class is closed right now.
+          </p>
+          <p className="mt-0.5 text-sm text-amber-800">
+            {access.window ?? "Outside scheduled hours"}
+            {access.opensAt && <> · Opens {manilaMoment(access.opensAt)}</>}
+          </p>
+          <p className="mt-1 text-xs text-amber-700">
+            You can still read your projects and past results. Starting work,
+            getting a token and submitting resume when the class opens.
+          </p>
+        </div>
+      )}
 
       <div className="relative space-y-6 px-5 pb-5">
         {total === 0 ? (

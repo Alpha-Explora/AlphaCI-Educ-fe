@@ -4,6 +4,7 @@ import type {
   Assignment,
   ClassCohort,
   ClassRoster,
+  ClassSchedule,
   CreateAssignmentResult,
   CreateClassInput,
   CreateProjectInput,
@@ -52,6 +53,16 @@ export const classesApi = {
     return apiRequest<ClassCohort>(`/classes/${id}/meeting-labs`, {
       method: "PATCH",
       body: { meetingLabOrgIds },
+    });
+  },
+
+  // Teacher-of-class (or admin) sets this section's weekly meeting window, in
+  // Philippine time. Pass null to remove it. This is a GATE, not a label: while
+  // set, students cannot start a session, take a token or submit outside it.
+  setSchedule(id: string, schedule: ClassSchedule | null) {
+    return apiRequest<ClassCohort>(`/classes/${id}/schedule`, {
+      method: "PATCH",
+      body: { schedule },
     });
   },
 

@@ -2,6 +2,7 @@
 import type { Assignment, AssignmentRepository } from "@/models/types";
 import { Card, EmptyState, Stat } from "@/components/ui";
 import { formatDateTime } from "@/components/ui/format";
+import { pointsPerRepo } from "@/models/points";
 
 export function StudentGradesCard({
   repo,
@@ -38,18 +39,34 @@ export function StudentGradesCard({
     );
   }
 
-  const pct = Math.round((repo.grade / assignment.points) * 100);
+  // Out of what THIS REPOSITORY is worth. On a SPLIT project each half carries
+  // half the marks, so dividing by the project's total showed a student full
+  // marks as 50% and told them they had failed work they had actually aced.
+  const outOf = pointsPerRepo(assignment);
+  const pct = Math.round((repo.grade / outOf) * 100);
+  const isHalf = outOf !== assignment.points;
+
   return (
     <Card className="p-5">
       <div className="flex items-center gap-8">
         <Stat
-          label="Your grade"
-          value={`${repo.grade}/${assignment.points}`}
+          label={isHalf ? "This half" : "Your grade"}
+          value={`${repo.grade}/${outOf}`}
           tone="success"
         />
         <Stat label="Percentage" value={`${pct}%`} tone="platform" />
         <Stat label="Graded" value={formatDateTime(repo.gradedAt)} />
       </div>
+
+      {/* Said explicitly, because a student looking at "42/50" on a project the
+          brief called 100 points would otherwise reasonably think something had
+          gone wrong. */}
+      {isHalf && (
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          This is one half of a {assignment.points}-point project — the backend and
+          frontend are marked separately and are worth {outOf} each.
+        </p>
+      )}
       {repo.teacherFeedback && (
         <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
