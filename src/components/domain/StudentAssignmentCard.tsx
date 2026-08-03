@@ -48,14 +48,38 @@ const COMPONENT_LABEL: Record<string, string> = {
  * average to anything a student can act on; what they need to know is which half
  * to open.
  */
-function RepoRow({ entry }: { readonly entry: Row["repos"][number] }) {
+function RepoRow({
+  entry,
+  closed,
+}: {
+  readonly entry: Row["repos"][number];
+  /** The teacher has ended this project — the row becomes unpressable. */
+  readonly closed: boolean;
+}) {
   const { repo, latestRun } = entry;
   const label = COMPONENT_LABEL[repo.component ?? "SINGLE"];
 
+  // A CLOSED project renders the same row as a <div>, not a <Link>.
+  //
+  // Removing the href rather than styling a dead link: an anchor that looks
+  // disabled is still focusable, still announced as a link, and still navigable
+  // by keyboard — so a student who tabs to it lands in a workspace where every
+  // action is refused by the server, which is the confusing outcome this is
+  // meant to prevent. No href, nothing to press.
+  const Wrapper = closed ? "div" : Link;
+  const wrapperProps = closed
+    ? { "aria-disabled": true as const }
+    : { href: `/student/repositories/${repo.id}` };
+
   return (
-    <Link
-      href={`/student/repositories/${repo.id}`}
-      className="group/row block rounded-lg border border-[var(--border-subtle)] bg-slate-50/70 p-3 transition-colors hover:border-platform-300 hover:bg-platform-50/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+    <Wrapper
+      {...(wrapperProps as { href: string })}
+      className={cn(
+        "block rounded-lg border p-3",
+        closed
+          ? "cursor-not-allowed border-[var(--border-subtle)] bg-slate-100/70 opacity-70"
+          : "group/row border-[var(--border-subtle)] bg-slate-50/70 transition-colors hover:border-platform-300 hover:bg-platform-50/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform",
+      )}
     >
       <div className="flex items-center justify-between gap-2">
         {/* Only a SPLIT half is named. A SINGLE repo would be labelled "Single",
@@ -77,16 +101,23 @@ function RepoRow({ entry }: { readonly entry: Row["repos"][number] }) {
         {latestRun && <PipelineStatusPill status={latestRun.status} />}
       </div>
 
-      <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-platform-700">
-        <span>Open</span>
-        <span
-          aria-hidden="true"
-          className="transition-transform duration-200 group-hover/row:translate-x-0.5"
-        >
-          →
+      {closed ? (
+        <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--text-muted)]">
+          <span aria-hidden="true">🔒</span>
+          <span>Unavailable — project closed</span>
         </span>
-      </span>
-    </Link>
+      ) : (
+        <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-platform-700">
+          <span>Open</span>
+          <span
+            aria-hidden="true"
+            className="transition-transform duration-200 group-hover/row:translate-x-0.5"
+          >
+            →
+          </span>
+        </span>
+      )}
+    </Wrapper>
   );
 }
 
@@ -106,27 +137,47 @@ export function StudentAssignmentCard({
 }) {
   const { assignment, repos } = row;
 
+  // The teacher ended this project. The card STAYS — a closed project a student
+  // can still see and read is the point; one that vanishes looks like it was
+  // deleted, or like they were removed from the class.
+  const closed = Boolean(assignment.closedAt);
+
   return (
     <article
       className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-xl border border-platform-200 bg-white p-5 shadow-card",
+        "relative flex h-full flex-col overflow-hidden rounded-xl border bg-white p-5 shadow-card",
+        closed ? "border-[var(--border-subtle)]" : "border-platform-200",
         "animate-fade-up",
       )}
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      {/* Brand hairline down the left edge. The only colour the card borrows —
-          the scores inside stay on the semantic scale, because the brand hue must
-          never be what tells a student whether their build passed. */}
+      {/* Brand hairline down the left edge — grey once closed, so the card reads
+          as inactive at a glance without the title becoming unreadable. The
+          scores inside stay on the semantic scale regardless, because the brand
+          hue must never be what tells a student whether their build passed. */}
       <span
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-platform-600 to-platform-400"
+        className={cn(
+          "absolute inset-y-0 left-0 w-1",
+          closed ? "bg-slate-300" : "bg-gradient-to-b from-platform-600 to-platform-400",
+        )}
       />
 
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="min-w-0 text-lg font-semibold text-[var(--text-strong)]">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3
+          className={cn(
+            "min-w-0 text-lg font-semibold",
+            closed ? "text-[var(--text-muted)]" : "text-[var(--text-strong)]",
+          )}
+        >
           {assignment.title}
         </h3>
-        {assignment.isGroup && <GenericPill tone="info">Group</GenericPill>}
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {assignment.isGroup && <GenericPill tone="info">Group</GenericPill>}
+          {/* Named on the card, not only on the row: a student scanning the class
+              needs to know this one is done before they reach for it. */}
+          {closed && <GenericPill>🔒 Closed</GenericPill>}
+        </div>
       </div>
 
       <p className="mt-1 line-clamp-2 text-sm text-[var(--text-muted)]">
@@ -140,7 +191,7 @@ export function StudentAssignmentCard({
       ) : (
         <div className="mt-4 space-y-2.5">
           {repos.map((entry) => (
-            <RepoRow key={entry.repo.id} entry={entry} />
+            <RepoRow key={entry.repo.id} entry={entry} closed={closed} />
           ))}
         </div>
       )}

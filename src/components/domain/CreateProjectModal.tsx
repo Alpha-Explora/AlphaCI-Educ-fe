@@ -29,7 +29,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   useCreateProject,
-  useLabSessionLimits,
   validateGroup,
   repoNamePreview,
   GROUP_MIN,
@@ -392,11 +391,6 @@ export function CreateProjectModal({
   // A number, not a string: the picker can only yield values from
   // COVERAGE_OPTIONS, so there is no half-typed intermediate state to hold.
   const [coverage, setCoverage] = useState(DEFAULT_COVERAGE);
-  // Lab session length. Empty string = "use the server default", which is a
-  // real choice and not the same as typing the default in: a project that never
-  // expressed an opinion follows the policy if the operator later changes it.
-  const limits = useLabSessionLimits();
-  const [sessionHours, setSessionHours] = useState("");
 
   // Starter project. Only meaningful for SINGLE — a SPLIT project scaffolds two
   // repositories with different languages, and "one template across both" is a
@@ -657,13 +651,6 @@ export function CreateProjectModal({
       // Coverage is absent from this list on purpose — it is a picker over
       // COVERAGE_OPTIONS, so it has no invalid state to report. The 0..100 rule
       // still lives in validateCreateProject as the authority on the wire.
-      if (sessionHours.trim() !== "") {
-        const hrs = Number(sessionHours);
-        if (!Number.isInteger(hrs) || hrs < limits.minSessionHours || hrs > limits.maxSessionHours)
-          errors.push(
-            `Lab session length must be a whole number between ${limits.minSessionHours} and ${limits.maxSessionHours} hours.`,
-          );
-      }
     }
     return errors;
   }, [
@@ -673,9 +660,6 @@ export function CreateProjectModal({
     type,
     soloSelected,
     groups,
-    sessionHours,
-    limits.minSessionHours,
-    limits.maxSessionHours,
   ]);
 
   function toggleSolo(id: string) {
@@ -724,8 +708,6 @@ export function CreateProjectModal({
       points: Number(points),
       coverageThreshold: coverage,
       branchStrategy,
-      // Omitted entirely when left blank — see the sessionHours state comment.
-      ...(sessionHours.trim() !== "" && { labSessionHours: Number(sessionHours) }),
       ...scaffold,
     };
     if (type === "SOLO") {
@@ -1232,43 +1214,19 @@ export function CreateProjectModal({
                   onChange={setCoverage}
                 />
 
-                {/* Lab session length.
-                    Sits with the repository settings because it governs how
-                    long a student may keep pushing to these repositories from
-                    a lab PC. */}
-                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <Field
-                    label="Lab session length (hours)"
-                    hint={`Leave blank for the default (${limits.defaultSessionHours}h). Maximum ${limits.maxSessionHours}h, set by your IT administrator.`}
-                  >
-                    {({ id }) => (
-                      <Input
-                        id={id}
-                        type="number"
-                        min={limits.minSessionHours}
-                        max={limits.maxSessionHours}
-                        step={1}
-                        value={sessionHours}
-                        onChange={(e) => setSessionHours(e.target.value)}
-                        placeholder={`${limits.defaultSessionHours} (default)`}
-                        className="sm:max-w-[12rem]"
-                      />
-                    )}
-                  </Field>
-                  {/* The single most misunderstood thing about this feature.
-                      GitHub fixes its token at 60 minutes and offers no way to
-                      change it; the extension simply replaces the token as it
-                      goes. Saying so here stops teachers from setting a long
-                      window believing it lengthens the token, and from setting
-                      a short one believing an hour is all students get. */}
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    How long a student can keep working on a lab PC before they
-                    have to press Start again. Their GitHub access is renewed
-                    automatically every {limits.tokenLifetimeMinutes} minutes
-                    behind the scenes — that interval is fixed by GitHub and is
-                    not what this sets.
-                  </p>
-                </div>
+                {/* The "Lab session length (hours)" field was here.
+
+                    Removed: WHEN a student may work on a project is the CLASS's
+                    meeting schedule now, set once on the class Settings tab and
+                    applied to every project in it. A per-project window was a
+                    second, independent answer to the same question, so a project
+                    could be workable outside its own class's hours — with nothing
+                    on screen saying which control had won.
+
+                    LAB_MAX_SESSION_HOURS still bounds how long a lab PC may keep
+                    re-minting GitHub tokens, but that is a credential lifetime an
+                    IT administrator owns, not a teaching decision, so it is no
+                    longer offered here. */}
 
                 {/* Repo name preview */}
                 <div>
