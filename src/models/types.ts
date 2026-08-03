@@ -1235,11 +1235,10 @@ export interface CreateProjectInput {
    * never constrains `coverageThreshold`.
    */
   template?: string;
-  /**
-   * How long a student's lab session may last, in hours. Omitted = server
-   * default. NOT the GitHub token lifetime, which is fixed at 60 minutes.
-   */
-  labSessionHours?: number;
+  // `labSessionHours` was here. Availability is the CLASS's meeting schedule
+  // now (ClassSchedule, set on the class Settings tab) — one answer to "when may
+  // a student work on this" instead of two that could disagree. The server no
+  // longer accepts the field.
 }
 
 // Response of the create-assignment endpoint (DB records; repos are placeholder

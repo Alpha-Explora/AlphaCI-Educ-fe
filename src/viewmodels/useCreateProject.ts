@@ -227,14 +227,6 @@ export function validateCreateProject(input: CreateProjectInput): string[] {
       errors.push("Minimum test coverage must be a whole number between 0 and 100.");
   }
 
-  // Lab session length — a whole number of hours. The server clamps to its own
-  // ceiling, so this only catches nonsense (0, 7.5, 500) before a round trip.
-  const hours = input.labSessionHours;
-  if (hours !== undefined) {
-    if (!Number.isInteger(hours) || hours < 1 || hours > 24)
-      errors.push("Lab session length must be a whole number of hours between 1 and 24.");
-  }
-
   // ADDENDUM G — SPLIT requires both backend and frontend stacks.
   if (input.repoStructure === "SPLIT") {
     if (!input.backendStack) errors.push("Choose a backend language.");
