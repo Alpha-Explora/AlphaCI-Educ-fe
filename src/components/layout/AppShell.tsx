@@ -166,16 +166,18 @@ export function AppShell({
             </span>
           </Link>
 
-          <span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] lg:inline">
-            {ROLE_LABEL[role]} workspace
-          </span>
+          {/* No "{Role} workspace" chip here any more, and no 🔬 beside the lab.
+              Both were permanent furniture that told you something you already
+              knew: the nav, the page titles and the identity block on the right
+              all say which side of the product you are on, and the chip repeated
+              it on every screen while pushing the lab switcher — the one control
+              in this header that actually changes state — further from the brand.
+              The role label survives where it is load-bearing: the home link's
+              accessible name, and `Role · email` on the right. */}
 
           {/* ADDENDUM K — active laboratory + switcher (staff only). */}
           {isStaff && labs.length > 0 && (
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span aria-hidden="true" className="text-base">
-                🔬
-              </span>
+            <div className="flex min-w-0 items-center">
               {labs.length > 1 ? (
                 <>
                   <label htmlFor="lab-switch" className="sr-only">
@@ -318,19 +320,13 @@ export function AppShell({
             })}
           </nav>
 
-          {/* Foot of the rail: the wordmark, revealed with the labels. It is the
-              one thing the collapsed state can afford to lose — the header
-              already carries the brand. */}
-          <div className="flex h-12 shrink-0 items-center gap-2.5 border-t border-[var(--border-subtle)] px-3">
+          {/* Foot of the rail: the mark alone. It used to be followed by
+              "{Role} workspace", the same chip that sat in the header — removing
+              it there and leaving it here would just mean the label reappeared
+              on hover. The mark stays because the collapsed rail is 56px of
+              otherwise empty column and it closes the shape. */}
+          <div className="flex h-12 shrink-0 items-center border-t border-[var(--border-subtle)] px-3">
             <BrandMark size={20} />
-            <span
-              className={cn(
-                "truncate whitespace-nowrap text-xs font-medium text-[var(--text-muted)]",
-                revealWithRail,
-              )}
-            >
-              {ROLE_LABEL[role]} workspace
-            </span>
           </div>
         </aside>
 

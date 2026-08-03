@@ -152,10 +152,32 @@ export const authAside = {
     "Open your project in VS Code.",
     "Push — the checks start on their own.",
   ],
-  /** Bottom of the right column. The one thing to do when this page fails. */
+  /** Foot of the copy column. The one thing to do when this page fails. */
   helpTitle: "Can't get in?",
-  helpBody:
-    "Your teacher or the IT office can reset your password and add you to a lab.",
+  helpBody: "Your teacher or the IT office can reset your password.",
+  workspaceEyebrow: "Inside your workspace",
+  workspaceTitle: "Everything for class, together.",
+  workspaceBody:
+    "Move from the brief to your latest result without hunting through different tools.",
+  workspaceItems: [
+    {
+      icon: "school",
+      title: "Class projects",
+      body: "Open the assignments and starter work prepared by your teacher.",
+    },
+    {
+      icon: "feedback",
+      title: "Clear push feedback",
+      body: "See build, test, and style results after every push.",
+    },
+    {
+      icon: "deadline",
+      title: "Your run history",
+      body: "Return to earlier results and understand what changed.",
+    },
+  ],
+  accessTitle: "No GitHub sign-in required",
+  accessBody: "Your school account opens the workspace set up for your class.",
 } as const;
 
 /**
@@ -180,10 +202,34 @@ export const staffAuthAside = {
     "Set the work, then read the results as they land.",
   ],
   helpTitle: "No account yet?",
-  helpBody:
-    "Staff accounts are created by your IT administrator, who sends an invitation by email. Ask them to add you, then set your password from that link.",
+  // One clause. AuthHelp now prints the title and this body as a single running
+  // line, so anything longer wraps into the three-line paragraph this replaced.
+  helpBody: "Ask your IT administrator to add you — they'll email an invite.",
   /** Overrides the student footnote, which tells the reader to ask a teacher. */
   footnote: "Any address works here — it does not have to be a school one.",
+  workspaceEyebrow: "Inside your workspace",
+  workspaceTitle: "Your classes at a glance.",
+  workspaceBody:
+    "Keep class setup, student activity, and pipeline results in one teaching view.",
+  workspaceItems: [
+    {
+      icon: "school",
+      title: "Class overview",
+      body: "Open every class you teach and see who is taking part.",
+    },
+    {
+      icon: "run",
+      title: "Live pipeline runs",
+      body: "Follow builds and tests as student pushes arrive.",
+    },
+    {
+      icon: "feedback",
+      title: "Review and feedback",
+      body: "Read results, inspect submissions, and mark the work.",
+    },
+  ],
+  accessTitle: "Staff access stays separate",
+  accessBody: "Use the account your IT administrator invited you with.",
 } as const;
 
 /**

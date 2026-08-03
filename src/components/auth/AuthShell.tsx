@@ -25,23 +25,28 @@
 // now the same object, and the copy around it can be quiet because it no
 // longer has to compete for the middle.
 //
-// A three-column grid on xl, the middle column alone below it:
+// `minmax(0, 1fr) auto minmax(0, 1fr)` on xl, the pass alone below it:
 //
-//   left    the promise, and the first three minutes after the button
+//   left    the promise, the first three minutes, then the pipeline readout
 //   centre  the pass. TOP-anchored, because it hangs from a hook and a hook
 //           floating in the vertical centre of a page is not a hook
-//   right   the run — stages, marks, verdict — then where to get help
+//   right   a preview of the workspace, then the one useful recovery note
 //
-// The outer columns are aria-hidden and come AFTER the form in the DOM, so
+// The copy column is aria-hidden and comes AFTER the form in the DOM, so
 // keyboard and screen-reader users reach the fields first with no skip link.
-// They are withheld below xl rather than squeezed: at that width the choice
-// is a readable pass or three cramped columns, and the pass wins.
+// It is withheld below xl rather than squeezed: at that width the choice is a
+// readable pass or two cramped columns, and the pass wins.
 // ============================================================================
 import Link from "next/link";
 import { Brand } from "@/components/layout/Brand";
 import { cn } from "@/components/ui/cn";
 import { AuthScene } from "./AuthScene";
-import { AuthPromise, AuthHelp, type AuthAsideCopy } from "./AuthAside";
+import {
+  AuthPromise,
+  AuthHelp,
+  AuthWorkspacePreview,
+  type AuthAsideCopy,
+} from "./AuthAside";
 import { LanyardBadge } from "./LanyardBadge";
 import { RunReadout } from "./RunReadout";
 import { brand, badgeCopy, authAside, staffAuthAside } from "@/config/brand";
@@ -66,7 +71,7 @@ export function AuthShell({
   children,
   footer,
   aside = "student",
-}: {
+}: Readonly<{
   /**
    * Small label above the welcome heading, e.g. "Password help". OPTIONAL,
    * and worth omitting: on the main sign-in page it repeated the wordmark
@@ -86,7 +91,7 @@ export function AuthShell({
    * larger audience, and the right answer for the pages that serve both.
    */
   aside?: "student" | "staff";
-}) {
+}>) {
   const asideCopy = ASIDE_COPY[aside];
 
   return (
@@ -104,18 +109,16 @@ export function AuthShell({
 
       <main
         id="main-content"
-        // The asides are justified to their outer edges, so on a big monitor
-        // the two columns sit AT the sides of the screen rather than huddling
-        // against the pass with a dead margin outside them. `1fr auto 1fr`
-        // keeps the pass optically centred however far apart they end up.
-        // The cap is wide but not absent: without one, an ultrawide would
-        // strand the columns a metre from the thing they describe.
-        className="relative mx-auto grid min-h-dvh w-full max-w-[112rem] items-center gap-10 px-5 pb-16 pt-24 sm:px-10 xl:grid-cols-[1fr_auto_1fr] xl:gap-12 xl:pt-16"
+        // Equal outer tracks keep the pass centred while giving wide monitors
+        // useful content on both sides. The side content remains capped so it
+        // stays readable instead of stretching to fill every last pixel.
+        // `xl:pb-8`, down from pb-12: on a 768px-tall lab monitor the pass alone
+        // reaches within 40px of the fold, and the old 48px of bottom padding
+        // was enough on its own to push the page into a scroll it did not need.
+        className="relative mx-auto grid min-h-dvh w-full max-w-[100rem] items-center gap-10 px-5 pb-16 pt-24 sm:px-10 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-start xl:gap-x-10 xl:px-12 xl:pb-8 xl:pt-12 2xl:gap-x-16"
       >
         {/* ------------------------------------------------------------- */}
         {/* The pass. FIRST in the DOM — it holds the form.               */}
-        {/* `self-start` keeps it hanging from the top of the grid while   */}
-        {/* the aside columns stay optically centred on it.                */}
         {/* ------------------------------------------------------------- */}
         <div className="order-1 flex justify-center xl:order-2 xl:self-start">
           <LanyardBadge
@@ -155,37 +158,56 @@ export function AuthShell({
           </LanyardBadge>
         </div>
 
-        {/* Each aside hugs its own outer edge — the left column starts at the
-            left of the page, the right column ends at the right of it — and on
-            a tall enough screen both start at the CARD'S TOP EDGE rather than
-            floating in the vertical middle.
+        {/* THE SIDE COLUMNS SHARE ONE TOP OFFSET. Both carry the same `mt`, so
+            they start on the same line as each other — a shelf the pass hangs
+            past, rather than two columns that each found their own height.
 
-            The offset is the hook (h-2.5) plus the strap: exactly how far
-            below the column top the card face begins. Written from the same
-            --strap-h the strap itself uses, so a viewport that shortens the
-            lanyard moves all three in step instead of leaving the columns at
-            a height nothing else agrees with.
+            The number is a compromise between the two things that were wrong
+            before. Flush with the card face, the copy sat lower than it needed
+            to; at the grid's top with no offset at all it floated a full
+            strap-length above the card and read as unattached to it. This lands
+            between: high enough to lead the eye down to the form, low enough
+            that the three objects still belong to one row.
 
-            WHY THE HEIGHT GATE. Top-aligned, the right column needs about
-            810px of viewport (151 top + 594 tall + the page's bottom padding).
-            Below that it ran 41px past the fold on the 768px lab monitor this
-            product is built for — a login page that scrolls is a worse
-            outcome than one whose columns are centred. Under 860px they fall
-            back to the grid's `items-center`, which is what they did before
-            and which fits. */}
+            Deliberately NOT --strap-h: that variable shortens the lanyard on a
+            squat viewport, and the columns following it would then rise on
+            exactly the screens with the least room to spare.
+
+            AND IT IS HEIGHT-GATED, for that same reason stated positively. The
+            xl breakpoint is 1280px WIDE, which a 1366x768 lab monitor clears —
+            so these columns are on screen at 768px of height, where the taller
+            of the two already ends within ~20px of the fold. Pushing it down
+            another 48px there buys a nicer top edge and pays for it with a
+            scrollbar on a login page. Above 820px there is room, so the offset
+            applies; below it the columns stay high and fit. */}
         <aside
           aria-hidden="true"
-          className="order-2 hidden xl:order-1 xl:block xl:justify-self-start xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
+          className="order-2 hidden xl:order-1 xl:mt-2 xl:block xl:justify-self-start xl:[@media(min-height:820px)]:mt-12 2xl:[@media(min-height:820px)]:mt-14"
         >
           <AuthPromise copy={asideCopy} />
+          <RunReadout className="mt-9" />
         </aside>
 
         <aside
           aria-hidden="true"
-          className="order-3 hidden xl:block xl:justify-self-end xl:[@media(min-height:860px)]:mt-[calc(var(--strap-h)_+_0.625rem)] xl:[@media(min-height:860px)]:self-start"
+          className="order-3 hidden xl:mt-2 xl:block xl:[@media(min-height:820px)]:mt-12 2xl:[@media(min-height:820px)]:mt-14"
         >
-          <RunReadout />
-          <AuthHelp copy={asideCopy} />
+          {/* `ml-auto` is what holds this off the card, and it is doing the job
+              `justify-self-end` on the <aside> could not: the aside used to
+              carry `w-full`, which makes it fill the whole track, and a grid
+              item that already spans its track has nothing left to justify. The
+              25rem panel inside it therefore sat at the track's LEFT edge —
+              hard against the pass, with all the slack stranded out to the
+              right. Pushing the inner box instead puts the empty space back
+              between the two, where it reads as the gap it is.
+
+              One wrapper for BOTH children, not a flex row on the aside: the
+              preview and the help note stack, and making the aside a flex
+              container would stand them side by side. */}
+          <div className="ml-auto w-full max-w-[25rem]">
+            <AuthWorkspacePreview copy={asideCopy} />
+            <AuthHelp copy={asideCopy} />
+          </div>
         </aside>
       </main>
 

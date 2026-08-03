@@ -75,11 +75,12 @@ export default function StaffSignInPage() {
             simply not set up yet, and the student page's talk of school email
             addresses suggested the former. It is the latter, always.
           */}
-          <p>
-            No account yet? Staff accounts are created by your IT administrator.
-            Once they add you, check your email for the invitation and set your
-            password from that link.
-          </p>
+          {/* Three sentences cut to one. The full version walked through the
+              whole invitation flow — add, email, link, set password — which is
+              a procedure, and a procedure belongs in the email that carries it,
+              not in the footnote of a form. What a locked-out teacher needs
+              here is only WHO to ask; the rest arrives when they do. */}
+          <p>No account yet? Your IT administrator sets one up and emails you an invite.</p>
           <p>
             Student?{" "}
             <Link

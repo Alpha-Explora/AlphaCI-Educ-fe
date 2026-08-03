@@ -218,7 +218,14 @@ export default function LandingPage() {
         {/* left-to-right thing and cramming it into a column would fight    */}
         {/* the one property that makes the diagram legible.                 */}
         {/* ---------------------------------------------------------------- */}
-        <section className="border-t border-[var(--border-subtle)] pt-10 xl:pt-12">
+        {/* No rule above the rail any more. It drew a hard horizontal across a
+            page whose whole conceit is a sheet of ruled paper — a second, darker
+            line cutting the sheet in half, competing with the rules already
+            printed on it. The band is separated by space instead, which is what
+            the paper metaphor was always going to prefer. The rule between the
+            rail and the checks row below survives: those two are adjacent
+            content that genuinely needs dividing, not a section boundary. */}
+        <section className="pt-10 xl:pt-12">
           <PipelineRail delay={0.35} />
           <div className="mt-10 border-t border-[var(--border-subtle)] pt-8 xl:mt-12">
             <ChecksRow delay={0.85} />
