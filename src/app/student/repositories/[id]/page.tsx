@@ -121,8 +121,12 @@ export default function StudentWorkspacePage() {
         {d && (
           <>
             <PageHeader
-              backHref="/student"
-              backLabel="Assignment Hub"
+              // Back to the CLASS this project belongs to, not past it to the
+              // course list. There is a level between them now (Courses -> class
+              // -> workspace), and a back link that skips one leaves a student
+              // re-finding their class every time they close a project.
+              backHref={`/student/classes/${d.assignment.classId}`}
+              backLabel="Back to class"
               title={d.assignment.title}
               subtitle={<span className="font-mono text-xs">{d.repo.repoName}</span>}
               meta={
