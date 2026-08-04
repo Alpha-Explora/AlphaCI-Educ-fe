@@ -1,6 +1,6 @@
 // MODEL LAYER — API surface barrel.
 // ViewModels import from here; Views never import these directly.
-export { ApiError, API_BASE_URL, getToken, setToken } from "./client";
+export { ApiError, API_BASE_URL, getToken, setToken, saveBlob } from "./client";
 export { authApi } from "./auth";
 export { organizationsApi } from "./organizations";
 export { platformApi } from "./platform";

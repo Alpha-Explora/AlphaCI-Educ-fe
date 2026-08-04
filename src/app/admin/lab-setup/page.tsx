@@ -148,6 +148,17 @@ function LabExtensionCard({ vm }: { readonly vm: LabPcSetupVM }) {
         </Banner>
       )}
 
+      {vm.downloadError && (
+        <Banner
+          tone={vm.downloadError.isNetworkError ? "network" : "error"}
+          className="mt-3"
+        >
+          {vm.downloadError.isNetworkError
+            ? "Couldn't reach the backend to download."
+            : vm.downloadError.message}
+        </Banner>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {/* A hidden input driven by a real Button, so the control matches every
             other action on this page instead of a bare browser file picker. */}
@@ -168,10 +179,11 @@ function LabExtensionCard({ vm }: { readonly vm: LabPcSetupVM }) {
           <span aria-hidden="true">⬆</span>{" "}
           {extension.fleetVersion ? "Publish a new version" : "Publish the extension"}
         </Button>
-        {vm.extensionDownloadUrl && (
+        {vm.canDownloadExtension && (
           <Button
             variant="secondary"
-            onClick={() => window.location.assign(vm.extensionDownloadUrl as string)}
+            onClick={vm.downloadExtension}
+            loading={vm.isDownloading}
           >
             <span aria-hidden="true">⬇</span> Download v{extension.fleetVersion}
           </Button>
@@ -350,16 +362,24 @@ export default function AdminLabSetupPage() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {vm.scriptUrl && (
-                    // Navigation rather than fetch: the response carries
-                    // Content-Disposition: attachment, so the browser shows a
-                    // real Save dialog and stays on this page — and the session
-                    // cookie rides along to satisfy the ADMIN check.
-                    <Button onClick={() => window.location.assign(vm.scriptUrl as string)}>
-                      <span aria-hidden="true">⬇</span> Download install-lab-pc.ps1
-                    </Button>
-                  )}
+                  {/* FETCHED, not navigated to. `window.location.assign` cannot
+                      carry the bearer token this client authenticates with, so it
+                      401s whenever the frontend and backend are different sites —
+                      fine on localhost, broken on Vercel -> Render. */}
+                  <Button onClick={vm.downloadScript} loading={vm.isDownloading}>
+                    <span aria-hidden="true">⬇</span> Download install-lab-pc.ps1
+                  </Button>
                 </div>
+                {vm.downloadError && (
+                  <Banner
+                    tone={vm.downloadError.isNetworkError ? "network" : "error"}
+                    className="mt-3"
+                  >
+                    {vm.downloadError.isNetworkError
+                      ? "Couldn't reach the backend to download."
+                      : vm.downloadError.message}
+                  </Banner>
+                )}
                 {/* The "Open extension in VS Code" button that used to sit here
                     pointed at vscode:extension/<id>, a URI that only resolves for
                     extensions published to the VS Code Marketplace. This one is
