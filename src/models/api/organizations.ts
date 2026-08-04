@@ -1,5 +1,5 @@
 // MODEL LAYER — Organizations / Admin resource
-import { apiRequest, apiUpload, API_BASE_URL } from "./client";
+import { apiDownload, apiRequest, apiUpload } from "./client";
 import type {
   AddStaffRequest,
   AddTeacherRequest,
@@ -133,14 +133,16 @@ export const organizationsApi = {
   },
 
   /**
-   * URL of the install script with this deployment's backend URL baked in.
+   * The install script, with this deployment's backend URL already in it.
    *
-   * A plain link rather than a fetch: the response is an attachment, so letting
-   * the browser navigate gives a real Save dialog. Session cookies ride along
-   * on a same-site navigation, so the ADMIN check still applies.
+   * FETCHED, NOT NAVIGATED TO. This used to return a URL for
+   * `window.location.assign`, which 401s whenever the frontend and backend are
+   * different sites: this client authenticates with a bearer token, and a
+   * navigation can only carry cookies. It worked locally because :3000 and :4000
+   * are the same site for cookies, and failed on Vercel -> Render. See apiDownload.
    */
-  labSetupScriptUrl(id: string, workDirPolicy: "ephemeral" | "persistent") {
-    return `${API_BASE_URL}/organizations/${id}/lab-setup/script?workDirPolicy=${workDirPolicy}`;
+  downloadLabSetupScript(id: string, workDirPolicy: "ephemeral" | "persistent") {
+    return apiDownload(`/organizations/${id}/lab-setup/script`, { workDirPolicy });
   },
 
   /**
@@ -160,13 +162,14 @@ export const organizationsApi = {
   },
 
   /**
-   * URL of the published .vsix.
+   * The published .vsix.
    *
-   * Same navigation trick as the install script: the response is an attachment and
-   * the admin's session cookie rides along, which is what authorises it — a
-   * navigation cannot send the lab-extension token header.
+   * Fetched for the same reason as the script above. This one had a second failure
+   * waiting: the route also accepts a lab-extension token, and once
+   * LAB_EXTENSION_TOKEN is set on the server, an anonymous navigation would be
+   * refused outright. It only appeared to work because that token is unset.
    */
-  labExtensionDownloadUrl() {
-    return `${API_BASE_URL}/lab-extension/vsix`;
+  downloadLabExtension() {
+    return apiDownload("/lab-extension/vsix");
   },
 };

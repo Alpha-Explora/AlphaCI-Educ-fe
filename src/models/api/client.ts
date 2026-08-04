@@ -158,6 +158,83 @@ export async function apiRequest<T>(
 }
 
 /**
+ * GET a file as a Blob, authenticated, and hand it back for saving.
+ *
+ * WHY NOT JUST NAVIGATE TO THE URL. That was the previous approach —
+ * `window.location.assign(url)` — and it 401s on any deployment where the frontend
+ * and backend are different sites. This client authenticates with a BEARER TOKEN
+ * from localStorage, and a browser navigation cannot carry an Authorization header;
+ * it can only carry cookies. Locally that went unnoticed because localhost:3000 and
+ * localhost:4000 are the same site for cookie purposes, so the session cookie rode
+ * along and the download worked. On Vercel -> Render it is cross-site, the cookie
+ * does not come, and the server sees an anonymous request.
+ *
+ * Fetching lets the same auth header used by every other call apply here too, at
+ * the cost of buffering the file in memory — fine for a script and a ~26 KB .vsix.
+ *
+ * `filename` is passed in rather than read from Content-Disposition: that header is
+ * not CORS-safelisted, so a cross-origin response hides it unless the server adds
+ * Access-Control-Expose-Headers. The caller already knows what it asked for.
+ */
+export async function apiDownload(
+  path: string,
+  query?: RequestOptions["query"],
+): Promise<Blob> {
+  const url = buildUrl(path, query);
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers,
+      cache: "no-store",
+      // Kept alongside the bearer token: a same-site deployment authenticates by
+      // cookie, and this costs nothing when there isn't one.
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError(
+      `Backend not reachable at ${API_BASE_URL}`,
+      "network",
+      null,
+      API_BASE_URL,
+    );
+  }
+
+  if (!res.ok) {
+    let message = `Download failed (${res.status})`;
+    try {
+      const data = await res.json();
+      if (data && typeof data.message === "string") message = data.message;
+    } catch {
+      /* not JSON — keep the status-based message */
+    }
+    throw new ApiError(message, "http", res.status, API_BASE_URL);
+  }
+
+  return res.blob();
+}
+
+/**
+ * Save a Blob to disk under a chosen name.
+ *
+ * The object URL is revoked on the next tick rather than immediately: Firefox
+ * cancels an in-flight download if its source URL is revoked synchronously.
+ */
+export function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/**
  * POST raw bytes — for uploading a file whose contents must arrive untouched.
  *
  * Separate from `apiRequest` because that function JSON-stringifies its body,

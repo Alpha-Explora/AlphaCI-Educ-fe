@@ -16,7 +16,7 @@
 // ============================================================================
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { organizationsApi } from "@/models/api";
+import { organizationsApi, saveBlob } from "@/models/api";
 import type { LabSetupInfo } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
 
@@ -46,14 +46,26 @@ export interface LabPcSetupVM {
   publishError: PresentableError | null;
   /** Version accepted by the last successful upload, for immediate confirmation. */
   publishedVersion: string | null;
-  /** Download URL for the currently published .vsix, or null when none exists. */
-  extensionDownloadUrl: string | null;
+
+  /**
+   * Save the install script / the published .vsix.
+   *
+   * Both FETCH and then save a Blob rather than navigating to a URL. A navigation
+   * cannot carry the bearer token this client authenticates with, so it 401s on any
+   * deployment where the frontend and backend are different sites — which is what
+   * happened on Vercel -> Render while working fine on localhost.
+   */
+  downloadScript: () => void;
+  downloadExtension: () => void;
+  isDownloading: boolean;
+  downloadError: PresentableError | null;
+  /** False until something is published — nothing to download before that. */
+  canDownloadExtension: boolean;
   /** Checks that still need action, most useful first. */
   blocking: LabSetupInfo["checks"];
   ready: boolean;
   policy: WorkDirPolicy;
   setPolicy: (p: WorkDirPolicy) => void;
-  scriptUrl: string | null;
   /** The per-PC rollout, in order, for the chosen policy. */
   steps: RolloutStep[];
   refetch: () => void;
@@ -168,6 +180,24 @@ export function useLabPcSetup(orgId: string | null): LabPcSetupVM {
     },
   });
 
+  // One mutation for both files: they fail the same way and only one can be in
+  // flight at a time, so a shared error banner tells the whole story.
+  const download = useMutation({
+    mutationFn: async (what: "script" | "extension") => {
+      if (what === "script") {
+        const blob = await organizationsApi.downloadLabSetupScript(
+          orgId as string,
+          policy,
+        );
+        saveBlob(blob, "install-lab-pc.ps1");
+        return;
+      }
+      const blob = await organizationsApi.downloadLabExtension();
+      // Named after the version so a technician can tell builds apart on disk.
+      saveBlob(blob, `educ-lab-${info?.extension.fleetVersion ?? "latest"}.vsix`);
+    },
+  });
+
   return {
     isLoading: query.isLoading,
     error: query.error ? toPresentableError(query.error) : null,
@@ -176,7 +206,6 @@ export function useLabPcSetup(orgId: string | null): LabPcSetupVM {
     ready: info?.ready ?? false,
     policy,
     setPolicy,
-    scriptUrl: orgId ? organizationsApi.labSetupScriptUrl(orgId, policy) : null,
     steps: buildSteps(info, policy),
     refetch: () => void query.refetch(),
 
@@ -186,10 +215,17 @@ export function useLabPcSetup(orgId: string | null): LabPcSetupVM {
     isPublishing: publish.isPending,
     publishError: publish.error ? toPresentableError(publish.error) : null,
     publishedVersion: publish.data?.version ?? null,
-    // Null until something is published: offering a download of nothing would
+
+    downloadScript: () => {
+      if (orgId && !download.isPending) download.mutate("script");
+    },
+    downloadExtension: () => {
+      if (!download.isPending) download.mutate("extension");
+    },
+    isDownloading: download.isPending,
+    downloadError: download.error ? toPresentableError(download.error) : null,
+    // False until something is published: offering a download of nothing would
     // produce a 404 the admin has to interpret.
-    extensionDownloadUrl: info?.extension.fleetVersion
-      ? organizationsApi.labExtensionDownloadUrl()
-      : null,
+    canDownloadExtension: Boolean(info?.extension.fleetVersion),
   };
 }
