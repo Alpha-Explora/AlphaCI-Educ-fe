@@ -4,7 +4,6 @@ import type {
   AssignmentRepository,
   GithubRepoActivity,
   GithubRunJobs,
-  LabToken,
   MergeResult,
   PipelineRun,
   PipelineRunDetail,
@@ -33,11 +32,12 @@ export const repositoriesApi = {
     });
   },
 
-  labToken(id: string) {
-    return apiRequest<LabToken>(`/repositories/${id}/lab-token`, {
-      method: "POST",
-    });
-  },
+  // NOTE: `POST /repositories/:id/lab-token` is deliberately NOT bound here.
+  // It mints a raw `ghs_` push credential, and the UI that displayed one — the
+  // student-facing "Lab access token" card — is gone; the VS Code handoff does
+  // the same job without the token ever reaching a screen or a clipboard. The
+  // route remains server-side as an operator escape hatch (curl, see the backend
+  // README). Re-binding it would put that credential back in a browser.
 
   // ADDENDUM B — provision a single repo record on GitHub (gated/simulated).
   provision(id: string) {

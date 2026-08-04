@@ -15,7 +15,7 @@
 // dead PC.
 // ============================================================================
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { organizationsApi } from "@/models/api";
 import type { LabSetupInfo } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
@@ -33,6 +33,21 @@ export interface LabPcSetupVM {
   isLoading: boolean;
   error: PresentableError | null;
   info: LabSetupInfo | null;
+  /**
+   * Publish a .vsix as the fleet's version.
+   *
+   * The button an admin presses cannot reach a lab PC — nothing in a browser can —
+   * so this sets DESIRED STATE and each PC's logon task converges on it. The naming
+   * says "publish" rather than "update" for that reason: calling it an update would
+   * promise something the web can't deliver.
+   */
+  publishExtension: (file: File) => void;
+  isPublishing: boolean;
+  publishError: PresentableError | null;
+  /** Version accepted by the last successful upload, for immediate confirmation. */
+  publishedVersion: string | null;
+  /** Download URL for the currently published .vsix, or null when none exists. */
+  extensionDownloadUrl: string | null;
   /** Checks that still need action, most useful first. */
   blocking: LabSetupInfo["checks"];
   ready: boolean;
@@ -103,10 +118,22 @@ function buildSteps(info: LabSetupInfo | null, policy: WorkDirPolicy): RolloutSt
       title: "5 · Verify on one PC before rolling out",
       body:
         "Sign in as a student, open an assignment, and press “Start assignment in VS Code”. " +
-        "VS Code should open on the repository with a countdown in the status bar, and " +
-        "git push should succeed with no prompt. Confirm no secret is left behind: " +
-        ".git/config should contain a credential helper path and no ghs_ token.",
+        "VS Code should open on the repository showing “✓ AlphaCI” in the status bar — a " +
+        "state, not a countdown; there is no session time limit any more. git push should " +
+        "succeed with no prompt. Confirm no secret is left behind: .git/config should " +
+        "contain a credential helper path and no ghs_ token.",
       command: 'Select-String -Path .git\\config -Pattern "ghs_"   # expect: no matches',
+    },
+    {
+      title: "6 · Confirm the PC can update itself",
+      body:
+        "install-lab-pc.ps1 also registers “AlphaCI Extension Update (logon)”, which reads " +
+        "the version published above and installs it only when it is newer. Once this task " +
+        "exists you never touch the PC again for an extension change — you upload a .vsix " +
+        "here and the lab converges at next logon. If registration failed, the script was " +
+        "not run elevated.",
+      command:
+        "Get-ScheduledTask -TaskName 'AlphaCI Extension Update (logon)'   # expect: Ready",
     },
   ];
 }
@@ -130,6 +157,17 @@ export function useLabPcSetup(orgId: string | null): LabPcSetupVM {
 
   const info = query.data ?? null;
 
+  const publish = useMutation({
+    mutationFn: (file: File) => organizationsApi.publishLabExtension(file),
+    onSuccess: () => {
+      // The checklist carries the published version and its own "is anything
+      // published?" check, so both are stale the moment this succeeds. Refetching
+      // rather than patching keeps the server as the single source of truth for
+      // what the fleet should run — the whole point of the feature.
+      void query.refetch();
+    },
+  });
+
   return {
     isLoading: query.isLoading,
     error: query.error ? toPresentableError(query.error) : null,
@@ -141,5 +179,17 @@ export function useLabPcSetup(orgId: string | null): LabPcSetupVM {
     scriptUrl: orgId ? organizationsApi.labSetupScriptUrl(orgId, policy) : null,
     steps: buildSteps(info, policy),
     refetch: () => void query.refetch(),
+
+    publishExtension: (file: File) => {
+      if (!publish.isPending) publish.mutate(file);
+    },
+    isPublishing: publish.isPending,
+    publishError: publish.error ? toPresentableError(publish.error) : null,
+    publishedVersion: publish.data?.version ?? null,
+    // Null until something is published: offering a download of nothing would
+    // produce a 404 the admin has to interpret.
+    extensionDownloadUrl: info?.extension.fleetVersion
+      ? organizationsApi.labExtensionDownloadUrl()
+      : null,
   };
 }

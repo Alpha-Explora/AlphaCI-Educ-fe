@@ -301,12 +301,17 @@ export function repoNamePreview(
 }
 
 /**
- * The bounds a teacher may choose a lab-session length within.
+ * Lab-session policy, for a UI that needs to describe it.
  *
- * Fetched rather than hard-coded because the ceiling is an operator policy
- * (`LAB_MAX_SESSION_HOURS`) that differs per deployment — offering 12 hours in
- * a wizard on a server that clamps to 4 would be a promise the UI cannot keep.
- * Falls back to safe values so the field still works if the call fails.
+ * The session-length bounds this used to fetch are gone: there is no window to
+ * choose a length within. A session lasts as long as the project is open and the
+ * class is inside its teacher-set meeting hours, so the only remaining knobs are
+ * whether the handoff is on and GitHub's fixed 60-minute token lifetime.
+ *
+ * Nothing consumes this today — the wizard's session-length field went with the
+ * window. Kept because `GET /session/limits` is the one place that answers "what
+ * governs a lab session on this deployment", and a future settings screen will
+ * want it rather than re-deriving the rule.
  */
 export function useLabSessionLimits(): LabSessionLimits {
   const query = useQuery({
@@ -317,16 +322,13 @@ export function useLabSessionLimits(): LabSessionLimits {
   });
 
   return (
-    // Mirrors the server's own defaults in config/lab-session.config.ts
-    // (LAB_MAX_SESSION_HOURS, 3). Being wrong here is not cosmetic: the number
-    // is printed as "Maximum Nh, set by your IT administrator", so a stale
-    // fallback offers a ceiling the server would then clamp.
+    // Mirrors the server's own defaults in config/lab-session.config.ts. The
+    // pessimistic `handoffEnabled: false` is deliberate: claiming the feature is
+    // on when the call failed would invite a student to press a button that 503s.
     query.data ?? {
-      defaultSessionHours: 3,
-      maxSessionHours: 3,
-      minSessionHours: 1,
       tokenLifetimeMinutes: 60,
       handoffEnabled: false,
+      sessionEndsWith: "project-open-and-class-hours",
     }
   );
 }

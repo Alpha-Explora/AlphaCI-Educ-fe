@@ -156,3 +156,57 @@ export async function apiRequest<T>(
   if (!text) return undefined as T;
   return JSON.parse(text) as T;
 }
+
+/**
+ * POST raw bytes — for uploading a file whose contents must arrive untouched.
+ *
+ * Separate from `apiRequest` because that function JSON-stringifies its body,
+ * which would corrupt a binary. Deliberately NOT multipart: the server reads the
+ * raw body, so there is no form to encode and no parser to add on either side.
+ *
+ * Everything else mirrors `apiRequest` exactly — bearer token, `credentials:
+ * "include"` for the session cookie, and the same ApiError shapes — so callers
+ * cannot end up handling two different error vocabularies.
+ */
+export async function apiUpload<T>(path: string, file: Blob): Promise<T> {
+  const url = buildUrl(path);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/octet-stream",
+  };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: file,
+      cache: "no-store",
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError(
+      `Backend not reachable at ${API_BASE_URL}`,
+      "network",
+      null,
+      API_BASE_URL,
+    );
+  }
+
+  if (!res.ok) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const data = await res.json();
+      if (data && typeof data.message === "string") message = data.message;
+      else if (Array.isArray(data?.message)) message = data.message.join(", ");
+    } catch {
+      /* not JSON — keep the status-based message */
+    }
+    throw new ApiError(message, "http", res.status, API_BASE_URL);
+  }
+
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
+}

@@ -948,16 +948,48 @@ export interface LabsResponse {
 export interface StartSessionResponse {
   deepLink: string;
   live: boolean;
-  /** When the CURRENT GitHub token lapses (~1h). Refreshed silently — NOT the
-   *  end of the student's work, and not the thing to count down to. */
+  /**
+   * When the CURRENT GitHub token lapses (~1h).
+   *
+   * Refreshed silently and indefinitely while the project is open. NEVER render
+   * this: it is the one field here that looks like a deadline and is not.
+   */
   tokenExpiresAt: string;
-  /** Epoch ms when the session window closes. THIS is the student's deadline. */
-  sessionExpiresAt: number;
-  /** Granted window in hours, after the server clamped it. */
-  sessionHours?: number;
-  /** Server ceiling, so a clamped value can be explained rather than just shown. */
-  maxSessionHours?: number;
-  fallbackAvailable: boolean;
+  /**
+   * True when the server handed back the launch that was ALREADY in flight
+   * rather than creating a second one — the student pressed Start twice. The
+   * deep link is byte-identical to the first, so re-following it is free.
+   */
+  reused: boolean;
+}
+
+/**
+ * What is already running for this student on this repository, and what governs
+ * whether they may work at all.
+ *
+ * Read on mount so the panel is truthful BEFORE anything is pressed — previously
+ * it learned its state only from a start response, so a reload lost it and the
+ * only way to find out where you stood was to press the button that mints a
+ * credential.
+ *
+ * NO DEADLINE HERE, deliberately. Access lasts as long as the project is open and
+ * the class is inside its teacher-set hours, so the honest thing to show is the
+ * timetable (`scheduleLabel`) rather than a countdown toward it.
+ */
+export interface SessionStatus {
+  handoffEnabled: boolean;
+  /** A VS Code session is attached and renewing its token. */
+  active: boolean;
+  /** True once VS Code has collected a launch: the button reads "Reopen". */
+  launched: boolean;
+  /** Whether this student may work on this project right now. */
+  openNow: boolean;
+  /** Why not, in the server's words (names the class hours). Null while open. */
+  closedReason: string | null;
+  /** "Mon, Wed, Fri · 08:00–10:00 (Philippine time)", or null for no schedule. */
+  scheduleLabel: string | null;
+  /** ISO instant the class next opens, when it is currently shut. */
+  reopensAt: string | null;
 }
 
 // --- Lab PC setup (IT Admin) ------------------------------------------------
@@ -976,22 +1008,54 @@ export interface LabSetupInfo {
   /** The API base a lab PC must be pointed at, derived from this deployment. */
   backendUrl: string;
   extensionId: string;
-  /** vscode:extension/... — opens the extension in VS Code once published. */
-  extensionInstallUrl: string;
+  /**
+   * What version the lab fleet should be running, and whether the download is
+   * protected.
+   *
+   * REPLACED `extensionInstallUrl` (`vscode:extension/<id>`), which only resolves
+   * for extensions published to the VS Code Marketplace. This one is deliberately
+   * unpublished, so that button did nothing while looking like the install path.
+   */
+  extension: {
+    /** null until an admin uploads a .vsix. */
+    fleetVersion: string | null;
+    uploadedAt: string | null;
+    uploadedBy: string | null;
+    /** False when the server has no LAB_EXTENSION_TOKEN — anyone with the URL can download. */
+    distributionProtected: boolean;
+  };
   checks: LabSetupCheck[];
   ready: boolean;
-  session: { maxSessionHours: number; claimTtlSec: number };
+  /** `maxSessionHours` is gone with the session window — there is no duration. */
+  session: { claimTtlSec: number };
   generatedAt: string;
 }
 
-// Bounds for the lab-session length a teacher may choose (GET /session/limits).
+/**
+ * The version an admin has published for lab PCs to converge on.
+ *
+ * Returned by the upload, and mirrored in `LabSetupInfo.extension`. The admin page
+ * sets desired state; each PC's logon task reads it and installs only when newer —
+ * a browser cannot reach another machine, so "update the fleet" has to mean this.
+ */
+export interface LabExtensionManifest {
+  extensionId: string;
+  version: string;
+  /** SHA-256 of the .vsix, so a lab PC can verify what it downloaded. */
+  sha256: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
+// Lab-session policy (GET /session/limits). No durations: a session lasts as long
+// as the project is open and the class is inside its teacher-set hours.
 export interface LabSessionLimits {
-  defaultSessionHours: number;
-  maxSessionHours: number;
-  minSessionHours: number;
   /** Fixed at 60 by GitHub. Exposed so the UI never implies it is adjustable. */
   tokenLifetimeMinutes: number;
   handoffEnabled: boolean;
+  /** What actually terminates a session, named so nobody looks for a timer. */
+  sessionEndsWith: "project-open-and-class-hours";
 }
 
 // ADDENDUM M — LIVE repo activity straight from GitHub (what the student sees
@@ -1059,6 +1123,15 @@ export interface GithubRepoActivity {
 
 // ADDENDUM B — GitHub App (gated). Every GitHub op carries `live`: false while
 // GitHub runs in SIMULATED mode, true once the backend env flag is flipped.
+/**
+ * The response shape of `POST /repositories/:id/lab-token`.
+ *
+ * NOT bound in the API layer and NOT rendered anywhere: the student-facing card
+ * that displayed this token is gone, because the VS Code handoff pushes without
+ * a credential ever reaching a screen. Kept as the contract for the route, which
+ * survives as an operator escape hatch. If you find yourself importing this into
+ * a component, that is the signal to stop.
+ */
 export interface LabToken {
   token: string;
   expiresAt: string;

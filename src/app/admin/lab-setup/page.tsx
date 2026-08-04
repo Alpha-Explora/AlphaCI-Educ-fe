@@ -10,8 +10,13 @@
 // Presentation only; readiness, the rollout copy and the download URL come from
 // useLabPcSetup.
 // ============================================================================
+import { useRef } from "react";
 import { useSession } from "@/viewmodels/useSession";
-import { useLabPcSetup, type WorkDirPolicy } from "@/viewmodels/useLabPcSetup";
+import {
+  useLabPcSetup,
+  type LabPcSetupVM,
+  type WorkDirPolicy,
+} from "@/viewmodels/useLabPcSetup";
 import {
   Banner,
   Button,
@@ -69,6 +74,115 @@ function CommandBlock({ command }: { readonly command: string }) {
       </pre>
       <CopyButton value={command} label="Copy" />
     </div>
+  );
+}
+
+/**
+ * The fleet's extension version — upload once, every lab PC converges.
+ *
+ * WHAT THIS IS NOT. It is not a button that updates ten PCs when pressed. Nothing
+ * in a browser can reach another machine, and building the UI as though it could
+ * would leave IT believing a rollout had happened when it had only been requested.
+ * So the copy says "publish", tells them what converges the PCs, and shows what the
+ * server currently hands out.
+ */
+function LabExtensionCard({ vm }: { readonly vm: LabPcSetupVM }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const extension = vm.info?.extension;
+  if (!extension) return null;
+
+  return (
+    <Card className="p-5 animate-fade-up">
+      <h2 className="text-base font-semibold text-[var(--text-strong)]">
+        Lab extension version
+      </h2>
+      <p className="mt-1 text-sm text-[var(--text-muted)]">
+        Upload the packaged <code className="font-mono text-xs">.vsix</code> once. Each
+        lab PC checks this at logon and installs it only if it is newer — you do not
+        touch the machines.
+      </p>
+
+      <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto,1fr]">
+        <dt className="text-[var(--text-muted)]">Fleet should run</dt>
+        <dd className="font-mono text-[var(--text-strong)]">
+          {extension.fleetVersion ? `v${extension.fleetVersion}` : "— nothing published yet"}
+        </dd>
+        {extension.uploadedAt && (
+          <>
+            <dt className="text-[var(--text-muted)]">Published</dt>
+            <dd className="text-[var(--text-strong)]">
+              {extension.uploadedAt.slice(0, 10)}
+              {extension.uploadedBy ? ` by ${extension.uploadedBy}` : ""}
+            </dd>
+          </>
+        )}
+      </dl>
+
+      {/* Reported rather than failed: whether the artifact should be readable by
+          anyone with the URL is a deployment decision, not a fault. But it must be
+          visible, because the package carries the IT runbook. */}
+      {extension.fleetVersion && !extension.distributionProtected && (
+        <Banner tone="warning" className="mt-3">
+          Anyone who knows the URL can download this <code>.vsix</code>. Set{" "}
+          <code className="font-mono text-xs">LAB_EXTENSION_TOKEN</code> on the server
+          and pass it to <code className="font-mono text-xs">install-lab-pc.ps1</code>{" "}
+          to require it.
+        </Banner>
+      )}
+
+      {vm.publishError && (
+        <Banner
+          tone={vm.publishError.isNetworkError ? "network" : "error"}
+          className="mt-3"
+        >
+          {vm.publishError.isNetworkError
+            ? "Couldn't reach the backend to publish."
+            : vm.publishError.message}
+        </Banner>
+      )}
+
+      {vm.publishedVersion && !vm.publishError && (
+        <Banner tone="success" className="mt-3">
+          v{vm.publishedVersion} is now the fleet version. Lab PCs will pick it up at
+          their next logon.
+        </Banner>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {/* A hidden input driven by a real Button, so the control matches every
+            other action on this page instead of a bare browser file picker. */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".vsix"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) vm.publishExtension(file);
+            // Cleared so choosing the SAME file again still fires a change event —
+            // which is exactly what someone does after a failed upload.
+            e.target.value = "";
+          }}
+        />
+        <Button onClick={() => inputRef.current?.click()} loading={vm.isPublishing}>
+          <span aria-hidden="true">⬆</span>{" "}
+          {extension.fleetVersion ? "Publish a new version" : "Publish the extension"}
+        </Button>
+        {vm.extensionDownloadUrl && (
+          <Button
+            variant="secondary"
+            onClick={() => window.location.assign(vm.extensionDownloadUrl as string)}
+          >
+            <span aria-hidden="true">⬇</span> Download v{extension.fleetVersion}
+          </Button>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-[var(--text-muted)]">
+        Build it with <code className="font-mono">npm run package</code> in
+        AlphaCI-Educ-lab-ext. Publish the backend BEFORE the extension: a new extension
+        against an old server is worse than not updating at all.
+      </p>
+    </Card>
   );
 }
 
@@ -152,9 +266,14 @@ export default function AdminLabSetupPage() {
                     Check again
                   </Button>
                   {!vm.ready && (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      Students are not blocked meanwhile — the manual lab-token fallback
-                      keeps working.
+                    // Was "students are not blocked meanwhile — the manual
+                    // lab-token fallback keeps working". It no longer does: that
+                    // panel is gone, so an unfinished checklist now means nobody
+                    // can open an assignment. Understating that is how a lab gets
+                    // left half-configured until a class walks in.
+                    <p className="text-xs font-medium text-danger">
+                      Until every check passes, students cannot open their assignments —
+                      this is the only route to their code.
                     </p>
                   )}
                 </div>
@@ -180,9 +299,13 @@ export default function AdminLabSetupPage() {
                   <dd className="font-mono text-xs text-[var(--text-strong)]">
                     {vm.info.extensionId}
                   </dd>
-                  <dt className="text-[var(--text-muted)]">Session window</dt>
+                  {/* Was "Session window — up to N hours". There is no window any
+                      more: a lab session lasts while the project is open and the
+                      class is inside its teacher-set hours, so quoting a duration
+                      here would describe a control that no longer exists. */}
+                  <dt className="text-[var(--text-muted)]">Access lasts</dt>
                   <dd className="text-[var(--text-strong)]">
-                    up to {vm.info.session.maxSessionHours} hours
+                    while the project is open and the class is in its hours
                   </dd>
                 </dl>
 
@@ -236,19 +359,20 @@ export default function AdminLabSetupPage() {
                       <span aria-hidden="true">⬇</span> Download install-lab-pc.ps1
                     </Button>
                   )}
-                  <Button
-                    variant="secondary"
-                    onClick={() => window.location.assign(vm.info!.extensionInstallUrl)}
-                  >
-                    Open extension in VS Code
-                  </Button>
                 </div>
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  The second button only works once the extension is published to a
-                  gallery. Until then, deploy the packaged <code>.vsix</code> alongside
-                  the script.
-                </p>
+                {/* The "Open extension in VS Code" button that used to sit here
+                    pointed at vscode:extension/<id>, a URI that only resolves for
+                    extensions published to the VS Code Marketplace. This one is
+                    deliberately unpublished, so the button did nothing at all while
+                    looking like the install path. Replaced by the fleet-version card
+                    below, which is the real mechanism. */}
               </Card>
+
+              {/* --- Fleet version -------------------------------------------
+                  The "update button" for the lab. It cannot push to a PC — nothing
+                  in a browser can reach another machine — so it sets the version
+                  each PC's logon task converges on. */}
+              <LabExtensionCard vm={vm} />
 
               {/* --- The procedure --------------------------------------- */}
               <Card className="p-5 animate-fade-up">
