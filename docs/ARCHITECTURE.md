@@ -63,7 +63,8 @@ derived/presentation logic. Views never compute business logic — they read it 
 | `useClassAssignments` | Assignments for a class. |
 | `useAssignmentRepositories` | Repositories under one assignment (teacher grading entry points). |
 | `useStudentDashboard` | Student assignments split into active vs past. |
-| `useRepositoryDetail` | Repo detail + branch selection + runs filtered to branch + trigger-run + lab-token actions. |
+| `useRepositoryDetail` | Repo detail + branch selection + runs filtered to branch + trigger-run. |
+| `useStartAssignment` | The VS Code handoff: reads the open session window (GET, mints nothing) and starts/re-opens one. Pressing Start twice reuses the launch already in flight rather than creating a second. |
 | `usePipelineRun` | A run's 5-stage checks, grouped in canonical stage order; masks hidden-test messages for the `student` audience. |
 | `useGrading` | Teacher grade form state + validation + grade/submit mutations. |
 | `useAdminOverview` | Org overview + archive-semester action. |
@@ -99,8 +100,8 @@ ViewModels and renders presentational components. Pages hold only view-local UI 
   components.
 - `layout/` — `AppShell` (sidebar + top bar + session guard) and `Brand`.
 - `domain/` — feature components composed from `ui/` and a single ViewModel each
-  (e.g. `PipelineStages`, `RepoRunsExplorer`, `GradingPanel`, `LabTokenPanel`,
-  `PlagiarismCard`, `ArchiveSemesterCard`).
+  (e.g. `PipelineStages`, `RepoRunsExplorer`, `GradingPanel`,
+  `StartAssignmentPanel`, `PlagiarismCard`, `ArchiveSemesterCard`).
 
 `providers.tsx` wires the React Query client and the `SessionProvider` (VM context) so every View
 beneath can consume ViewModels.

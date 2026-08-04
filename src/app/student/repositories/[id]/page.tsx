@@ -38,7 +38,6 @@ import { PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
 import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
 import { CodeBrowserPanel } from "@/components/domain/CodeBrowserPanel";
-import { LabTokenPanel } from "@/components/domain/LabTokenPanel";
 import { StartAssignmentPanel } from "@/components/domain/StartAssignmentPanel";
 import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { StudentGradesCard } from "@/components/domain/StudentGradesCard";
@@ -153,8 +152,8 @@ export default function StudentWorkspacePage() {
             {closed && (
               <Banner tone="warning" title="Project closed">
                 Your teacher has ended this project. You can no longer open it in VS
-                Code, get a lab token, merge a pull request, or submit. Your work and
-                grades stay available under Code, Actions, Test results and Grades.
+                Code, merge a pull request, or submit. Your work and grades stay
+                available under Code, Actions, Test results and Grades.
               </Banner>
             )}
 
@@ -188,23 +187,25 @@ export default function StudentWorkspacePage() {
                     </p>
                   </Card>
 
-                  {/* Actions: start-in-VS-Code (with manual lab-token fallback) +
-                      submit. Hidden once the teacher closes the project. */}
+                  {/* Actions: start-in-VS-Code + submit. Hidden once the teacher
+                      closes the project.
+
+                      The manual "Lab access token" card used to sit under the
+                      start panel as a fallback. It is gone: it rendered a live
+                      `ghs_` push credential on a shared lab screen, copied it to
+                      the clipboard, and asked a student to paste it into a shell
+                      to do what the extension does invisibly. A fallback that
+                      hands out a worse credential than the primary path is not a
+                      safety net. What replaced it is the start panel naming who
+                      can fix each failure, since there is nothing left to fall
+                      back TO. */}
                   {!closed && (
                     // items-start, so the submit card is only as tall as its own
-                    // content. Stretching it to match the two stacked cards beside
-                    // it left a large empty panel with a button marooned at the
-                    // bottom — the gap read as something failing to load.
+                    // content. Stretching it to match the card beside it left a
+                    // large empty panel with a button marooned at the bottom —
+                    // the gap read as something failing to load.
                     <div className="grid items-start gap-5 lg:grid-cols-2">
-                      <div className="space-y-5">
-                        <StartAssignmentPanel repoId={d.repo.id} />
-                        <LabTokenPanel
-                          token={vm.labToken}
-                          onRequest={vm.requestLabToken}
-                          isLoading={vm.isRequestingToken}
-                          error={vm.labTokenError}
-                        />
-                      </div>
+                      <StartAssignmentPanel repoId={d.repo.id} />
 
                       {/*
                         Deliberately reworded to stop this being confused with

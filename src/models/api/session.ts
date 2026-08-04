@@ -1,9 +1,9 @@
 // MODEL LAYER — Lab Session handoff (docs/LAB_SESSION_HANDOFF_PLAN.md).
 // Starts a secure "open in VS Code" session for a repo. Returns a vscode://
 // deep link carrying only a single-use claim — never a token. 503 when the
-// handoff feature is disabled (the View then shows the manual fallback).
+// handoff feature is disabled; 429 when a launch is already in flight.
 import { apiRequest } from "./client";
-import type { LabSessionLimits, StartSessionResponse } from "../types";
+import type { LabSessionLimits, SessionStatus, StartSessionResponse } from "../types";
 
 /**
  * Client-side ceiling for starting a session.
@@ -23,6 +23,16 @@ export const sessionApi = {
       method: "POST",
       signal: AbortSignal.timeout(START_TIMEOUT_MS),
     });
+  },
+
+  /**
+   * What is already running, WITHOUT starting anything.
+   *
+   * A GET so it is safe to fire on mount and on refocus: it mints no credential
+   * and opens no window, which is precisely the property the POST does not have.
+   */
+  status(repoId: string) {
+    return apiRequest<SessionStatus>(`/repositories/${repoId}/session`);
   },
 
   /**

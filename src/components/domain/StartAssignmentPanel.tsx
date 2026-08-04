@@ -1,72 +1,38 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — Start assignment in VS Code (Lab Session handoff)
+//
 // One-click launch that hands off to the AlphaCI VS Code extension via a
-// vscode:// deep link (single-use claim, never a token). This sits ABOVE the
-// manual LabTokenPanel: every non-launch outcome (simulated, feature off, error,
-// or "VS Code didn't open") points the student at the manual steps below.
+// vscode:// deep link (single-use claim, never a token).
+//
+// THIS IS THE ONLY ROUTE TO THE CODE. The manual "Lab access token" panel that
+// used to sit below it is gone: it printed a live `ghs_` credential on a shared
+// lab screen, put it on the clipboard, and asked a fourteen-year-old to paste it
+// into a shell — for a job the extension does invisibly. Removing it changes what
+// this panel owes the student: every failure state has to name who can fix it,
+// because there is no longer a second path to point at.
+//
+// THERE IS NO COUNTDOWN, AND THAT IS THE POINT. A session used to run against a
+// fixed window (LAB_MAX_SESSION_HOURS) with a clock ticking down in this card.
+// Access now continues for as long as the project is open and the class is inside
+// its teacher-set meeting hours, so what this shows instead is the TIMETABLE — a
+// fact a student can plan around, rather than a number falling toward a deadline
+// that was never the real one.
+//
 // State/actions come from useStartAssignment.
 // ============================================================================
 import { useStartAssignment } from "@/viewmodels/useStartAssignment";
-import { useCountdown, type CountdownUrgency } from "@/viewmodels/useCountdown";
-import { Banner, Button, Card, cn } from "@/components/ui";
+import { Banner, Button, Card, Skeleton } from "@/components/ui";
 import { brand } from "@/config/brand";
 
-const URGENCY_STYLE: Record<CountdownUrgency, string> = {
-  normal: "border-[var(--border-subtle)] bg-slate-50 text-[var(--text-strong)]",
-  warning: "border-amber-200 bg-amber-50 text-amber-800",
-  critical: "border-red-200 bg-red-50 text-red-700",
-  expired: "border-red-200 bg-red-50 text-red-700",
-};
-
-/**
- * Time left in the lab session.
- *
- * Counts down to the SESSION WINDOW, never to the GitHub token's ~1h expiry.
- * The extension replaces that token silently every hour, so showing it would
- * put a scary clock on a non-event and — worse — teach students that their work
- * ends at an hour when it does not. This is the only deadline that stops them.
- */
-function SessionCountdown({
-  expiresAt,
-  hours,
-}: {
-  readonly expiresAt: number;
-  readonly hours: number | null;
-}) {
-  const countdown = useCountdown(expiresAt);
-  if (!countdown) return null;
-
-  return (
-    <div
-      className={cn(
-        "mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2.5",
-        URGENCY_STYLE[countdown.urgency],
-      )}
-      // Announced on the minute rather than every tick: a per-second live
-      // region would talk over a screen-reader user continuously.
-      role="timer"
-      aria-live="off"
-    >
-      <span className="text-sm font-medium">
-        {countdown.isExpired ? "Lab session ended" : "Lab session time remaining"}
-      </span>
-      <span className="font-mono text-base font-semibold tabular-nums">
-        {countdown.isExpired ? "—" : countdown.label}
-      </span>
-      <p className="w-full text-xs opacity-80">
-        {countdown.isExpired
-          ? "Press “Start assignment in VS Code” again to continue working. Your pushed work is safe on GitHub."
-          : `Your access renews automatically until this runs out${
-              hours ? ` (${hours}-hour session set by your teacher)` : ""
-            }. Push your work before it does.`}
-      </p>
-    </div>
-  );
-}
-
-export function StartAssignmentPanel({ repoId }: { repoId: string }) {
+export function StartAssignmentPanel({ repoId }: { readonly repoId: string }) {
   const vm = useStartAssignment(repoId);
+
+  // "Reopen" once VS Code has already collected a launch. The distinction is the
+  // student's, not the server's: pressing Start with an editor already open reads
+  // as "nothing happened" unless the button admits it is a second opening.
+  const isReopen = vm.launched;
+  const canStart = vm.handoffEnabled && vm.openNow;
 
   return (
     <Card className="p-5">
@@ -79,9 +45,41 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
         account needed.
       </p>
 
-      <Button className="mt-4" onClick={vm.start} loading={vm.isStarting}>
-        <span aria-hidden="true">🚀</span> Start assignment in VS Code
-      </Button>
+      {/* The operator has not switched the handoff on. Shown BEFORE the button so
+          a student is not invited to press something that can only 503. */}
+      {!vm.handoffEnabled && (
+        <Banner tone="warning" className="mt-4" title="Not switched on yet">
+          One-click launch has not been enabled for this server. Tell your teacher — it
+          needs turning on before anyone can open an assignment.
+        </Banner>
+      )}
+
+      {/* Outside class hours, or the teacher closed the project. The server writes
+          this sentence and it already names the class, its hours and when they
+          resume — so it is rendered verbatim rather than paraphrased into
+          something vaguer. */}
+      {vm.handoffEnabled && !vm.openNow && vm.closedReason && (
+        <Banner tone="info" className="mt-4" title="Not open right now">
+          {vm.closedReason}
+        </Banner>
+      )}
+
+      {vm.isLoadingStatus ? (
+        // A button whose label depends on server state must not render before that
+        // state arrives: "Start" flipping to "Reopen" a moment later is how a
+        // student ends up pressing both.
+        <Skeleton className="mt-4 h-11 w-64 rounded-lg" />
+      ) : (
+        <Button
+          className="mt-4"
+          onClick={vm.start}
+          loading={vm.isStarting}
+          disabled={!canStart}
+        >
+          <span aria-hidden="true">🚀</span>{" "}
+          {isReopen ? "Reopen in VS Code" : "Start assignment in VS Code"}
+        </Button>
+      )}
 
       {/* The permission prompt is named FIRST because it is the common case and
           the old copy misdiagnosed it. VS Code asks "Allow … to open this URI?"
@@ -89,25 +87,77 @@ export function StartAssignmentPanel({ repoId }: { repoId: string }) {
           answered nothing happens at all — which read as "the extension is
           broken" and sent people to reinstall software that was working. */}
       {vm.phase === "launching" && (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Opening VS Code… If VS Code asks{" "}
-          <strong>&ldquo;Allow {brand.name} to open this URI?&rdquo;</strong>, choose{" "}
-          <strong>Open</strong> — tick &ldquo;Do not ask me again&rdquo; and it will not ask
-          on this PC again. If nothing appears at all, VS Code or the {brand.name} extension
-          may not be installed — use the <strong>manual steps below</strong>.
-        </p>
+        <div className="mt-3 space-y-2 text-sm text-[var(--text-muted)]">
+          <p>
+            Opening VS Code… If VS Code asks{" "}
+            <strong>&ldquo;Allow {brand.name} to open this URI?&rdquo;</strong>, choose{" "}
+            <strong>Open</strong> — tick &ldquo;Do not ask me again&rdquo; and it will not
+            ask on this PC again.
+          </p>
+          {/* Re-following the SAME link, with no server call. The claim is
+              single-use, so this is either harmless or the thing that finally
+              works — and it gives an impatient student something to press that
+              cannot mint a second credential. */}
+          {vm.retryOpen && (
+            <p>
+              Nothing appeared?{" "}
+              <button
+                type="button"
+                onClick={vm.retryOpen}
+                className="font-medium text-platform underline hover:no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+              >
+                Try the same link again
+              </button>{" "}
+              — this reuses the launch you already started. If it still does nothing,
+              VS Code or the {brand.name} extension is not installed on this PC: tell
+              your teacher.
+            </p>
+          )}
+        </div>
       )}
 
-      {(vm.phase === "simulated" || vm.phase === "unavailable") && vm.message && (
+      {/* Not a failure: the server refused to build a SECOND session while the
+          first is still opening. Info tone, because the student did nothing
+          wrong and nothing is broken. */}
+      {vm.phase === "throttled" && vm.message && (
         <Banner tone="info" className="mt-3">
           {vm.message}
         </Banner>
       )}
 
-      {/* Shown for every started session, including simulated ones: a student
-          working through the manual steps is racing the same clock. */}
-      {vm.session && (
-        <SessionCountdown expiresAt={vm.session.expiresAt} hours={vm.session.hours} />
+      {vm.phase === "simulated" && vm.message && (
+        <Banner tone="warning" className="mt-3" title="This lab isn't connected yet">
+          {vm.message}
+        </Banner>
+      )}
+
+      {vm.phase === "unavailable" && vm.message && (
+        <Banner tone="error" className="mt-3">
+          {vm.message}
+        </Banner>
+      )}
+
+      {/* WHAT REPLACED THE COUNTDOWN.
+          Two sentences, both static: how long access lasts, and what governs it.
+          The second only appears when the teacher actually set meeting hours —
+          most classes have none, and inventing a rule for them would be worse
+          than saying nothing. */}
+      {canStart && (
+        <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-slate-50 px-3 py-2.5 text-xs text-[var(--text-muted)]">
+          <p>
+            Your access renews itself while you work — there is no time limit to watch,
+            and nothing to press again. Push whenever you are ready.
+          </p>
+          {vm.scheduleLabel && (
+            <p className="mt-1.5">
+              This project is open during class hours:{" "}
+              <span className="font-medium text-[var(--text-strong)]">
+                {vm.scheduleLabel}
+              </span>
+              . Pushing stops outside them.
+            </p>
+          )}
+        </div>
       )}
     </Card>
   );

@@ -1,5 +1,5 @@
 // MODEL LAYER — Organizations / Admin resource
-import { apiRequest, API_BASE_URL } from "./client";
+import { apiRequest, apiUpload, API_BASE_URL } from "./client";
 import type {
   AddStaffRequest,
   AddTeacherRequest,
@@ -7,6 +7,7 @@ import type {
   AdminOverview,
   ArchiveSemesterResponse,
   GithubTeamWithMembers,
+  LabExtensionManifest,
   LabSetupInfo,
   ReconcileResponse,
   RemoveStaffResponse,
@@ -140,5 +141,32 @@ export const organizationsApi = {
    */
   labSetupScriptUrl(id: string, workDirPolicy: "ephemeral" | "persistent") {
     return `${API_BASE_URL}/organizations/${id}/lab-setup/script?workDirPolicy=${workDirPolicy}`;
+  },
+
+  /**
+   * Publish a .vsix as the version every lab PC should converge on.
+   *
+   * Raw bytes, not multipart — the server reads the body directly, so there is no
+   * form to encode and no parser to add on either side. The VERSION is read out of
+   * the package server-side rather than sent from here: a filename or a form field
+   * could disagree with the artifact, and then every lab PC would be told it was
+   * current when it was not.
+   *
+   * NOT under `/organizations/:id`, because the extension is one artifact for the
+   * whole deployment rather than per laboratory — every lab runs the same build.
+   */
+  publishLabExtension(file: Blob) {
+    return apiUpload<LabExtensionManifest>("/lab-extension", file);
+  },
+
+  /**
+   * URL of the published .vsix.
+   *
+   * Same navigation trick as the install script: the response is an attachment and
+   * the admin's session cookie rides along, which is what authorises it — a
+   * navigation cannot send the lab-extension token header.
+   */
+  labExtensionDownloadUrl() {
+    return `${API_BASE_URL}/lab-extension/vsix`;
   },
 };

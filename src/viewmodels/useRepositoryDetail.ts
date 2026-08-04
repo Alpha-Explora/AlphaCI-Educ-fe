@@ -6,14 +6,19 @@
 //   - branch selection state
 //   - runs filtered to the selected branch + the latest run
 //   - triggering a new pipeline run (mock)
-//   - requesting a short-lived lab (App installation) token
+//
+// It used to own "request a short-lived lab token" as well. That went with the
+// LabTokenPanel it fed: handing a student a raw `ghs_` credential to paste into a
+// shell was a worse version of what the VS Code handoff does invisibly. The
+// server route still exists as an operator escape hatch
+// (POST /repositories/:id/lab-token, see the backend README) — nothing in the UI
+// calls it.
 // ============================================================================
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { repositoriesApi } from "@/models/api";
-import type { LabToken, PipelineRun, RepositoryDetail } from "@/models/types";
+import type { PipelineRun, RepositoryDetail } from "@/models/types";
 import { queryKeys } from "./queryKeys";
-import { reportGithubLive } from "./useGithubMode";
 import { toPresentableError, type PresentableError } from "./errors";
 
 export interface RepositoryDetailVM {
@@ -34,17 +39,11 @@ export interface RepositoryDetailVM {
   // actions
   triggerRun: () => void;
   isTriggeringRun: boolean;
-
-  requestLabToken: () => void;
-  labToken: LabToken | null;
-  isRequestingToken: boolean;
-  labTokenError: PresentableError | null;
 }
 
 export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
   const queryClient = useQueryClient();
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
-  const [labToken, setLabToken] = useState<LabToken | null>(null);
 
   const query = useQuery({
     queryKey: queryKeys.repositories.detail(repoId ?? "none"),
@@ -83,14 +82,6 @@ export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
     },
   });
 
-  const labTokenMutation = useMutation({
-    mutationFn: () => repositoriesApi.labToken(repoId as string),
-    onSuccess: (token) => {
-      setLabToken(token);
-      reportGithubLive(token.live);
-    },
-  });
-
   return {
     data: query.data,
     isLoading: query.isLoading,
@@ -106,12 +97,5 @@ export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
 
     triggerRun: () => triggerMutation.mutate(),
     isTriggeringRun: triggerMutation.isPending,
-
-    requestLabToken: () => labTokenMutation.mutate(),
-    labToken,
-    isRequestingToken: labTokenMutation.isPending,
-    labTokenError: labTokenMutation.error
-      ? toPresentableError(labTokenMutation.error)
-      : null,
   };
 }
