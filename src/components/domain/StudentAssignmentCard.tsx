@@ -10,6 +10,7 @@ import Link from "next/link";
 import type { StudentDashboard } from "@/models/types";
 import { GenericPill, PipelineStatusPill, RepoStatusPill, cn } from "@/components/ui";
 import { relativeDue } from "@/components/ui/format";
+import { pointsPerRepo } from "@/models/points";
 
 type Row = StudentDashboard["assignments"][number];
 
@@ -21,10 +22,16 @@ type Row = StudentDashboard["assignments"][number];
  * className argument is exactly the shape Sonar rejects (S3358) and a marker
  * later needs to check.
  */
-function scoreTone(score: number | null | undefined): string {
+function scoreTone(score: number | null | undefined, maxPoints: number): string {
   if (score == null) return "text-[var(--text-muted)]";
-  if (score >= 80) return "text-success";
-  if (score >= 50) return "text-platform";
+  // AS A PERCENTAGE OF THIS REPOSITORY'S CEILING, because the thresholds are
+  // percentages and `score` is a POINT total. They were compared directly, which
+  // is only equivalent when a repository is marked out of 100 — on each half of a
+  // SPLIT project the ceiling is 50, so a flawless 50/50 fell in the 50–79 band
+  // and was coloured as a middling result.
+  const percent = maxPoints > 0 ? (score / maxPoints) * 100 : 0;
+  if (percent >= 80) return "text-success";
+  if (percent >= 50) return "text-platform";
   return "text-amber-600";
 }
 
@@ -51,10 +58,13 @@ const COMPONENT_LABEL: Record<string, string> = {
 function RepoRow({
   entry,
   closed,
+  maxPoints,
 }: {
   readonly entry: Row["repos"][number];
   /** The teacher has ended this project — the row becomes unpressable. */
   readonly closed: boolean;
+  /** What THIS repository is marked out of — half the project total on a SPLIT. */
+  readonly maxPoints: number;
 }) {
   const { repo, latestRun } = entry;
   const label = COMPONENT_LABEL[repo.component ?? "SINGLE"];
@@ -91,8 +101,10 @@ function RepoRow({
         ) : (
           <span className="text-xs font-medium text-[var(--text-muted)]">Workspace</span>
         )}
-        <span className={cn("text-sm font-semibold tabular-nums", scoreTone(latestRun?.score))}>
-          {latestRun?.score != null ? `${latestRun.score}%` : "—"}
+        <span
+          className={cn("text-sm font-semibold tabular-nums", scoreTone(latestRun?.score, maxPoints))}
+        >
+          {latestRun?.score != null ? `${latestRun.score}/${maxPoints}` : "—"}
         </span>
       </div>
 
@@ -191,7 +203,14 @@ export function StudentAssignmentCard({
       ) : (
         <div className="mt-4 space-y-2.5">
           {repos.map((entry) => (
-            <RepoRow key={entry.repo.id} entry={entry} closed={closed} />
+            <RepoRow
+              key={entry.repo.id}
+              entry={entry}
+              closed={closed}
+              // Per REPOSITORY, not per project: each half of a SPLIT is worth
+              // half the total, and that is the ceiling its own run scored against.
+              maxPoints={pointsPerRepo(assignment)}
+            />
           ))}
         </div>
       )}

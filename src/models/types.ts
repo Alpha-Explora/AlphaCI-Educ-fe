@@ -28,9 +28,19 @@ export type UserStatus = "ACTIVE" | "ARCHIVED" | "ANONYMIZED";
 export type EnrollmentRole = "TEACHER" | "STUDENT";
 export type RepoStatus = "IN_PROGRESS" | "SUBMITTED" | "GRADED" | "ARCHIVED";
 export type PipelineStatus = "QUEUED" | "RUNNING" | "PASSED" | "FAILED";
+/**
+ * Mirrors PipelineStage in the backend's domain/types.ts, and the
+ * `ci.pipeline_stage` Postgres enum.
+ *
+ * QUALITY is the SonarCloud component. It was absent, so the server's stage
+ * mapping sent the pipeline's `quality` key to the catch-all SCORING — and 35%
+ * of the mark, the largest single component, was rendered under the label
+ * "Partial-Credit Scoring".
+ */
 export type PipelineStage =
   | "SANDBOX"
   | "LINT"
+  | "QUALITY"
   | "PUBLIC_TESTS"
   | "HIDDEN_TESTS"
   | "SCORING";
@@ -206,10 +216,18 @@ export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 export type BranchStrategy = "MAIN_ONLY" | "MAIN_UAT";
 export type RepoComponent = "SINGLE" | "BACKEND" | "FRONTEND";
 
-// Ordered list of the 5 pipeline stages, for stable UI rendering.
+/**
+ * The stages in PIPELINE order, for stable rendering of the breakdown.
+ *
+ * Not every stage arrives on every run, and the breakdown renders only what did:
+ * the real pipeline reports lint, quality, public tests and hidden tests, so
+ * SANDBOX and SCORING are usually absent. That is why the heading counts what is
+ * present instead of promising five.
+ */
 export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   "SANDBOX",
   "LINT",
+  "QUALITY",
   "PUBLIC_TESTS",
   "HIDDEN_TESTS",
   "SCORING",
@@ -330,6 +348,25 @@ export interface CourseWithInstructors extends Course {
  * names ARE the product's definition of a graded branch.
  */
 export const GRADED_BRANCHES: readonly string[] = ["main", "uat"];
+
+/**
+ * The same branches in PROMOTION order — the order work travels, not the order
+ * they are listed for marking.
+ *
+ * A separate constant because the two orders genuinely differ and the difference
+ * decides a default. Work goes branch → uat → main, so on a MAIN_UAT project the
+ * first hop a student submits into is `uat`; `GRADED_BRANCHES` above is a set
+ * whose order is incidental, and filtering a repository's branches by it yields
+ * whatever order GitHub returned, which is alphabetical — `main` first, i.e. the
+ * LAST hop. Selecting a merge target from that order would quietly invite every
+ * student on a two-stage project to skip the promotion stage the project exists
+ * to teach.
+ *
+ * Intersect it with the branches a repository actually has; never offer it raw.
+ * A MAIN_ONLY project has no `uat`, and offering one is the bug this ordering
+ * was extracted to fix.
+ */
+export const BRANCH_PROMOTION_ORDER: readonly string[] = ["uat", "main"];
 
 export interface ClassSchedule {
   days: number[];
@@ -478,6 +515,24 @@ export interface Assignment {
    * means SINGLE.
    */
   repoStructure?: "SINGLE" | "SPLIT";
+  /**
+   * How many promotion stages this project's pipeline has — MAIN_ONLY is
+   * branch → PR → main, MAIN_UAT adds → PR → uat → PR → main.
+   *
+   * The same gap `repoStructure` above describes, with a sharper consequence: the
+   * server has always sent this, the UI never modelled it, and so the "Merge
+   * into" dropdown offered a hardcoded `uat` on every project. On a MAIN_ONLY
+   * project no such branch exists, and `uat` was also the DEFAULT — so a
+   * student's first ever pull request was refused by the server with "You can
+   * only submit into main", naming a branch the dropdown had not offered.
+   *
+   * The dropdown no longer needs this: it intersects the product's graded branch
+   * names with the branches the repository actually HAS, which is true whatever
+   * the strategy says. This is here for the explanatory copy, which is the one
+   * thing the branch list cannot convey — the number of hops is the lesson the
+   * setting exists to teach. Absent means MAIN_UAT, matching the server.
+   */
+  branchStrategy?: BranchStrategy;
   createdAt: string;
   // ADDENDUM L — set when a teacher ENDS (closes) the project. When present,
   // students can't start a lab session, get a token, or submit. null = open.

@@ -17,7 +17,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { repositoriesApi } from "@/models/api";
-import type { PipelineRun, RepositoryDetail } from "@/models/types";
+import { GRADED_BRANCHES, type PipelineRun, type RepositoryDetail } from "@/models/types";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
 
@@ -34,6 +34,8 @@ export interface RepositoryDetailVM {
 
   // derived run views
   runsForBranch: PipelineRun[];
+  /** Runs excluded by the branch filter — 0 when the selected branch has them all. */
+  runsOnOtherBranches: number;
   latestRun: PipelineRun | null;
 
   // actions
@@ -56,20 +58,48 @@ export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
     [query.data],
   );
 
-  // Default selection sentinel: null means "not yet chosen" → fall back to
-  // first branch (or the run's branch) without forcing a state update in render.
+  // Default selection sentinel: null means "not yet chosen" → fall back without
+  // forcing a state update in render.
+  //
+  // A GRADED branch, not `branches[0]`. GitHub returns branches alphabetically,
+  // so on a repository with a `dev` branch `branches[0]` was `dev` — a branch the
+  // marking view deliberately does not list. Two things followed, both silent:
+  // the branch toggle rendered with NOTHING selected, since `dev` matched none of
+  // the chips it draws; and the run filter below found no `dev` runs and fell
+  // through to showing every run from every branch, under a toggle labelled
+  // `main`. A teacher read a pull-request run as a run on main.
+  //
+  // GRADED_BRANCHES order is used on purpose — `main` before `uat`, the marking
+  // view's order. Promotion order is the other way round and belongs to the
+  // submit panel, which is choosing a destination rather than a record to read.
   const effectiveBranch =
     selectedBranch ??
+    GRADED_BRANCHES.find((name) =>
+      query.data?.branches.some((b) => b.name === name),
+    ) ??
     query.data?.branches[0]?.name ??
     query.data?.runs[0]?.branch ??
     null;
 
+  // STRICTLY the selected branch's runs. The old `filtered.length > 0 ? filtered
+  // : runs` fallback meant "show everything" whenever a branch had no runs of its
+  // own, which is indistinguishable on screen from "these are that branch's
+  // runs". An empty list is the honest answer, and the list renders its own
+  // "no runs on this branch yet" for it.
   const runsForBranch = useMemo(() => {
     const runs = query.data?.runs ?? [];
     if (!effectiveBranch) return runs;
-    const filtered = runs.filter((r) => r.branch === effectiveBranch);
-    return filtered.length > 0 ? filtered : runs;
+    return runs.filter((r) => r.branch === effectiveBranch);
   }, [query.data, effectiveBranch]);
+
+  // What the strict filter now hides, so the view can say so rather than leaving
+  // a teacher to conclude the pipeline never ran. Pull-request runs land here:
+  // the workflow reports `GITHUB_REF_NAME`, which on a `pull_request` event is
+  // the synthetic `N/merge` ref and matches no branch that exists.
+  const runsOnOtherBranches = useMemo(
+    () => (query.data?.runs.length ?? 0) - runsForBranch.length,
+    [query.data, runsForBranch],
+  );
 
   const latestRun = runsForBranch[0] ?? null;
 
@@ -93,6 +123,7 @@ export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
     selectBranch: setSelectedBranch,
 
     runsForBranch,
+    runsOnOtherBranches,
     latestRun,
 
     triggerRun: () => triggerMutation.mutate(),
