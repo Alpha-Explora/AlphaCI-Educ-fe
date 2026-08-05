@@ -10,6 +10,7 @@ import type {
   LabExtensionManifest,
   LabSetupInfo,
   ReconcileResponse,
+  RemoveAdminResponse,
   RemoveStaffResponse,
   StudentAccountSummary,
   SystemUser,
@@ -124,6 +125,16 @@ export const organizationsApi = {
     return apiRequest<AddTeacherResponse>("/organizations/admins", {
       method: "POST",
       body: payload,
+    });
+  },
+
+  /**
+   * Removes an IT admin from EVERY laboratory — the inverse of addAdmin, and
+   * likewise with no organization id, because the role never had a single lab.
+   */
+  removeAdmin(userId: string) {
+    return apiRequest<RemoveAdminResponse>(`/organizations/admins/${userId}`, {
+      method: "DELETE",
     });
   },
 

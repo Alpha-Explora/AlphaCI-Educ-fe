@@ -12,12 +12,13 @@
 // ============================================================================
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { platformApi } from "@/models/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { organizationsApi, platformApi } from "@/models/api";
 import type {
   PlatformLabSummary,
   PlatformPerson,
   PlatformOverview,
+  RemoveAdminResponse,
   UserRole,
 } from "@/models/types";
 import { useSession } from "./useSession";
@@ -65,6 +66,22 @@ export interface SuperAdminConsoleVM {
   openingLabId: string | null;
   openLabError: string | null;
 
+  /*
+    Removing an IT admin. TWO STEPS ON PURPOSE — `askRemoveAdmin` only opens the
+    confirmation, `confirmRemoveAdmin` performs it. The action deletes an account
+    across every laboratory and cannot be undone from this console, so it must
+    not be reachable by one stray click in a list that is otherwise read-only.
+  */
+  removingAdmin: PersonRow | null;
+  askRemoveAdmin: (person: PersonRow) => void;
+  cancelRemoveAdmin: () => void;
+  confirmRemoveAdmin: () => void;
+  isRemovingAdmin: boolean;
+  removeAdminError: PresentableError | null;
+  /** The last successful removal, so the console can report what happened. */
+  removedAdmin: RemoveAdminResponse | null;
+  dismissRemovedAdmin: () => void;
+
   isLoading: boolean;
   isRefreshing: boolean;
   error: PresentableError | null;
@@ -90,7 +107,10 @@ function alertsFor(lab: PlatformLabSummary): LabAlert[] {
 
 export function useSuperAdminConsole(): SuperAdminConsoleVM {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { selectLab } = useSession();
+  const [removingAdmin, setRemovingAdmin] = useState<PersonRow | null>(null);
+  const [removedAdmin, setRemovedAdmin] = useState<RemoveAdminResponse | null>(null);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [openingLabId, setOpeningLabId] = useState<string | null>(null);
@@ -143,6 +163,17 @@ export function useSuperAdminConsole(): SuperAdminConsoleVM {
       });
   }, [allPeople, query, roleFilter]);
 
+  const removeAdminMutation = useMutation({
+    mutationFn: (userId: string) => organizationsApi.removeAdmin(userId),
+    onSuccess: (result) => {
+      setRemovingAdmin(null);
+      setRemovedAdmin(result);
+      // The overview carries the people list AND every per-lab admin count, so
+      // nothing narrower than a refetch of it would be honest.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platform.overview });
+    },
+  });
+
   const openLab = useCallback(
     (orgId: string) => {
       setOpenLabError(null);
@@ -178,6 +209,22 @@ export function useSuperAdminConsole(): SuperAdminConsoleVM {
     openLab,
     openingLabId,
     openLabError,
+
+    removingAdmin,
+    askRemoveAdmin: (person: PersonRow) => {
+      removeAdminMutation.reset(); // A previous failure must not greet the next person.
+      setRemovingAdmin(person);
+    },
+    cancelRemoveAdmin: () => setRemovingAdmin(null),
+    confirmRemoveAdmin: () => {
+      if (removingAdmin) removeAdminMutation.mutate(removingAdmin.id);
+    },
+    isRemovingAdmin: removeAdminMutation.isPending,
+    removeAdminError: removeAdminMutation.error
+      ? toPresentableError(removeAdminMutation.error)
+      : null,
+    removedAdmin,
+    dismissRemovedAdmin: () => setRemovedAdmin(null),
 
     isLoading: result.isLoading,
     isRefreshing: result.isFetching && !result.isLoading,
