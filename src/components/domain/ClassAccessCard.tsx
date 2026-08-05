@@ -28,6 +28,7 @@ import type { TeacherClass } from "@/viewmodels/useTeacherCourseBoard";
 import {
   classMeetingNow,
   describeSchedule,
+  formatTime12,
   humaniseMinutes,
   isEnforceable,
   isInSession,
@@ -223,7 +224,10 @@ function NextUpPill({
   const day = nextMeetingDay(schedule, now);
   // Under an hour reads as urgency ("in 25 min"); further out, the weekday is
   // the useful part, because "in 3 days" does not tell a teacher which day.
-  const when = mins < 60 ? `in ${humaniseMinutes(mins)}` : `${day} ${schedule?.startTime}`;
+  const when =
+    mins < 60
+      ? `in ${humaniseMinutes(mins)}`
+      : `${day} ${formatTime12(schedule?.startTime ?? '')}`;
   return <GenericPill tone="neutral">Next · {when}</GenericPill>;
 }
 

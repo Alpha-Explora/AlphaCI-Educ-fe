@@ -123,6 +123,33 @@ export function minutesUntilClose(
   return end - manilaNow(at).minuteOfDay;
 }
 
+/**
+ * "19:30" -> "7:30pm", "08:00" -> "8am", "12:00" -> "12pm", "00:00" -> "12am".
+ *
+ * DISPLAY ONLY. `ClassSchedule.startTime` is stored and enforced as 24-hour
+ * "HH:MM" — the server parses it, the DTO validates it, and the `<input
+ * type="time">` in the editor round-trips it. Nothing here may travel back into
+ * a payload; this is the last step before a string reaches a screen.
+ *
+ * A whole hour drops its ":00", because "8am" is how a timetable is read aloud
+ * and "8:00am" is a form field. Minutes are kept zero-padded when present, so
+ * 19:05 is "7:05pm" rather than "7:5pm".
+ */
+export function formatTime12(hhmm: string): string {
+  const mins = parseHhMm(hhmm);
+  if (mins === null) return hhmm; // Unparseable: show what was stored, never "NaN".
+
+  const hours24 = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  const suffix = hours24 < 12 ? "am" : "pm";
+  // 0 and 12 both display as 12 — midnight is 12am, noon is 12pm.
+  const hours12 = hours24 % 12 || 12;
+
+  return minutes === 0
+    ? `${hours12}${suffix}`
+    : `${hours12}:${String(minutes).padStart(2, "0")}${suffix}`;
+}
+
 /** "Mon, Wed, Fri" — the days only, for a compact row. */
 export function describeDays(schedule: ClassSchedule | null | undefined): string | null {
   if (!isEnforceable(schedule)) return null;
@@ -131,11 +158,11 @@ export function describeDays(schedule: ClassSchedule | null | undefined): string
     .join(", ");
 }
 
-/** "Mon, Wed, Fri · 08:00–10:00" — days and times, without the timezone suffix. */
+/** "Mon, Wed, Fri · 8am–10am" — days and times, without the timezone suffix. */
 export function describeSchedule(schedule: ClassSchedule | null | undefined): string | null {
   const days = describeDays(schedule);
   if (!days) return null;
-  return `${days} · ${schedule!.startTime}–${schedule!.endTime}`;
+  return `${days} · ${formatTime12(schedule!.startTime)}–${formatTime12(schedule!.endTime)}`;
 }
 
 /** "in 25 minutes" / "in 3 hours" / "in 2 days" — a duration, humanised. */
