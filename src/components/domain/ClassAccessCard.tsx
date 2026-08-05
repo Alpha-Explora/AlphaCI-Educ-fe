@@ -78,8 +78,16 @@ export function ClassAccessCard({ classes }: { readonly classes: TeacherClass[] 
     <section
       className={cn(
         "animate-fade-up overflow-hidden rounded-xl border bg-white shadow-card",
+        /*
+          Emerald palette, NOT `success/40`. The `success` token is a hex CSS
+          variable (`--status-success: #0f9d58`) mapped without an `<alpha-value>`
+          slot, so Tailwind cannot compose an alpha into it and every `/opacity`
+          variant on it silently compiles to NOTHING. Only `platform` survives
+          that, because it stores raw channels. This matches GenericPill's own
+          success tone, which is why the pill and this rail agree.
+        */
         access.isOpen
-          ? "border-success/40 ring-1 ring-success/20"
+          ? "border-emerald-300 ring-1 ring-emerald-100"
           : "border-[var(--border-subtle)]",
       )}
       aria-labelledby="class-access-heading"
@@ -173,7 +181,8 @@ function StatusRail({
     <div
       className={cn(
         "flex flex-wrap items-center justify-between gap-3 px-5 py-3",
-        isOpen ? "bg-success/10" : "bg-slate-50",
+        // Emerald, not `success/10` — see the note on the section border above.
+        isOpen ? "bg-emerald-50" : "bg-slate-50",
       )}
     >
       <div className="flex flex-wrap items-center gap-2.5">

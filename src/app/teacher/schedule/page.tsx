@@ -7,11 +7,17 @@
 // section's own Settings tab, so a teacher with six sections had six pages to
 // visit to see their week — and no way at all to see which one was running now.
 //
-// PHILIPPINE TIME, SAID ONCE AND PROMINENTLY. Every window on this page is
-// Asia/Manila regardless of the teacher's laptop clock. Repeating the timezone on
-// every row would be noise; omitting it entirely is how a teacher on a
-// mis-set laptop misreads their whole timetable. So it is stated once, at the top,
-// where it governs everything below it.
+// A TABLE, AND ONE TABLE. Sections are homogeneous rows compared along the same
+// four axes (when, status, what's next, open after hours), which is exactly what
+// a table is for and what a card grid was fighting. It is deliberately NOT
+// grouped per course either: grouping would break the sort that gives the page
+// its point — soonest first — leaving several little tables each ordered
+// internally and none comparable with the others. The course is a column instead.
+//
+// PHILIPPINE TIME, SAID ONCE. Every window here is Asia/Manila regardless of the
+// teacher's laptop clock. Repeating that on every row would be noise; omitting it
+// is how a teacher on a mis-set laptop misreads their whole timetable. So it is
+// stated once, above the table it governs.
 //
 // Derivation lives in useTeacherSchedule; this file is layout.
 // ============================================================================
@@ -23,7 +29,7 @@ import {
   Card,
   EmptyState,
   GenericPill,
-  SkeletonCard,
+  Skeleton,
   Stat,
   StateBoundary,
   cn,
@@ -42,13 +48,12 @@ export default function TeacherSchedulePage() {
             When each of your sections meets, and whether students can work on its
             projects right now. All times are{" "}
             <span className="font-medium text-[var(--text-strong)]">
-              Philippine time
+              Philippine time.
             </span>
-            .
           </p>
         </div>
 
-        {!vm.isLoading && !vm.error && vm.totals.sections > 0 && (
+        {!vm.isLoading && !vm.error && vm.rows.length > 0 && (
           <div className="grid grid-cols-3 gap-6 rounded-xl border border-[var(--border-subtle)] bg-white px-5 py-4 shadow-card">
             <Stat label="Sections" value={vm.totals.sections} tone="platform" />
             <Stat label="Meeting now" value={vm.meetingNow.length} tone="success" />
@@ -73,64 +78,70 @@ export default function TeacherSchedulePage() {
             description="Once you create a class section under one of your courses, its meeting hours appear here."
           />
         }
-        loadingFallback={
-          <div className="space-y-4">
-            {[0, 1].map((i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        }
+        loadingFallback={<Skeleton className="h-72 w-full rounded-xl" />}
       >
-        <div className="space-y-8">
-          {/* What is happening RIGHT NOW, lifted out of the list. A teacher
-              checking this page mid-morning is nearly always asking one
-              question, and it should not require reading every group. */}
-          {vm.meetingNow.length > 0 && (
-            <section className="animate-fade-up rounded-xl border border-success/40 bg-success/5 px-5 py-4 ring-1 ring-success/20">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-strong)]">
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-success"
-                />
-                Meeting now
-              </h2>
-              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
-                {vm.meetingNow.map((row) => (
-                  <li key={row.classInfo.id} className="text-sm">
-                    <span className="font-medium text-[var(--text-strong)]">
-                      {row.classInfo.code} · {row.classInfo.section}
-                    </span>
-                    {row.nextChange && (
-                      <span className="text-[var(--text-muted)]"> — {row.nextChange}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+        <div className="space-y-4 animate-fade-up">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-sm">
+                <caption className="sr-only">
+                  Your class sections, soonest first. Each row shows when the section
+                  meets, whether it is running now, and whether students may work on it
+                  outside those hours.
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] bg-slate-50/70 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Section
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Course
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Meets
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Status
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Next
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Outside hours
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {vm.rows.map((row) => (
+                    <ScheduleTableRow key={row.classInfo.id} row={row} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
-          {vm.groups.map((group) => (
-            <section key={group.courseId} className="space-y-4 animate-fade-up">
-              <div className="border-b border-[var(--border-subtle)] pb-3">
-                <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                  {group.label}
-                </h2>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                {group.rows.map((row) => (
-                  <SectionScheduleCard key={row.classInfo.id} row={row} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {/*
+            The footnote the rows no longer carry. Stated once because it is the
+            same sentence for every section, and thirty copies of it is how a
+            table stops being scannable.
+          */}
+          <p className="max-w-3xl text-xs leading-relaxed text-[var(--text-muted)]">
+            <span className="font-medium text-[var(--text-strong)]">Outside hours</span>{" "}
+            lets students work on a section&apos;s projects at any time, not only during
+            the hours above. They still need the class code — switching it on opens the
+            class so there is one to give them. Ending a class on Home turns it back off
+            and signs everyone out.
+          </p>
         </div>
       </StateBoundary>
     </div>
   );
 }
 
-/** Copy and colour for each state — kept in one place so they cannot drift. */
+/** Copy and colour per state, in one place so the two cannot drift apart. */
 const STATE_LABEL: Record<
   ScheduleRow["state"],
   { text: string; tone: "success" | "warning" | "neutral" | "info" }
@@ -141,73 +152,112 @@ const STATE_LABEL: Record<
   unscheduled: { text: "No hours set", tone: "info" },
 };
 
-function SectionScheduleCard({ row }: { readonly row: ScheduleRow }) {
-  const { classInfo, state, window: meetingWindow, nextChange } = row;
+function ScheduleTableRow({ row }: { readonly row: ScheduleRow }) {
+  const { classInfo, state, courseLabel, sectionLabel, window: meetingWindow, nextChange } =
+    row;
   const badge = STATE_LABEL[state];
-  const sectionLabel = `${classInfo.code} · ${classInfo.section}`;
+
+  /*
+    CLOSED SECTIONS ARE GREYED. Nobody can work on them right now, so they are
+    background information — the rows that matter are the ones a student could be
+    touching this minute. Greying them is what lets the live rows be found without
+    reading the Status column.
+
+    Muting is applied to the TEXT, not as an `opacity` on the whole row. Two
+    reasons, and the second is the important one: opacity would also fade the
+    status pill (the one thing explaining WHY the row is grey), and it would fade
+    the outside-hours switch — an interactive control that is still perfectly
+    usable here, and which greying would falsely read as disabled. Turning that
+    switch on is the main reason a teacher visits a closed row at all.
+  */
+  const muted = state === "closed";
 
   return (
-    <Card
+    <tr
       className={cn(
-        "p-5",
-        state === "in-session" && "border-success/40 ring-1 ring-success/20",
+        "transition-colors hover:bg-slate-50/60",
+        /*
+          A tinted row rather than only a pill: the live section is what the page
+          is opened to find, and it should be locatable without reading a column.
+
+          Emerald palette, NOT `success/5`. The `success` token is a hex CSS
+          variable mapped without an `<alpha-value>` slot, so every `/opacity`
+          variant on it compiles to nothing at all — a tint that silently does not
+          exist. Tailwind's own palette colours take modifiers fine.
+        */
+        state === "in-session" && "bg-emerald-50/70",
+        muted && "bg-slate-50/40",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-[var(--text-strong)]">
+      <th scope="row" className="px-4 py-3 text-left font-normal">
+        <div className="flex items-center gap-2.5">
+          {state === "in-session" && (
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success"
+            />
+          )}
+          <div className="min-w-0">
+            <p
+              className={cn(
+                "font-medium",
+                muted ? "text-[var(--text-muted)]" : "text-[var(--text-strong)]",
+              )}
+            >
               {sectionLabel}
-            </h3>
-            <GenericPill tone={badge.tone}>{badge.text}</GenericPill>
+            </p>
+            <p className="truncate text-xs text-[var(--text-muted)]">{classInfo.name}</p>
           </div>
-          <p className="mt-0.5 truncate text-sm text-[var(--text-muted)]">
-            {classInfo.name}
-          </p>
         </div>
+      </th>
 
-        {/* Straight to the place the window is edited. The schedule is set on the
-            section's own Settings tab and stays there — duplicating the editor
-            here would be a second form writing the same field. */}
+      <td className="px-4 py-3 text-[var(--text-muted)]">{courseLabel}</td>
+
+      <td className="px-4 py-3">
+        {meetingWindow ? (
+          <span
+            className={cn(
+              "tabular-nums",
+              muted ? "text-[var(--text-muted)]" : "text-[var(--text-strong)]",
+            )}
+          >
+            {meetingWindow}
+          </span>
+        ) : (
+          <span className="text-[var(--text-muted)]">Any time</span>
+        )}
+      </td>
+
+      <td className="px-4 py-3">
+        <GenericPill tone={badge.tone}>{badge.text}</GenericPill>
+      </td>
+
+      <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
+        {nextChange ?? "—"}
+      </td>
+
+      <td className="px-4 py-3">
+        {/* Only meaningful for a section that HAS hours — there is nothing to
+            suspend on one that is already always open, and offering the switch
+            there would imply the opposite. */}
+        {state === "unscheduled" ? (
+          <span className="text-xs text-[var(--text-muted)]">—</span>
+        ) : (
+          <OutsideHoursToggle classId={classInfo.id} sectionLabel={sectionLabel} />
+        )}
+      </td>
+
+      <td className="px-4 py-3 text-right">
+        {/* Straight to where the window is edited. The schedule is set on the
+            section's own Settings tab and stays there — a second editor here
+            would be two forms writing one field. */}
         <Link
           href={`/teacher/classes/${classInfo.id}`}
-          className="shrink-0 text-xs font-medium text-platform underline underline-offset-2 hover:text-platform-700"
+          className="whitespace-nowrap text-xs font-medium text-platform underline underline-offset-2 hover:text-platform-700"
         >
           Edit hours
         </Link>
-      </div>
-
-      <dl className="mt-4 space-y-2 border-t border-[var(--border-subtle)] pt-4 text-sm">
-        <div className="flex justify-between gap-4">
-          <dt className="text-[var(--text-muted)]">Meets</dt>
-          <dd className="text-right font-medium text-[var(--text-strong)]">
-            {meetingWindow ?? (
-              <span className="font-normal text-[var(--text-muted)]">
-                Any time — no hours set
-              </span>
-            )}
-          </dd>
-        </div>
-        {nextChange && (
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--text-muted)]">
-              {state === "in-session" ? "Ends" : "Next"}
-            </dt>
-            <dd className="text-right font-medium text-[var(--text-strong)]">
-              {nextChange}
-            </dd>
-          </div>
-        )}
-      </dl>
-
-      {/* Only meaningful for a section that HAS hours — there is nothing to
-          suspend on a section that is already always open, and offering the
-          switch there would imply the opposite. */}
-      {state !== "unscheduled" && (
-        <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
-          <OutsideHoursToggle classId={classInfo.id} sectionLabel={sectionLabel} />
-        </div>
-      )}
-    </Card>
+      </td>
+    </tr>
   );
 }

@@ -40,6 +40,10 @@ export type SectionState =
 export interface ScheduleRow {
   classInfo: TeacherClass;
   state: SectionState;
+  /** "Programming 1" — the course this section belongs to, for its own column. */
+  courseLabel: string;
+  /** "CS-101 · A" — how a teacher refers to the section out loud. */
+  sectionLabel: string;
   /** "Mon, Wed, Fri · 08:00–10:00", or null when unscheduled. */
   window: string | null;
   /** Human phrase for what happens next: "2 hours left", "Mon 08:00". */
@@ -48,16 +52,8 @@ export interface ScheduleRow {
   sortKey: number;
 }
 
-export interface ScheduleGroup {
-  /** "IS-1234 — Programming 1", or the course code for a section from elsewhere. */
-  label: string;
-  courseId: string;
-  rows: ScheduleRow[];
-}
-
 export interface TeacherScheduleVM {
-  groups: ScheduleGroup[];
-  /** Every row, flat — for the "meeting now" strip at the top. */
+  /** Every section, one row, already sorted by what happens soonest. */
   rows: ScheduleRow[];
   meetingNow: ScheduleRow[];
   totals: { sections: number; scheduled: number; outsideHoursOpen: number };
@@ -86,6 +82,21 @@ export function useTeacherSchedule(
 
   const classes = dash.data?.classes;
   const { courses } = coursesVm;
+
+  /*
+    Course titles by id AND by code, because a section's course may live in
+    another lab and so have no local record by id — the same code-matching rule
+    the course board uses, for the same reason: a teacher reads "Programming 1
+    here" and "Programming 1 there" as one subject. Falling back to the section's
+    own code means a row is never left with a blank Course cell.
+  */
+  const courseLabels = useMemo(() => {
+    const byId = new Map(courses.map((c) => [c.id, c.title] as const));
+    const byCode = new Map(
+      courses.map((c) => [c.code.trim().toUpperCase(), c.title] as const),
+    );
+    return { byId, byCode };
+  }, [courses]);
 
   const rows = useMemo<ScheduleRow[]>(() => {
     const built = (classes ?? []).map((classInfo) => {
@@ -129,9 +140,17 @@ export function useTeacherSchedule(
       else if (!scheduled) sortKey = Number.MAX_SAFE_INTEGER;
       else sortKey = minutesUntilOpen(schedule, now) ?? Number.MAX_SAFE_INTEGER - 1;
 
+      const code = classInfo.code.trim().toUpperCase();
+      const courseLabel =
+        courseLabels.byId.get(classInfo.courseId) ??
+        courseLabels.byCode.get(code) ??
+        classInfo.code;
+
       return {
         classInfo,
         state,
+        courseLabel,
+        sectionLabel: `${classInfo.code} · ${classInfo.section}`,
         window: describeSchedule(schedule),
         nextChange,
         sortKey,
@@ -139,58 +158,18 @@ export function useTeacherSchedule(
     });
 
     return built.sort((a, b) => a.sortKey - b.sortKey);
-  }, [classes, now]);
+  }, [classes, now, courseLabels]);
 
   /*
-    Grouped by course for the body of the page, using the same code-matching rule
-    as the course board: a section whose course lives in another lab still files
-    under the matching local course, because a teacher reads "Programming 1 here"
-    and "Programming 1 there" as one subject. Sections matching nothing fall into
-    their own group keyed by course code rather than being dropped — a section
-    missing from a timetable is the one bug this page cannot have.
+    NO GROUPING. This used to bucket rows into one card-grid per course, which a
+    table makes redundant twice over: the course is a COLUMN now, and grouping
+    would break the sort that gives the page its point — urgency first. Six
+    courses meant six little tables, each internally ordered by "what's next" and
+    none of them comparable with the others, which is the opposite of what a
+    teacher opens a timetable to find out.
   */
-  const groups = useMemo<ScheduleGroup[]>(() => {
-    const byCourseId = new Map<string, ScheduleRow[]>();
-    const byCode = new Map<string, ScheduleRow[]>();
-
-    const localCourseByCode = new Map(
-      courses.map((c) => [c.code.trim().toUpperCase(), c] as const),
-    );
-
-    for (const row of rows) {
-      const local = courses.find((c) => c.id === row.classInfo.courseId);
-      if (local) {
-        byCourseId.set(local.id, [...(byCourseId.get(local.id) ?? []), row]);
-        continue;
-      }
-      const code = row.classInfo.code.trim().toUpperCase();
-      const matched = localCourseByCode.get(code);
-      if (matched) {
-        byCourseId.set(matched.id, [...(byCourseId.get(matched.id) ?? []), row]);
-      } else {
-        byCode.set(code, [...(byCode.get(code) ?? []), row]);
-      }
-    }
-
-    const fromCourses: ScheduleGroup[] = courses
-      .map((course) => ({
-        label: `${course.code} — ${course.title}`,
-        courseId: course.id,
-        rows: byCourseId.get(course.id) ?? [],
-      }))
-      .filter((g) => g.rows.length > 0);
-
-    const orphans: ScheduleGroup[] = [...byCode.entries()].map(([code, list]) => ({
-      label: code,
-      courseId: `code:${code}`,
-      rows: list,
-    }));
-
-    return [...fromCourses, ...orphans];
-  }, [rows, courses]);
 
   return {
-    groups,
     rows,
     meetingNow: rows.filter((r) => r.state === "in-session"),
     totals: {
