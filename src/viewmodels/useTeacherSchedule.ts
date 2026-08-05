@@ -17,6 +17,7 @@ import { useTeacherDashboard } from "./useTeacherDashboard";
 import type { TeacherClass } from "./useTeacherCourseBoard";
 import {
   describeSchedule,
+  formatTime12,
   humaniseMinutes,
   isEnforceable,
   isInSession,
@@ -138,7 +139,7 @@ export function useTeacherSchedule(
               // teacher wants the weekday — "in 3 days" does not say which.
               mins < 60
               ? `in ${humaniseMinutes(mins)}`
-              : `${nextMeetingDay(schedule, now)} ${schedule?.startTime}`;
+              : `${nextMeetingDay(schedule, now)} ${formatTime12(schedule?.startTime ?? '')}`;
       }
 
       /*

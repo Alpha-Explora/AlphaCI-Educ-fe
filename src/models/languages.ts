@@ -47,6 +47,24 @@ export interface LanguageProfile {
   label: string;
   /** Files whose presence identifies this language in a repository. */
   detect: string[];
+  /**
+   * The project types a teacher can pick that all run THIS pipeline.
+   *
+   * There are seven scaffold stacks and four pipeline languages, and the gap
+   * between those two numbers is the single most confusing thing on this page:
+   * a teacher who set a project to "React" goes looking for a React tab, finds
+   * none, and reasonably concludes their language is unsupported. It is not —
+   * React, Next.js and NestJS are all `package.json` projects that install with
+   * `npm ci` and test with `npm test`, so the pipeline has one Node definition
+   * covering all four (see the `language:` input in scaffold-builder.util.ts,
+   * whose type is exactly 'node' | 'java' | 'python' | 'php').
+   *
+   * Listing them here rather than giving each its own tab is deliberate. Four
+   * tabs would print the same six commands four times, imply a difference the
+   * pipeline does not make, and leave four copies to drift apart the next time
+   * a command changes.
+   */
+  stacks: string[];
   toolchain: {
     runtime: string;
     version: string;
@@ -73,6 +91,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
     key: "node",
     label: "Node.js / TypeScript",
     detect: ["package.json"],
+    stacks: ["Node.js", "NestJS", "Next.js", "React"],
     toolchain: {
       runtime: "Node.js",
       version: "22",
@@ -136,6 +155,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
     key: "python",
     label: "Python",
     detect: ["requirements.txt", "pyproject.toml"],
+    stacks: ["Python"],
     toolchain: { runtime: "CPython", version: "3.12", cache: "pip" },
     commands: [
       {
@@ -194,6 +214,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
     key: "java",
     label: "Java (Maven)",
     detect: ["pom.xml"],
+    stacks: ["Java"],
     toolchain: { runtime: "Temurin JDK", version: "21", cache: "maven" },
     commands: [
       {
@@ -255,6 +276,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
     key: "php",
     label: "PHP",
     detect: ["composer.json"],
+    stacks: ["PHP"],
     toolchain: {
       runtime: "PHP",
       version: "8.3",

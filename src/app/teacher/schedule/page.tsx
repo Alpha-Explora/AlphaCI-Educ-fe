@@ -7,12 +7,18 @@
 // section's own Settings tab, so a teacher with six sections had six pages to
 // visit to see their week — and no way at all to see which one was running now.
 //
-// A TABLE, AND ONE TABLE. Sections are homogeneous rows compared along the same
-// four axes (when, status, what's next, open after hours), which is exactly what
-// a table is for and what a card grid was fighting. It is deliberately NOT
-// grouped per course either: grouping would break the sort that gives the page
-// its point — soonest first — leaving several little tables each ordered
-// internally and none comparable with the others. The course is a column instead.
+// A CALENDAR, THEN A TABLE — and both earn their place.
+//
+// The calendar answers "what does my week actually look like": it expands each
+// section's weekly rule onto real days, so a clash or a heavy Thursday is seen
+// rather than worked out. The table answers "what is the state of each section",
+// which a grid cannot do — a status, a countdown and a switch do not fit in a
+// day cell, and squeezing them there would cost the calendar the thing it is
+// good at.
+//
+// The table is deliberately NOT grouped per course: grouping would break the
+// sort that gives it its point — soonest first — leaving several little tables
+// each ordered internally and none comparable. The course is a column instead.
 //
 // PHILIPPINE TIME, SAID ONCE. Every window here is Asia/Manila regardless of the
 // teacher's laptop clock. Repeating that on every row would be noise; omitting it
@@ -29,6 +35,7 @@ import {
   type ScheduleRow,
 } from "@/viewmodels/useTeacherSchedule";
 import { OutsideHoursToggle } from "@/components/domain/OutsideHoursToggle";
+import { ScheduleCalendar } from "@/components/domain/ScheduleCalendar";
 import {
   Card,
   EmptyState,
@@ -84,7 +91,13 @@ export default function TeacherSchedulePage() {
         }
         loadingFallback={<Skeleton className="h-72 w-full rounded-xl" />}
       >
-        <div className="space-y-4 animate-fade-up">
+        <div className="space-y-8 animate-fade-up">
+          <ScheduleCalendar rows={vm.rows} />
+
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+              Sections
+            </h2>
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-sm">
@@ -139,6 +152,7 @@ export default function TeacherSchedulePage() {
             class so there is one to give them. Ending a class on Home turns it back off
             and signs everyone out.
           </p>
+          </div>
         </div>
       </StateBoundary>
     </div>
