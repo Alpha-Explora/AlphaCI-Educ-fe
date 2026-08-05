@@ -374,6 +374,18 @@ export interface ClassSchedule {
   startTime: string;
   /** "HH:MM", exclusive — a 10:00 end means 10:00 is already over. */
   endTime: string;
+  /**
+   * The laboratory THIS window meets in.
+   *
+   * Per window, because a section moves rooms mid-week: lecture in Laboratory 1
+   * on Monday, hands-on in Laboratory 2 on Wednesday. Absent means "wherever the
+   * section meets" — every window stored before the field existed.
+   *
+   * In an occupancy response this is always set: the server resolves and expands
+   * it there, so the grid can compare it to the room it is drawing without
+   * repeating the fallback and risking a different answer from the server's.
+   */
+  labOrgId?: string;
 }
 
 /**

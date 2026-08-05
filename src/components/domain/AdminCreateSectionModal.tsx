@@ -75,6 +75,21 @@ export function AdminCreateSectionModal({
 
   const course = catalog.courses.find((c) => c.id === courseId) ?? null;
 
+  /*
+    Teachers who work in this laboratory but do NOT teach this course.
+
+    The dropdown lists course INSTRUCTORS, which is correct — the server refuses
+    a section given to anyone else. But the two lists look identical from the
+    outside, so an admin who has just added a teacher to the laboratory opens
+    this, does not find them, and reasonably concludes the appointment failed.
+    Naming them turns a silent omission into an instruction.
+  */
+  const unassigned = useMemo(() => {
+    if (!course) return [];
+    const assigned = new Set(course.instructors.map((i) => i.id));
+    return catalog.teachers.filter((t) => !assigned.has(t.id));
+  }, [course, catalog.teachers]);
+
   // Teacher must belong to the chosen course; clear a stale pick when the course
   // changes rather than sending one the server will refuse.
   useEffect(() => {
@@ -204,11 +219,7 @@ export function AdminCreateSectionModal({
         <Field
           label="Teacher"
           required
-          hint={
-            course && course.instructors.length === 0
-              ? "This course has no teachers yet. Assign one to the course first."
-              : "Only teachers assigned to this course can be given a section of it."
-          }
+          hint={teacherHint(course?.code, course?.instructors.length ?? 0, unassigned)}
         >
           {({ id }) => (
             <Select
@@ -310,6 +321,7 @@ export function AdminCreateSectionModal({
                   bookings={vm.bookings}
                   value={slots}
                   onChange={setSlots}
+                  labs={labChoices.filter((l) => labIds.includes(l.id))}
                 />
               ) : (
                 <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
@@ -355,4 +367,43 @@ export function AdminCreateSectionModal({
       </form>
     </Modal>
   );
+}
+
+/**
+ * Why a teacher an admin expects is not in the list.
+ *
+ * Written as a sentence naming the people rather than a generic rule, because
+ * the generic rule was already there and did not help: "only teachers assigned
+ * to this course" is true, and gives no way to tell whether the teacher you just
+ * added is missing because the appointment failed or because assigning them to
+ * the LABORATORY is a different act from assigning them to the COURSE.
+ *
+ * Capped at three names. Past that the list stops being a prompt and becomes a
+ * paragraph, and the action is the same however many there are.
+ */
+function teacherHint(
+  courseCode: string | undefined,
+  assignedCount: number,
+  unassigned: readonly { id: string; fullName: string }[],
+): string {
+  const where = courseCode ?? "this course";
+
+  if (unassigned.length === 0) {
+    return assignedCount === 0
+      ? `${where} has no teachers yet. Assign one to the course first.`
+      : "Only teachers assigned to this course can be given a section of it.";
+  }
+
+  const shown = unassigned.slice(0, 3).map((t) => t.fullName);
+  const names =
+    unassigned.length > shown.length
+      ? `${shown.join(", ")} and ${unassigned.length - shown.length} more`
+      : shown.length > 1
+        ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`
+        : shown[0];
+  const verb = unassigned.length === 1 ? "teaches" : "teach";
+
+  return assignedCount === 0
+    ? `${where} has no teachers yet. ${names} ${verb} in this laboratory — assign them to the course to give them a section.`
+    : `Only teachers assigned to this course are listed. ${names} ${verb} in this laboratory but not on ${where} — add them to the course first.`;
 }
