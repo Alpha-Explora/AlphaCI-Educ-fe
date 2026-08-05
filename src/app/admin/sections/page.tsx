@@ -112,9 +112,22 @@ export default function AdminSectionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       {row.window ? (
-                        <span className="tabular-nums text-[var(--text-strong)]">
-                          {row.window}
-                        </span>
+                        <div>
+                          <span className="tabular-nums text-[var(--text-strong)]">
+                            {row.window}
+                          </span>
+                          {/*
+                            WHERE, under WHEN. A section can meet in two rooms on
+                            two days, so the hours alone no longer locate it — and
+                            "what is in Laboratory 2?" is the question this table
+                            gets scanned for.
+                          */}
+                          {row.rooms.length > 0 && (
+                            <span className="block text-xs text-[var(--text-muted)]">
+                              {row.rooms.join(" · ")}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <GenericPill tone="warning">No hours set</GenericPill>
                       )}

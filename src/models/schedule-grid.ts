@@ -108,7 +108,7 @@ export function toRuns(blocks: readonly ClassSchedule[]): Map<number, Run[]> {
  * describe themselves three times over. With it, the common timetable stays the
  * one-line thing it always was, and only genuinely different hours split.
  */
-export function toBlocks(runs: DayRuns): ClassSchedule[] {
+export function toBlocks(runs: DayRuns, labOrgId?: string): ClassSchedule[] {
   const byWindow = new Map<string, { from: number; to: number; days: number[] }>();
   for (const [day, dayRuns] of runs) {
     for (const run of dayRuns) {
@@ -124,5 +124,24 @@ export function toBlocks(runs: DayRuns): ClassSchedule[] {
       days: [...entry.days].sort((a, b) => a - b),
       startTime: slotToTime(entry.from),
       endTime: slotToTime(entry.to),
+      // Stamped here rather than by the caller so a window can never come back
+      // from the grid without the room it was drawn in.
+      ...(labOrgId && { labOrgId }),
     }));
+}
+
+/**
+ * The room a window belongs to, for grouping in the editor.
+ *
+ * `fallback` is the first room available to the section. A window with no room
+ * of its own predates the field, and treating it as unassigned would hide it
+ * from every tab — so it is shown under the first room, where an admin can see
+ * it and redraw it. The SERVER resolves the same absence against the section's
+ * meeting labs when it matters; this is only about which tab draws it.
+ */
+export function blockLabOrFallback(
+  block: ClassSchedule,
+  fallback: string | undefined,
+): string | undefined {
+  return block.labOrgId ?? fallback;
 }

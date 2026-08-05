@@ -27,6 +27,7 @@ import { DAY_SHORT, formatTime12, isEnforceable, scheduleBlocks } from "@/models
 import type { ScheduleRow } from "@/viewmodels/useTeacherSchedule";
 import type { ClassSchedule } from "@/models/types";
 import { Button, cn } from "@/components/ui";
+import { useSession } from "@/viewmodels/useSession";
 
 /** Manila is UTC+8, always — see the header. */
 const MANILA_OFFSET_MS = 8 * 60 * 60_000;
@@ -108,6 +109,14 @@ export function ScheduleCalendar({ rows }: { readonly rows: ScheduleRow[] }) {
 
     return { days: built, label: range };
   }, [weekOffset]);
+
+  const { labs } = useSession();
+  const labName = useMemo(() => {
+    const byId = new Map(labs.map((l) => [l.id, l.name]));
+    // Built once and passed down, rather than looked up inside each block: the
+    // grid draws up to seven columns of them and DayColumn is on the hot path.
+    return (id: string | undefined) => (id ? byId.get(id) : undefined);
+  }, [labs]);
 
   const scheduled = rows.filter((r) => isEnforceable(r.classInfo.schedule));
   const unscheduled = rows.filter((r) => !isEnforceable(r.classInfo.schedule));
@@ -202,6 +211,7 @@ export function ScheduleCalendar({ rows }: { readonly rows: ScheduleRow[] }) {
                 weekday={d.weekday}
                 rows={scheduled}
                 hours={hours}
+                labName={labName}
               />
             ))}
           </div>
@@ -233,10 +243,13 @@ function DayColumn({
   weekday,
   rows,
   hours,
+  labName,
 }: {
   readonly weekday: number;
   readonly rows: ScheduleRow[];
   readonly hours: number[];
+  /** Names a room id, so a block can say WHERE as well as when. */
+  readonly labName: (id: string | undefined) => string | undefined;
 }) {
   /*
     Flattened to MEETINGS: one entry per (section, window) that names this day.
@@ -270,7 +283,12 @@ function DayColumn({
           <Link
             key={`${row.classInfo.id}-${block.startTime}`}
             href={`/teacher/classes/${row.classInfo.id}`}
-            title={`${row.sectionLabel} — ${row.courseLabel} · ${row.window}`}
+            title={[
+              `${row.sectionLabel} — ${row.courseLabel} · ${row.window}`,
+              labName(block.labOrgId),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             style={{ top, height: Math.max(height, 22) }}
             className={cn(
               "absolute inset-x-1 overflow-hidden rounded border px-1.5 py-0.5 text-[11px] leading-tight transition-opacity hover:opacity-85",
@@ -281,6 +299,16 @@ function DayColumn({
             <span className="block truncate tabular-nums opacity-80">
               {formatTime12(block.startTime)}–{formatTime12(block.endTime)}
             </span>
+            {/*
+              The room, when the block is tall enough to hold a third line. A
+              section can meet in a different laboratory on a different day, so
+              the hour alone no longer says where to go.
+            */}
+            {height >= 44 && labName(block.labOrgId) && (
+              <span className="block truncate text-[10px] opacity-70">
+                {labName(block.labOrgId)}
+              </span>
+            )}
           </Link>
         );
       })}

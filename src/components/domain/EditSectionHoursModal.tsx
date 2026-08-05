@@ -11,12 +11,13 @@
 // rooms are facts it already holds, and asking the client to restate them would
 // be a round trip and a chance to send something stale.
 // ============================================================================
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAdminCreateSection } from "@/viewmodels/useAdminCreateSection";
+import { useSession } from "@/viewmodels/useSession";
 import type { AdminSectionRow } from "@/viewmodels/useAdminSections";
 import type { ClassSchedule } from "@/models/types";
 import { scheduleBlocks } from "@/models/schedule";
-import { Banner, Button, Modal } from "@/components/ui";
+import { Banner, Button, Modal, cn } from "@/components/ui";
 import { ScheduleGridPicker } from "./ScheduleGridPicker";
 import type { PresentableError } from "@/viewmodels/errors";
 
@@ -44,17 +45,47 @@ export function EditSectionHoursModal({
     scheduleBlocks(row.classInfo.schedule),
   );
 
-  const vm = useAdminCreateSection({ classId });
+  const { labs } = useSession();
+
+  /*
+    Which rooms this section may use.
+
+    Editable HERE, not just on creation, because moving a class to another
+    laboratory mid-term is ordinary and re-creating the section to record it
+    would mean a second roster and a second gradebook for one cohort. Seeded
+    from what the section already meets in, falling back to the laboratory that
+    owns it — a section recorded before rooms were tracked meets where it lives.
+  */
+  const [labIds, setLabIds] = useState<string[]>(() => {
+    const meeting = row.classInfo.meetingLabOrgIds ?? [];
+    return meeting.length > 0 ? meeting : [row.classInfo.orgId];
+  });
+
+  const labChoices = useMemo(
+    () => labs.filter((l) => labIds.includes(l.id)).map((l) => ({ id: l.id, name: l.name })),
+    [labs, labIds],
+  );
+
+  /*
+    `labOrgIds` is passed EXPLICITLY alongside the class id. The server resolves
+    a section's rooms from `classId` when the client says nothing, which would
+    shade the rooms it meets in TODAY — so a laboratory ticked a moment ago would
+    show an empty week and imply every hour in it was free.
+  */
+  const vm = useAdminCreateSection({ classId, labOrgIds: labIds });
 
   const complete = blocks.length > 0;
 
   useEffect(() => {
     if (!complete) return;
-    const id = setTimeout(() => vm.check({ schedule: blocks, classId }), 250);
+    const id = setTimeout(
+      () => vm.check({ schedule: blocks, classId, labOrgIds: labIds }),
+      250,
+    );
     return () => clearTimeout(id);
     // vm identity changes each render; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complete, blocks, classId]);
+  }, [complete, blocks, classId, labIds]);
 
   const blocked = vm.conflicts.length > 0;
 
@@ -69,7 +100,54 @@ export function EditSectionHoursModal({
       <div className="space-y-4">
         {error && <Banner tone="error">{error.message}</Banner>}
 
-        <ScheduleGridPicker bookings={vm.bookings} value={blocks} onChange={setBlocks} />
+        <fieldset>
+          <legend className="text-sm font-medium text-[var(--text-strong)]">
+            Laboratories
+          </legend>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            Every room this section uses. Each meeting is then booked in one of
+            them.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {labs.map((option) => {
+              const on = labIds.includes(option.id);
+              // Untickable only while nothing is booked there — dropping a room
+              // out from under its windows would leave them pointing at a
+              // laboratory this section no longer meets in.
+              const inUse = blocks.some((b) => b.labOrgId === option.id);
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={on && inUse}
+                  title={on && inUse ? "Remove its meetings first." : undefined}
+                  onClick={() =>
+                    setLabIds((cur) =>
+                      on ? cur.filter((x) => x !== option.id) : [...cur, option.id],
+                    )
+                  }
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm ring-1 ring-inset transition-colors",
+                    on
+                      ? "bg-platform-50 text-platform-800 ring-platform-300"
+                      : "bg-white text-[var(--text-muted)] ring-[var(--border-subtle)] hover:bg-slate-50",
+                    on && inUse && "cursor-not-allowed opacity-70",
+                  )}
+                >
+                  {option.name}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <ScheduleGridPicker
+          bookings={vm.bookings}
+          value={blocks}
+          onChange={setBlocks}
+          labs={labChoices}
+        />
 
         {blocked && (
           <Banner tone="error" title="This slot is already taken">

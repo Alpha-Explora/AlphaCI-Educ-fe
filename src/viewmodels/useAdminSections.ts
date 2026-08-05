@@ -15,9 +15,10 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { classesApi } from "@/models/api";
 import type { ClassCohort, ClassSchedule } from "@/models/types";
-import { describeSchedule, isEnforceable } from "@/models/schedule";
+import { describeSchedule, isEnforceable, scheduleBlocks } from "@/models/schedule";
 import { queryKeys } from "./queryKeys";
 import { toPresentableError, type PresentableError } from "./errors";
+import { useSession } from "./useSession";
 
 export interface AdminSectionRow {
   classInfo: ClassCohort;
@@ -25,6 +26,15 @@ export interface AdminSectionRow {
   label: string;
   /** "Mon, Wed · 8am–10am", or null when it has no hours yet. */
   window: string | null;
+  /**
+   * Every laboratory this section's hours are booked in, by NAME.
+   *
+   * Its own field rather than folded into `window`, because a section meeting in
+   * two rooms has one timetable and two places — and the list is what an admin
+   * scans to answer "what is in Laboratory 2?". Empty when the section has no
+   * hours, or when its rooms cannot be named from the session.
+   */
+  rooms: string[];
 }
 
 export interface AdminSectionsVM {
@@ -46,6 +56,9 @@ export interface AdminSectionsVM {
 
 export function useAdminSections(orgId: string | null): AdminSectionsVM {
   const queryClient = useQueryClient();
+  // Rooms are ids on a section and names on a screen; the session is what holds
+  // the mapping, and it is already loaded for every admin surface.
+  const { labs } = useSession();
 
   const query = useQuery({
     queryKey: queryKeys.classes.list({ orgId: orgId ?? undefined }),
@@ -79,12 +92,20 @@ export function useAdminSections(orgId: string | null): AdminSectionsVM {
   });
 
   const sections = useMemo<AdminSectionRow[]>(() => {
+    const labNameById = new Map(labs.map((l) => [l.id, l.name]));
     const rows = (query.data ?? []).map((classInfo) => ({
       classInfo,
       label: `${classInfo.code} · ${classInfo.section}`,
       window: isEnforceable(classInfo.schedule)
         ? describeSchedule(classInfo.schedule)
         : null,
+      rooms: [
+        ...new Set(
+          scheduleBlocks(classInfo.schedule)
+            .map((b) => labNameById.get(b.labOrgId ?? ""))
+            .filter((name): name is string => Boolean(name)),
+        ),
+      ],
     }));
     // Unscheduled last: they are the ones needing attention, but they sort
     // nowhere sensible among real times, so they go in their own block.
@@ -93,7 +114,7 @@ export function useAdminSections(orgId: string | null): AdminSectionsVM {
       if (a.window && !b.window) return -1;
       return a.label.localeCompare(b.label);
     });
-  }, [query.data]);
+  }, [query.data, labs]);
 
   return {
     sections,

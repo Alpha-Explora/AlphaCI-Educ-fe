@@ -21,6 +21,17 @@
 // arithmetic and the run merging, because those have edge cases at every
 // boundary and none of them need React to be exercised.
 //
+// ONE ROOM AT A TIME
+//
+// A window carries the laboratory it meets in, so a section can run Monday in
+// Laboratory 1 and Wednesday in Laboratory 2. The grid therefore draws ONE room:
+// the tabs pick which, dragging stamps that room onto the window, and the other
+// rooms’ windows stay visible in outline so the week still reads as a whole.
+//
+// What is shaded changes with the tab too, and only half of it. A ROOM is busy
+// only in its own tab; the TEACHER is busy in every tab, because they cannot be
+// in two laboratories at once however free the second one is.
+//
 // BUSY CELLS ARE NOT CLICKABLE. Greying alone would let an admin drag across a
 // booked slot and only learn at Save; the pointer refuses instead, and a drag
 // that would cross a busy cell stops at its edge.
@@ -30,6 +41,7 @@ import { DAY_SHORT, formatTime12 } from "@/models/schedule";
 import {
   GRID_SLOTS_PER_HOUR as SLOTS_PER_HOUR,
   GRID_TOTAL_SLOTS as TOTAL_SLOTS,
+  blockLabOrFallback,
   mergeRuns,
   slotToTime,
   timeToSlot,
@@ -56,12 +68,47 @@ export function ScheduleGridPicker({
   bookings,
   value,
   onChange,
+  labs,
 }: {
   readonly bookings: ScheduleBooking[];
   /** Every window currently chosen. Empty means the section has no timetable. */
   readonly value: readonly ClassSchedule[];
   readonly onChange: (next: ClassSchedule[]) => void;
+  /** Rooms this section may use. The first is where drawing starts. */
+  readonly labs: readonly { id: string; name: string }[];
 }) {
+  const fallbackLab = labs[0]?.id;
+  const [activeLab, setActiveLab] = useState<string | undefined>(fallbackLab);
+
+  /*
+    Keep the tab on a room the section still has. Untick a laboratory while its
+    tab is open and the grid would otherwise keep stamping windows with a room
+    the section no longer meets in.
+  */
+  const lab = labs.some((l) => l.id === activeLab) ? activeLab : fallbackLab;
+  if (lab !== activeLab) setActiveLab(lab);
+
+  const labName = (id: string | undefined) =>
+    labs.find((l) => l.id === id)?.name ?? "this laboratory";
+
+  /*
+    The windows this tab edits, and the ones it merely shows.
+
+    MEMOIZED, and not as a micro-optimisation. A drag fires setHover on every
+    pointer move; if these were plain `.filter` calls they would return new
+    arrays each time, `toRuns` below would rebuild its Map, and every DayColumn
+    would get a fresh `selected` prop — defeating the memo that keeps a drag from
+    re-rendering all 224 cells. That is exactly the lag this grid was rebuilt to
+    remove.
+  */
+  const [mine, others] = useMemo(() => {
+    const here: ClassSchedule[] = [];
+    const away: ClassSchedule[] = [];
+    for (const block of value) {
+      (blockLabOrFallback(block, fallbackLab) === lab ? here : away).push(block);
+    }
+    return [here, away] as const;
+  }, [value, lab, fallbackLab]);
   // Anchor slot of a drag in progress, or null. Held in state (not a ref) so the
   // preview repaints as the pointer moves.
   const [anchor, setAnchor] = useState<{ day: number; slot: number } | null>(null);
@@ -92,6 +139,14 @@ export function ScheduleGridPicker({
       // the room twice, and reading only the first would leave its second
       // window looking free.
       for (const block of booking.schedule) {
+        /*
+          The room half of the filter. The server sends every window with a
+          concrete `labOrgId`, so a laboratory booking only shades the tab it
+          belongs to — booking Laboratory 1 at nine must leave Laboratory 2 at
+          nine drawable. A TEACHER booking has no such escape: it shades every
+          tab, because the person is busy wherever the room is.
+        */
+        if (!booking.reasons.includes("TEACHER") && block.labOrgId !== lab) continue;
         const from = Math.max(0, timeToSlot(block.startTime));
         const to = Math.min(TOTAL_SLOTS, timeToSlot(block.endTime));
         for (const day of block.days) {
@@ -111,11 +166,16 @@ export function ScheduleGridPicker({
       }
     }
     return map;
-  }, [bookings]);
+  }, [bookings, lab]);
 
   const isBusy = (day: number, slot: number) => busy.get(`${day}:${slot}`)?.length;
 
-  const runs = useMemo(() => toRuns(value), [value]);
+  // This tab's windows only. Feeding the whole value in would draw Laboratory
+  // 2's Wednesday as if it were this room's, and editing it here would move it.
+  const runs = useMemo(() => toRuns(mine), [mine]);
+
+  /** Other rooms' windows, per day, drawn in outline so the week reads whole. */
+  const elsewhere = useMemo(() => toRuns(others), [others]);
 
   /** The range a drag currently describes, clamped before any booked slot. */
   const previewRange = (() => {
@@ -138,7 +198,9 @@ export function ScheduleGridPicker({
     for (const [day, dayRuns] of next) {
       if (dayRuns.length === 0) next.delete(day);
     }
-    onChange(toBlocks(next));
+    // Stamped with the tab's room, and put back beside the rooms it does not
+    // touch — this editor owns one laboratory's windows, not the whole set.
+    onChange(sortBlocks([...others, ...toBlocks(next, lab)]));
   };
 
   /** Adds a window. Overlapping or abutting ones on that day become one. */
@@ -162,15 +224,56 @@ export function ScheduleGridPicker({
     setHover(null);
   };
 
-  const blocks = toBlocks(runs);
+  // Every window, both tabs' worth: the chips below are the one place an admin
+  // can see and remove the whole timetable without hunting through the tabs.
+  const blocks = sortBlocks([...others, ...toBlocks(runs, lab)]);
 
   return (
     <div className="space-y-2">
+      {/*
+        Only when there is a choice to make. One laboratory means every window
+        goes there anyway, and a single tab would be a control that does nothing.
+      */}
+      {labs.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-[var(--text-muted)]">Drawing in</span>
+          {labs.map((option) => {
+            const on = option.id === lab;
+            const count = value.filter(
+              (b) => blockLabOrFallback(b, fallbackLab) === option.id,
+            ).length;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setActiveLab(option.id)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
+                  on
+                    ? "bg-platform-600 text-white ring-platform-600"
+                    : "bg-white text-[var(--text-muted)] ring-[var(--border-subtle)] hover:bg-slate-50",
+                )}
+              >
+                {option.name}
+                {count > 0 && (
+                  <span className={cn("ml-1.5", on ? "text-white/75" : "text-platform-600")}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[var(--text-muted)]">
-          Drag down a column for each meeting — drag again on another day to add a
-          second one. Click a blue block to remove it. Shaded slots name the
-          section already booked there.
+          Drag down a column for each meeting in{" "}
+          <span className="font-medium text-[var(--text-strong)]">{labName(lab)}</span>.
+          Click a blue block to remove it. Shaded slots name the section already
+          booked there
+          {labs.length > 1 && "; outlined blocks are this section in another room"}.
         </p>
         {blocks.length > 0 && (
           <button
@@ -236,6 +339,7 @@ export function ScheduleGridPicker({
                 day={day}
                 busy={busy}
                 selected={runs.get(day) ?? EMPTY_RUNS}
+                elsewhere={elsewhere.get(day) ?? EMPTY_RUNS}
                 preview={
                   previewRange?.day === day
                     ? { from: previewRange.from, to: previewRange.to + 1 }
@@ -269,17 +373,29 @@ export function ScheduleGridPicker({
       {blocks.length > 0 ? (
         <ul className="flex flex-wrap gap-1.5">
           {blocks.map((block) => (
-            <li key={`${block.startTime}-${block.endTime}-${block.days.join()}`}>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-platform-50 px-2.5 py-1 text-xs font-medium text-platform-700">
+            <li key={`${block.labOrgId ?? ""}-${block.startTime}-${block.endTime}-${block.days.join()}`}>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                  // The chips for the room being edited read as active; the rest
+                  // are context, matching how the grid draws them.
+                  blockLabOrFallback(block, fallbackLab) === lab
+                    ? "bg-platform-50 text-platform-700"
+                    : "bg-slate-100 text-slate-600",
+                )}
+              >
                 {block.days.map((d) => DAY_SHORT[d]).join(", ")} ·{" "}
                 {formatTime12(block.startTime)}–{formatTime12(block.endTime)}
+                {labs.length > 1 && (
+                  <span className="opacity-70">
+                    · {labName(blockLabOrFallback(block, fallbackLab))}
+                  </span>
+                )}
                 <button
                   type="button"
-                  aria-label={`Remove ${block.days.map((d) => DAY_SHORT[d]).join(", ")} ${formatTime12(block.startTime)} to ${formatTime12(block.endTime)}`}
-                  onClick={() =>
-                    onChange(blocks.filter((other) => other !== block))
-                  }
-                  className="text-platform-500 transition-colors hover:text-platform-800"
+                  aria-label={`Remove ${block.days.map((d) => DAY_SHORT[d]).join(", ")} ${formatTime12(block.startTime)} to ${formatTime12(block.endTime)} in ${labName(blockLabOrFallback(block, fallbackLab))}`}
+                  onClick={() => onChange(blocks.filter((other) => other !== block))}
+                  className="opacity-60 transition-opacity hover:opacity-100"
                 >
                   ×
                 </button>
@@ -301,6 +417,22 @@ export function ScheduleGridPicker({
 
 /** Shared empty array, so an unselected column keeps the same prop identity. */
 const EMPTY_RUNS: Run[] = [];
+
+/**
+ * A stable order for the chip list: room, then time of day.
+ *
+ * Without it the list re-shuffles whenever a tab is switched, because the tab
+ * being edited rebuilds its windows and the others are simply concatenated. A
+ * timetable that reorders itself as you look at it is unreadable.
+ */
+function sortBlocks(blocks: ClassSchedule[]): ClassSchedule[] {
+  return [...blocks].sort(
+    (a, b) =>
+      (a.labOrgId ?? "").localeCompare(b.labOrgId ?? "") ||
+      a.startTime.localeCompare(b.startTime) ||
+      Math.min(...a.days) - Math.min(...b.days),
+  );
+}
 
 /**
  * Why this booking blocks the slot, in two words.
@@ -341,14 +473,17 @@ const DayColumn = memo(function DayColumn({
   day,
   busy,
   selected,
+  elsewhere,
   preview,
   onPointerDownSlot,
   onPointerMoveSlot,
 }: {
   readonly day: number;
   readonly busy: Map<string, ScheduleBooking[]>;
-  /** Every window chosen on this day. Several, since each drag adds one. */
+  /** Every window chosen on this day, IN THE ACTIVE ROOM. */
   readonly selected: readonly Run[];
+  /** This section's windows on this day in OTHER rooms — context, not editable. */
+  readonly elsewhere: readonly Run[];
   readonly preview: Run | null;
   readonly onPointerDownSlot: (slot: number) => void;
   readonly onPointerMoveSlot: (slot: number) => void;
@@ -458,6 +593,21 @@ const DayColumn = memo(function DayColumn({
           </div>
         );
       })}
+
+      {/*
+        The same section, in a room this tab is not drawing. Outlined rather than
+        filled so it cannot be mistaken for something editable here, and drawn
+        BEFORE the active room so an overlap resolves in favour of what is being
+        edited. Not interactive: removing it belongs to its own tab, or to the
+        chips below the grid.
+      */}
+      {elsewhere.map((run) => (
+        <div
+          key={`other-${run.from}`}
+          style={{ top: run.from * SLOT_PX, height: (run.to - run.from) * SLOT_PX }}
+          className="pointer-events-none absolute inset-x-0 rounded-sm border border-dashed border-platform-400 bg-platform-100/40"
+        />
+      ))}
 
       {selected.map((run) => (
         <div

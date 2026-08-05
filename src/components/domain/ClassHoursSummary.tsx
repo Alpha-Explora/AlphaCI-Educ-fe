@@ -13,6 +13,7 @@
 // where conflict checking lives with it.
 // ============================================================================
 import { Card, GenericPill } from "@/components/ui";
+import { useSession } from "@/viewmodels/useSession";
 import { DAY_SHORT, WEEK_ORDER, formatTime12, isEnforceable, scheduleBlocks } from "@/models/schedule";
 import type { ClassSchedule } from "@/models/types";
 
@@ -27,6 +28,16 @@ export function ClassHoursSummary({
   // one of the two meetings — the teacher would plan around a class that is not
   // when the card says it is.
   const blocks = scheduleBlocks(schedule);
+
+  /*
+    Rooms are named, not just recorded. A section can meet in Laboratory 1 on
+    Monday and Laboratory 2 on Wednesday, and a teacher reading "Wed 1–3pm" with
+    no room has to ask someone where to go. Only shown when the section actually
+    uses more than one — repeating a single room on every line is noise.
+  */
+  const { labs } = useSession();
+  const labName = (id: string | undefined) => labs.find((l) => l.id === id)?.name;
+  const manyRooms = new Set(blocks.map((b) => b.labOrgId)).size > 1;
 
   return (
     <Card className="p-5 animate-fade-up sm:max-w-2xl">
@@ -51,7 +62,7 @@ export function ClassHoursSummary({
           <dl className="space-y-2 text-sm">
             {blocks.map((block) => (
               <div
-                key={`${block.days.join()}-${block.startTime}`}
+                key={`${block.labOrgId ?? ""}-${block.days.join()}-${block.startTime}`}
                 className="flex justify-between gap-4"
               >
                 <dt className="text-[var(--text-muted)]">
@@ -59,8 +70,15 @@ export function ClassHoursSummary({
                     .map((d) => DAY_SHORT[d])
                     .join(", ")}
                 </dt>
-                <dd className="font-medium tabular-nums text-[var(--text-strong)]">
-                  {formatTime12(block.startTime)} – {formatTime12(block.endTime)}
+                <dd className="text-right">
+                  <span className="font-medium tabular-nums text-[var(--text-strong)]">
+                    {formatTime12(block.startTime)} – {formatTime12(block.endTime)}
+                  </span>
+                  {manyRooms && labName(block.labOrgId) && (
+                    <span className="block text-xs text-[var(--text-muted)]">
+                      {labName(block.labOrgId)}
+                    </span>
+                  )}
                 </dd>
               </div>
             ))}
