@@ -6,16 +6,17 @@
 // a laboratory and the last thing undone: no student can reach their work until
 // this code is on the screen.
 //
-// IT PICKS THE SECTION ITSELF. This used to open with a dropdown, which asked the
-// teacher a question their own timetable already answers — and asked it at the
-// worst moment, standing in front of a full room. `classMeetingNow` reads the
-// schedules and pre-selects whichever section is meeting now (or opening
-// soonest), so the ordinary case is one button and nothing else.
+// IT SHOWS THE UPCOMING CLASS, AND ONLY THAT. `classMeetingNow` reads the
+// timetable and picks whichever section is meeting now (or opening soonest), so
+// Home answers one question — "start the class I am about to teach" — in one
+// button.
 //
-// The picker still exists behind "Switch section", because auto-detection is a
-// GUESS and the cases it gets wrong are real: a make-up class, a room swap, a
-// section with no schedule set. A guess that cannot be overridden is worse than
-// no guess at all.
+// There is deliberately no section picker here any more. A dropdown asked the
+// teacher something their own timetable already answers, at the worst possible
+// moment, standing in front of a full room. Any OTHER section is opened from its
+// own Settings tab (see ClassAccessPanel), which is where a make-up class or a
+// room swap is dealt with — and where the section being acted on is the page you
+// are standing on rather than a choice in a list.
 //
 // Loud when open, quiet when closed — it is read off a projector by people at the
 // back of the room, but a teacher glancing at the dashboard between classes
@@ -34,19 +35,10 @@ import {
   minutesUntilOpen,
   nextMeetingDay,
 } from "@/models/schedule";
-import { Banner, Button, GenericPill, Select, Spinner, cn } from "@/components/ui";
+import { Banner, Button, GenericPill, Spinner, cn } from "@/components/ui";
 import { JoinCodeDisplay } from "./JoinCodeDisplay";
 
 export function ClassAccessCard({ classes }: { readonly classes: TeacherClass[] }) {
-  /*
-    `null` means "follow the timetable" — the auto-detected section. It only
-    becomes an id when the teacher overrides, which is why this is not simply
-    seeded with the detected value: a seeded id would freeze the card on whatever
-    section was current when the page loaded, and a dashboard left open through a
-    period change would keep offering the class that just finished.
-  */
-  const [override, setOverride] = useState<string | null>(null);
-
   /*
     Re-detect every minute. The teacher's dashboard is left open across period
     boundaries far more often than it is reloaded — that IS the usage pattern —
@@ -59,13 +51,7 @@ export function ClassAccessCard({ classes }: { readonly classes: TeacherClass[] 
     return () => clearInterval(id);
   }, []);
 
-  const detected = useMemo(() => classMeetingNow(classes, now), [classes, now]);
-
-  // An override that no longer exists (section deleted, lab switched) falls back
-  // to detection rather than leaving the card pinned to a dead id.
-  const overridden = override ? classes.find((c) => c.id === override) : null;
-  const selected = overridden ?? detected;
-
+  const selected = useMemo(() => classMeetingNow(classes, now), [classes, now]);
   const access = useClassAccess(selected?.id ?? null);
 
   if (classes.length === 0) return null;
@@ -100,9 +86,6 @@ export function ClassAccessCard({ classes }: { readonly classes: TeacherClass[] 
         scheduled={scheduled}
         inSession={inSession}
         now={now}
-        classes={classes}
-        override={override}
-        onOverride={setOverride}
       />
 
       <div className="space-y-4 px-5 py-5">
@@ -160,9 +143,6 @@ function StatusRail({
   scheduled,
   inSession,
   now,
-  classes,
-  override,
-  onOverride,
 }: {
   readonly isOpen: boolean;
   readonly outsideHours: boolean;
@@ -171,12 +151,7 @@ function StatusRail({
   readonly scheduled: boolean;
   readonly inSession: boolean;
   readonly now: Date;
-  readonly classes: TeacherClass[];
-  readonly override: string | null;
-  readonly onOverride: (id: string | null) => void;
 }) {
-  const [picking, setPicking] = useState(false);
-
   return (
     <div
       className={cn(
@@ -214,35 +189,6 @@ function StatusRail({
         {outsideHours && <GenericPill tone="warning">Outside hours open</GenericPill>}
       </div>
 
-      <div className="flex items-center gap-2">
-        {picking && classes.length > 1 && (
-          <Select
-            value={override ?? ""}
-            onChange={(e) => onOverride(e.target.value || null)}
-            className="w-auto min-w-[13rem]"
-            aria-label="Section"
-          >
-            {/* The empty value is a real choice, not a placeholder: it hands the
-                card back to the timetable after a manual override. */}
-            <option value="">Follow my timetable</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {labelFor(c)} — {c.name}
-              </option>
-            ))}
-          </Select>
-        )}
-
-        {classes.length > 1 && (
-          <button
-            type="button"
-            onClick={() => setPicking((p) => !p)}
-            className="text-xs font-medium text-platform underline underline-offset-2 hover:text-platform-700"
-          >
-            {picking ? "Done" : "Switch section"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

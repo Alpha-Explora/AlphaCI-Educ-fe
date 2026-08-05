@@ -25,13 +25,10 @@ import { useStudentDashboard } from "@/viewmodels/useStudentDashboard";
 import { Button, EmptyState, SkeletonCard, StateBoundary } from "@/components/ui";
 import { JoinClassModal } from "@/components/domain/JoinClassModal";
 import { StudentClassCard } from "@/components/domain/StudentClassCard";
-import { ClassCodeBar } from "@/components/domain/ClassCodeBar";
-import { useClassCode } from "@/viewmodels/useClassCode";
 
 export default function StudentHubPage() {
   const { user } = useSession();
   const vm = useStudentDashboard(user?.id ?? null);
-  const code = useClassCode();
   const [joinOpen, setJoinOpen] = useState(false);
 
   return (
@@ -51,16 +48,6 @@ export default function StudentHubPage() {
           <span aria-hidden="true">＋</span> Join Class
         </Button>
       </div>
-
-      {/*
-        Above the cards, and only when it has something to do: a class is waiting
-        for a code, or the student is in no classes at all. It sits outside the
-        StateBoundary so a student with nothing enrolled still gets somewhere to
-        type their first join code rather than an empty state alone.
-      */}
-      {!vm.isLoading && !vm.error && (
-        <ClassCodeBar vm={code} sections={vm.sections} />
-      )}
 
       <StateBoundary
         isLoading={vm.isLoading}
