@@ -90,6 +90,18 @@ export function useStudentDashboard(studentId: string | null): StudentDashboardV
     queryKey: queryKeys.dashboards.student(studentId ?? "none"),
     queryFn: () => dashboardsApi.student(studentId as string),
     enabled: Boolean(studentId),
+    /*
+      The payload now carries whether each class is workable RIGHT NOW
+      (ClassAccessState.state), and a teacher pressing Start or End changes that
+      for the whole room at once with nothing to push it to an open tab. 30s is
+      the compromise: a student sees their class open within half a minute of the
+      teacher starting it, while thirty tabs in a laboratory are not hammering
+      the endpoint.
+    */
+    refetchInterval: 30_000,
+    // The common shape of a lab session is "open the dashboard, work in VS Code
+    // for twenty minutes, come back" — and the class may have ended in between.
+    refetchOnWindowFocus: true,
   });
 
   const sections = useMemo<ClassSection[]>(() => {

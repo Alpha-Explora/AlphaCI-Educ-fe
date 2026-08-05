@@ -1,6 +1,5 @@
 // VIEW LAYER — Student area shell.
 import { AppShell, type NavItem } from "@/components/layout/AppShell";
-import { ClassCodeGate } from "@/components/domain/ClassCodeGate";
 
 // Logout is rendered by AppShell in the one top header.
 // Icons are required — the rail collapses to 56px, where the glyph is all there is.
@@ -19,19 +18,19 @@ export default function StudentLayout({
   readonly children: React.ReactNode;
 }) {
   /*
-    The gate wraps the SHELL, not the page content — so an un-admitted student
-    gets a single focused screen rather than the full nav rail wrapped around a
-    locked panel. Every student route is inside this layout, so there is no page
-    that renders without passing it first.
+    NO GATE HERE, and that is deliberate. A class-code screen used to wrap this
+    shell and hold the whole student area shut until a code was typed — which also
+    hid a student's own marks, feedback and project briefs from them, anywhere,
+    at any hour.
 
-    Enforcement is the server's (ClassAccessGuard refuses every student API call
-    with 403 CLASS_CODE_REQUIRED); this only decides what is on screen.
+    The code now gates DOING the work rather than seeing the product: the
+    dashboard always renders, and each course card shows itself open or closed
+    with the reason (see useMyClassAccess). Enforcement is the server's, in
+    AccessPolicy.assertProjectActionable — nothing here grants anything.
   */
   return (
-    <ClassCodeGate>
-      <AppShell role="STUDENT" nav={NAV}>
-        {children}
-      </AppShell>
-    </ClassCodeGate>
+    <AppShell role="STUDENT" nav={NAV}>
+      {children}
+    </AppShell>
   );
 }

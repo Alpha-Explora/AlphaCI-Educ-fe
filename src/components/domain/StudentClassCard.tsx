@@ -22,6 +22,7 @@
 import Link from "next/link";
 import { CardDecor, GenericPill, cn, patternFor } from "@/components/ui";
 import { manilaMoment } from "@/models/manila";
+import { CLASS_STATE_COPY } from "@/viewmodels/useClassCode";
 import type { ClassSection } from "@/viewmodels/useStudentDashboard";
 
 export function StudentClassCard({
@@ -34,8 +35,17 @@ export function StudentClassCard({
 }) {
   const { classInfo, access, active, past, total } = section;
 
-  // Closed only when the SERVER says so — never derived from the browser clock.
-  const locked = access ? !access.inSession : false;
+  /*
+    CLOSED ONLY WHEN THE SERVER SAYS SO — never derived from the browser clock.
+
+    `state` is the whole answer ("can this student work on this class right now"),
+    computed by the same code AccessPolicy consults when it refuses, so this card
+    can never promise something the API will then deny. A class the server sent no
+    state for is treated as open, matching the fallback for having no schedule.
+  */
+  const state = access?.state ?? "open";
+  const copy = CLASS_STATE_COPY[state];
+  const locked = state !== "open";
 
   return (
     <Link
@@ -48,6 +58,16 @@ export function StudentClassCard({
           "bg-gradient-to-br from-platform-50 via-platform-50 to-white p-5 pt-6 shadow-card",
           "transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-platform-300 group-hover:shadow-card-hover",
           "animate-fade-up",
+          /*
+            GREYED WHEN CLOSED. Desaturating the whole card is what makes the one
+            open class findable in a grid of six without reading a single word.
+
+            Applied as a wash on the card's own surface rather than `opacity`,
+            deliberately: opacity would fade the status pill and the hint — the
+            two things explaining WHY it is closed and what to do — which is the
+            information a student most needs at exactly that moment.
+          */
+          locked && "border-slate-200 from-slate-50 via-slate-50 to-white",
         )}
         style={{ animationDelay: `${index * 50}ms` }}
       >
@@ -67,7 +87,9 @@ export function StudentClassCard({
           {active.length > 0 && (
             <GenericPill tone="warning">{active.length} to do</GenericPill>
           )}
-          {locked && <GenericPill>🔒 Closed</GenericPill>}
+          {/* The state, not just "closed". Each of the four has a different thing
+              the student should do next, and a lock icon says none of them. */}
+          {locked && <GenericPill tone={copy.tone}>{copy.label}</GenericPill>}
         </div>
 
         <h2 className="relative mt-2 text-base font-semibold text-[var(--text-strong)]">
@@ -97,12 +119,15 @@ export function StudentClassCard({
           </div>
         </div>
 
-        {/* Class hours, on the card rather than one level in. A student who cannot
-            work right now should learn that BEFORE opening the class and finding
-            every action refused. */}
-        {locked && access?.opensAt && (
+        {/* WHY it is closed, on the card rather than one level in. A student who
+            cannot work right now should learn that — and what to do about it —
+            BEFORE opening the class and finding every action refused. */}
+        {locked && (
           <p className="relative mt-3 text-xs text-[var(--text-muted)]">
-            Opens {manilaMoment(access.opensAt)}
+            {copy.hint}
+            {state === "outside-hours" && access?.opensAt
+              ? ` Opens ${manilaMoment(access.opensAt)}.`
+              : ""}
           </p>
         )}
 
