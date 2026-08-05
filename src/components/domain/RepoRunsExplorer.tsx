@@ -18,21 +18,34 @@ export function RepoRunsExplorer({
   selectedBranch,
   onSelectBranch,
   runs,
+  runsOnOtherBranches = 0,
   audience,
   onTriggerRun,
   isTriggering,
   sonarDashboardUrl,
-}: {
+  maxPoints,
+}: Readonly<{
   branches: RepoBranch[];
   selectedBranch: string | null;
   onSelectBranch: (name: string) => void;
   runs: PipelineRun[];
+  /**
+   * Runs this repository has that the branch filter excluded.
+   *
+   * Rendered as a note, because the filter used to give up silently and show
+   * every branch's runs whenever the selected one had none — which looked
+   * identical to those runs belonging to the selected branch. Saying "3 more on
+   * other branches" keeps the list strict without making the rest invisible.
+   */
+  runsOnOtherBranches?: number;
   audience: "student" | "teacher";
   onTriggerRun?: () => void;
   isTriggering?: boolean;
   /** This repository's SonarCloud project, when one was provisioned. */
   sonarDashboardUrl?: string;
-}) {
+  /** What THIS repository is marked out of — the run score's denominator. */
+  maxPoints?: number;
+}>) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   // ONLY THE GRADED BRANCHES.
@@ -96,12 +109,34 @@ export function RepoRunsExplorer({
             runs={runs}
             selectedRunId={effectiveRunId}
             onSelect={setSelectedRunId}
+            maxPoints={maxPoints}
           />
+          {/*
+            What the branch filter left out. Pull-request runs are the usual
+            reason: the workflow reports GitHub's ref name, which on a
+            `pull_request` event is the synthetic `N/merge` ref rather than the
+            branch, so those runs match no chip above. Without this line a strict
+            filter reads as "the pipeline has not run", which is the wrong
+            conclusion to leave a teacher holding.
+          */}
+          {runsOnOtherBranches > 0 && (
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              {runsOnOtherBranches} more{" "}
+              {runsOnOtherBranches === 1 ? "run" : "runs"} on other branches, including
+              pull requests. The Actions panel above lists every run.
+            </p>
+          )}
         </div>
         <div className="space-y-4">
           <Card className="p-4">
+            {/*
+              Not "5-stage". The real pipeline has seven stages and REPORTS four
+              of them — lint, code quality, public tests, hidden tests — so a
+              heading promising five sat above a list of four, and the reader was
+              left to guess which one was missing and whether that mattered.
+            */}
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              5-stage breakdown
+              Stage breakdown
             </p>
             <PipelineStages runId={effectiveRunId} audience={audience} />
           </Card>

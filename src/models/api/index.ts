@@ -7,6 +7,7 @@ export { platformApi } from "./platform";
 export { usersApi } from "./users";
 export { coursesApi } from "./courses";
 export { classesApi } from "./classes";
+export { classAccessApi } from "./class-access";
 export { assignmentsApi } from "./assignments";
 export { customProjectsApi } from "./custom-projects";
 export { hiddenTestsApi } from "./hidden-tests";

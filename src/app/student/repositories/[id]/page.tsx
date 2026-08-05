@@ -355,9 +355,11 @@ export default function StudentWorkspacePage() {
                       selectedBranch={vm.selectedBranch}
                       onSelectBranch={vm.selectBranch}
                       runs={vm.runsForBranch}
+                      runsOnOtherBranches={vm.runsOnOtherBranches}
                       audience="student"
                       onTriggerRun={vm.triggerRun}
                       isTriggering={vm.isTriggeringRun}
+                      maxPoints={pointsPerRepo(d.assignment)}
                     />
                   )}
 

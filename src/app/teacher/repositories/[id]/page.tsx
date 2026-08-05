@@ -258,10 +258,14 @@ export default function TeacherRepositoryPage() {
                           selectedBranch={vm.selectedBranch}
                           onSelectBranch={vm.selectBranch}
                           runs={vm.runsForBranch}
+                          runsOnOtherBranches={vm.runsOnOtherBranches}
                           audience="teacher"
                           onTriggerRun={vm.triggerRun}
                           isTriggering={vm.isTriggeringRun}
                           sonarDashboardUrl={d.repo.sonarDashboardUrl}
+                          // This repository's share, not the project total — the
+                          // same denominator the grading panel enforces.
+                          maxPoints={pointsPerRepo(d.assignment)}
                         />
                       )}
                     </section>
@@ -342,9 +346,15 @@ export default function TeacherRepositoryPage() {
                             />
                             <Stat
                               label="Latest CI score"
+                              // Out of the same denominator as the recorded grade
+                              // beside it. It was rendered as a bare percentage
+                              // while `score` is a POINT total — so on these SPLIT
+                              // projects, where each half is marked out of 50, a
+                              // run scoring 35 of 50 read as "35%" against a
+                              // recorded grade of "35/50". Two scales, one row.
                               value={
                                 vm.latestRun && vm.latestRun.score !== null
-                                  ? `${vm.latestRun.score}%`
+                                  ? `${vm.latestRun.score}/${pointsPerRepo(d.assignment)}`
                                   : "—"
                               }
                               tone={
@@ -389,6 +399,10 @@ export default function TeacherRepositoryPage() {
                           <GradingPanel
                             repo={d.repo}
                             maxPoints={pointsPerRepo(d.assignment)}
+                            // The same run the "Latest CI score" stat beside this
+                            // reads, so the number the button applies is the number
+                            // on screen — one source, not two that can disagree.
+                            pipelineRun={vm.latestRun}
                           />
                         </div>
                       </div>

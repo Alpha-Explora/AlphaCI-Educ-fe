@@ -1,8 +1,12 @@
 "use client";
 // ============================================================================
 // VIEWMODEL LAYER — Pipeline run detail
-// Loads a run + its 5-stage checks, groups checks by stage in canonical order,
+// Loads a run + its checks, groups them by stage in canonical pipeline order,
 // and (for students) masks the messages of hidden tests. Teachers see all.
+//
+// Groups are dropped when empty, so the breakdown shows the stages that actually
+// REPORTED rather than a fixed five. The real pipeline reports four of its seven
+// stages, which is why the heading above it no longer promises a number.
 // ============================================================================
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";

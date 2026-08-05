@@ -14,7 +14,13 @@
 import { useState } from "react";
 import { usePullRequests } from "@/viewmodels/usePullRequests";
 import { PullRequestDiff } from "./PullRequestDiff";
-import type { MergeReadiness, PullRequestView, RepoBranch } from "@/models/types";
+import {
+  BRANCH_PROMOTION_ORDER,
+  GRADED_BRANCHES,
+  type MergeReadiness,
+  type PullRequestView,
+  type RepoBranch,
+} from "@/models/types";
 import {
   Banner,
   Button,
@@ -28,8 +34,6 @@ import {
   Textarea,
   cn,
 } from "@/components/ui";
-
-const PROTECTED_BRANCHES = ["uat", "main"] as const;
 
 export function SubmitForReviewPanel({
   repoId,
@@ -45,15 +49,48 @@ export function SubmitForReviewPanel({
 }) {
   const vm = usePullRequests(repoId);
 
-  // Only branches a student could propose FROM. Offering `main` as a source
-  // would produce a pull request from a branch into itself, which the server
-  // rejects — better not to present it at all.
-  const sourceBranches = branches.filter(
-    (b) => !PROTECTED_BRANCHES.includes(b.name as (typeof PROTECTED_BRANCHES)[number]),
+  // Only branches a student could propose FROM. Offering a graded branch as a
+  // source would produce a pull request from a branch into itself, which the
+  // server rejects — better not to present it at all.
+  const sourceBranches = branches.filter((b) => !GRADED_BRANCHES.includes(b.name));
+
+  // WHICH TARGETS EXIST, not which targets the product has names for.
+  //
+  // This was a hardcoded `["uat", "main"]` rendered directly, so every project
+  // offered `uat` — including MAIN_ONLY projects, which have no such branch. It
+  // was also the default, so a student who submitted without touching the
+  // dropdown got the server's refusal ("You can only submit into main") on their
+  // first ever pull request, naming a branch the dropdown had not offered them.
+  //
+  // Intersecting the promotion order with the repository's ACTUAL branches is
+  // the whole fix, and it needs no knowledge of the strategy: a MAIN_ONLY repo
+  // has no `uat` to find. It is also the pattern RepoRunsExplorer already uses
+  // for the branch toggle a few sections up the same page.
+  const targetBranches = BRANCH_PROMOTION_ORDER.filter((name) =>
+    branches.some((b) => b.name === name),
   );
 
-  const [head, setHead] = useState(sourceBranches[0]?.name ?? "");
-  const [base, setBase] = useState<string>("uat");
+  // Null means "not chosen yet" rather than seeding state from the first render's
+  // data, so a selection cannot outlive the branch that backed it. Merging moves
+  // branches — and can delete the one just merged — which invalidates the
+  // repository query and re-renders this panel with a different list. A value
+  // captured once in useState would still be sitting in the dropdown, naming a
+  // branch that no longer exists. Same sentinel pattern as useRepositoryDetail.
+  const [headChoice, setHeadChoice] = useState<string | null>(null);
+  const [baseChoice, setBaseChoice] = useState<string | null>(null);
+
+  const head =
+    headChoice && sourceBranches.some((b) => b.name === headChoice)
+      ? headChoice
+      : (sourceBranches[0]?.name ?? "");
+
+  // Defaults to the first hop that EXISTS — `uat` on a two-stage project, `main`
+  // on a one-stage one. It was the literal `"uat"`, which on a MAIN_ONLY project
+  // is a branch the server refuses and the student never chose.
+  const base =
+    baseChoice && targetBranches.includes(baseChoice)
+      ? baseChoice
+      : (targetBranches[0] ?? "");
 
   return (
     <Card className="p-5">
@@ -80,6 +117,20 @@ export function SubmitForReviewPanel({
                 You have no feature branches yet. Create one, push your work to
                 it, then come back here to submit it.
               </Banner>
+            ) : targetBranches.length === 0 ? (
+              /*
+                Sources but no targets. Not a state a correctly provisioned
+                repository can reach — `main` exists from creation — so it means
+                either the branch list could not be read from GitHub just now, or
+                provisioning did not finish. Previously this rendered a dropdown
+                offering `uat` and `main` regardless, and every submission was
+                refused with no clue why.
+              */
+              <Banner tone="warning">
+                This project has no branch to submit into yet. Its <code>main</code>{" "}
+                branch could not be read — reload in a moment, and tell your
+                teacher if it keeps happening.
+              </Banner>
             ) : (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -88,7 +139,7 @@ export function SubmitForReviewPanel({
                       <Select
                         id={id}
                         value={head}
-                        onChange={(e) => setHead(e.target.value)}
+                        onChange={(e) => setHeadChoice(e.target.value)}
                       >
                         {sourceBranches.map((b) => (
                           <option key={b.name} value={b.name}>
@@ -103,9 +154,9 @@ export function SubmitForReviewPanel({
                       <Select
                         id={id}
                         value={base}
-                        onChange={(e) => setBase(e.target.value)}
+                        onChange={(e) => setBaseChoice(e.target.value)}
                       >
-                        {PROTECTED_BRANCHES.map((b) => (
+                        {targetBranches.map((b) => (
                           <option key={b} value={b}>
                             {b}
                           </option>
@@ -117,7 +168,7 @@ export function SubmitForReviewPanel({
                 <Button
                   onClick={() => vm.open({ head, base })}
                   loading={vm.isOpening}
-                  disabled={!head}
+                  disabled={!head || !base}
                 >
                   Open pull request
                 </Button>
@@ -128,6 +179,22 @@ export function SubmitForReviewPanel({
                     ? "a teammate reviews it"
                     : "you merge it once the checks pass"}
                   .
+                  {/*
+                    The promotion path, spelled out, and only when there IS one.
+                    A two-stage project is the case where "merge into uat" looks
+                    like a detour — saying where it leads is the difference
+                    between a confusing extra step and the lesson the setting
+                    exists to teach. Read off the branches that exist, so it
+                    cannot contradict the dropdown beside it.
+                  */}
+                  {targetBranches.length > 1 && (
+                    <>
+                      {" "}
+                      Work reaches <code>main</code> through{" "}
+                      <code>{targetBranches[0]}</code> first — one pull request
+                      per hop, each checked by the pipeline.
+                    </>
+                  )}
                 </p>
               </div>
             )}

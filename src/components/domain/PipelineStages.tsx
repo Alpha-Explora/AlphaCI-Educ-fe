@@ -23,6 +23,15 @@ const STAGE_META: Record<PipelineStage, { label: string; icon: string; blurb: st
     blurb: "Zero-trust isolated container",
   },
   LINT: { label: "Linting & Style", icon: "🎨", blurb: "PEP8 / style guide" },
+  // The largest single component of the mark — 35%, ahead of the visible tests.
+  // It had no entry, so the server's stage mapping sent it to SCORING and every
+  // student and teacher read their code-quality result under the heading
+  // "Partial-Credit Scoring · Rubric summary".
+  QUALITY: {
+    label: "Code Quality",
+    icon: "🔍",
+    blurb: "SonarCloud — bugs, smells, duplication",
+  },
   PUBLIC_TESTS: {
     label: "Public Tests",
     icon: "🧪",

@@ -12,6 +12,16 @@ export interface PresentableError {
    * rather than only ever printing the server's sentence back at the user.
    */
   status: number | null;
+  /**
+   * The server's machine-readable cause, when it sent one (`ApiError.code`).
+   *
+   * Carried through because a status alone is often not specific enough to act
+   * on: several different 403s reach the same screen, and only the code tells
+   * "you are outside the class-code gate" (CLASS_CODE_REQUIRED) apart from "that
+   * isn't your section". Branch on this, never on `message` — the sentence is
+   * copy and rewording it would silently break whatever depended on it.
+   */
+  code: string | null;
 }
 
 export function toPresentableError(error: unknown): PresentableError {
@@ -21,6 +31,7 @@ export function toPresentableError(error: unknown): PresentableError {
       isNetworkError: error.isNetworkError,
       baseUrl: error.baseUrl,
       status: error.status,
+      code: error.code,
     };
   }
   return {
@@ -28,5 +39,11 @@ export function toPresentableError(error: unknown): PresentableError {
     isNetworkError: false,
     baseUrl: API_BASE_URL,
     status: null,
+    code: null,
   };
+}
+
+/** True when this failure is the class-code gate refusing an un-admitted student. */
+export function isClassCodeRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "CLASS_CODE_REQUIRED";
 }

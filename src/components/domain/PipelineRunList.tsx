@@ -8,11 +8,23 @@ export function PipelineRunList({
   runs,
   selectedRunId,
   onSelect,
-}: {
+  maxPoints,
+}: Readonly<{
   runs: PipelineRun[];
   selectedRunId: string | null;
   onSelect: (runId: string) => void;
-}) {
+  /**
+   * What one repository is marked out of, for the score's denominator.
+   *
+   * `run.score` is a POINT total — `earned`, scaled to this ceiling by the
+   * scoring endpoint — and it was rendered as "35%". On a 100-point project the
+   * two coincide, which is why it survived; on a 50-point project 35 of 50 was
+   * displayed as "35%" when the run scored 70%, and on a SPLIT project each half
+   * is marked out of half the total. Optional so a caller without the assignment
+   * to hand degrades to a bare number rather than to a wrong percentage.
+   */
+  maxPoints?: number;
+}>) {
   if (runs.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
@@ -48,17 +60,33 @@ export function PipelineRunList({
                     {run.commitMessage}
                   </p>
                 )}
+                {/*
+                  The counts appear only when there ARE counts. Stage ⑦ reports
+                  per-stage points and no test totals, so every real run stores
+                  0/0 — and this line rendered "0/0 tests" beneath a passing run,
+                  which reads as "none of your tests ran". The same rule the stage
+                  breakdown already applies to "0/0 pts", for the same reason:
+                  saying nothing beats a truthful number that means nothing.
+                */}
                 <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                  {formatDateTime(run.startedAt)} ·{" "}
-                  <span className="tabular-nums">
-                    {run.passedTests}/{run.totalTests} tests
-                  </span>
+                  {formatDateTime(run.startedAt)}
+                  {run.totalTests > 0 && (
+                    <>
+                      {" · "}
+                      <span className="tabular-nums">
+                        {run.passedTests}/{run.totalTests} tests
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 {run.score !== null && (
-                  <span className="text-sm font-semibold tabular-nums text-[var(--text-strong)]">
-                    {run.score}%
+                  <span
+                    className="text-sm font-semibold tabular-nums text-[var(--text-strong)]"
+                    title="The pipeline's own score for this run. Not the recorded mark."
+                  >
+                    {maxPoints ? `${run.score}/${maxPoints}` : run.score}
                   </span>
                 )}
                 <PipelineStatusPill status={run.status} />
