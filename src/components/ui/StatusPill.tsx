@@ -18,14 +18,24 @@ const TONE: Record<Tone, string> = {
   running: "bg-sky-50 text-sky-700 ring-sky-200",
 };
 
+/**
+ * `md` exists for a pill that has to be read at a glance rather than inspected —
+ * a class card's own status, say, scanned across a grid of six. Kept as a size on
+ * the SHARED pill rather than a bespoke badge at the call site so there is still
+ * one tone map; a hand-rolled "closed" chip would be the copy that drifts.
+ */
+type PillSize = "sm" | "md";
+
 function Pill({
   tone,
   children,
   dot = true,
+  size = "sm",
 }: {
   tone: Tone;
   children: React.ReactNode;
   dot?: boolean;
+  size?: PillSize;
 }) {
   const dotColor: Record<Tone, string> = {
     neutral: "bg-slate-400",
@@ -38,14 +48,16 @@ function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset",
+        size === "md" ? "px-3 py-1 text-sm" : "px-2.5 py-0.5 text-xs",
         TONE[tone],
       )}
     >
       {dot && (
         <span
           className={cn(
-            "h-1.5 w-1.5 rounded-full",
+            "rounded-full",
+            size === "md" ? "h-2 w-2" : "h-1.5 w-1.5",
             dotColor[tone],
             tone === "running" && "animate-pulse",
           )}
@@ -116,12 +128,17 @@ export function PlagiarismPill({ status }: { status: PlagiarismStatus }) {
 export function GenericPill({
   tone = "neutral",
   children,
+  size = "sm",
+  dot = false,
 }: {
   tone?: Tone;
   children: React.ReactNode;
+  size?: PillSize;
+  /** Off by default — a generic pill is a label, not a live status. */
+  dot?: boolean;
 }) {
   return (
-    <Pill tone={tone} dot={false}>
+    <Pill tone={tone} dot={dot} size={size}>
       {children}
     </Pill>
   );
