@@ -428,7 +428,7 @@ export interface ClassCohort {
    * window — start a session, take a token, submit. Reading is never blocked.
    * Enforced on the server; this copy drives the Settings form and the labels.
    */
-  schedule?: ClassSchedule;
+  schedule?: ClassSchedule[] | ClassSchedule;
   /**
    * The timetable is suspended for this section — asynchronous work is allowed.
    *
@@ -1430,8 +1430,14 @@ export interface CreateClassInput {
    * what books a room, so two sections whose labs intersect cannot share an hour.
    */
   meetingLabOrgIds?: string[];
-  /** Meeting hours. Optional, but conflict-checked the moment it is supplied. */
-  schedule?: ClassSchedule;
+  /**
+   * Meeting hours. Optional, but conflict-checked the moment it is supplied.
+   *
+   * A LIST: one section meeting Monday morning and Wednesday afternoon is one
+   * section with two windows. Outbound payloads are always arrays — the server
+   * rejects a bare object, even though it still READS one from an old row.
+   */
+  schedule?: ClassSchedule[];
 }
 
 // IT-Admin create-course + invite-instructor inputs.
@@ -1460,14 +1466,16 @@ export interface ScheduleBooking {
   classId: string;
   classLabel: string;
   className: string;
-  schedule: ClassSchedule;
+  /** Every window it occupies — already normalized to a list by the server. */
+  schedule: ClassSchedule[];
   /** Why it is relevant: the teacher's own class, the room's, or both. */
   reasons: Array<"TEACHER" | "LABORATORY">;
 }
 
 /** POST /classes/schedule-check — a dry run of the timetable rules. */
 export interface CheckScheduleInput {
-  schedule: ClassSchedule;
+  /** The windows being proposed. Empty is allowed and means "nothing yet". */
+  schedule: ClassSchedule[];
   /**
    * The section being edited. The server resolves its teacher, its rooms and its
    * own exclusion from this — an edit should not have to restate facts the

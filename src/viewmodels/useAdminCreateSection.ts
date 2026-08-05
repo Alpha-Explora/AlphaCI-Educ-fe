@@ -30,9 +30,9 @@ export interface AdminCreateSectionVM {
   createdClass: ClassCohort | null;
   reset: () => void;
 
-  /** Preview conflicts for a slot. Safe to call on every keystroke. */
+  /** Preview conflicts for a set of windows. Safe to call on every keystroke. */
   check: (input: {
-    schedule: ClassSchedule;
+    schedule: ClassSchedule[];
     classId?: string;
     teacherId?: string;
     labOrgIds?: string[];
@@ -73,7 +73,7 @@ export function useAdminCreateSection(
 
   const checkMutation = useMutation({
     mutationFn: (input: {
-      schedule: ClassSchedule;
+      schedule: ClassSchedule[];
       classId?: string;
       teacherId?: string;
       labOrgIds?: string[];

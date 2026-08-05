@@ -33,7 +33,7 @@ export interface AdminSectionsVM {
   error: PresentableError | null;
   refetch: () => void;
 
-  setHours: (classId: string, schedule: ClassSchedule | null) => void;
+  setHours: (classId: string, schedule: ClassSchedule[] | null) => void;
   isSavingHours: boolean;
   hoursError: PresentableError | null;
   resetHours: () => void;
@@ -62,7 +62,13 @@ export function useAdminSections(orgId: string | null): AdminSectionsVM {
   const invalidateAll = () => void queryClient.invalidateQueries();
 
   const hoursMutation = useMutation({
-    mutationFn: ({ classId, schedule }: { classId: string; schedule: ClassSchedule | null }) =>
+    mutationFn: ({
+      classId,
+      schedule,
+    }: {
+      classId: string;
+      schedule: ClassSchedule[] | null;
+    }) =>
       classesApi.setSchedule(classId, schedule),
     onSuccess: invalidateAll,
   });
