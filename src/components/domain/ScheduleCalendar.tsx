@@ -10,11 +10,11 @@
 //
 // WHAT IS BEING DRAWN
 //
-// A ClassSchedule is a WEEKLY RECURRENCE (`days: [1,3,5]`) with one window
-// applied to every day it names. So a section is not one block — it is one block
-// per day it meets, all at the same hour. There is no per-day variation to model
-// because the domain type does not have one; when it grows one, this is the
-// component that changes.
+// A section carries a LIST of weekly windows, each a recurrence (`days: [1,3,5]`)
+// with one time range applied to every day it names. So a section is not one
+// block on this grid — it is one block per (window, day) pair, and two windows
+// mean a section can sit at 8am on Monday and 1pm on Wednesday. Everything below
+// draws MEETINGS, flattened from that pair, rather than sections.
 //
 // PHILIPPINE TIME THROUGHOUT. The dates across the top come from Manila's
 // calendar, not the viewer's — a teacher on a laptop set to UTC must not see
@@ -23,8 +23,9 @@
 // ============================================================================
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { DAY_SHORT, formatTime12, isEnforceable } from "@/models/schedule";
+import { DAY_SHORT, formatTime12, isEnforceable, scheduleBlocks } from "@/models/schedule";
 import type { ScheduleRow } from "@/viewmodels/useTeacherSchedule";
+import type { ClassSchedule } from "@/models/types";
 import { Button, cn } from "@/components/ui";
 
 /** Manila is UTC+8, always — see the header. */
@@ -111,13 +112,21 @@ export function ScheduleCalendar({ rows }: { readonly rows: ScheduleRow[] }) {
   const scheduled = rows.filter((r) => isEnforceable(r.classInfo.schedule));
   const unscheduled = rows.filter((r) => !isEnforceable(r.classInfo.schedule));
 
-  // A section whose hours fall outside the drawn window. Listed rather than
-  // clipped — cropping the grid must never be the reason a class disappears.
-  const offGrid = scheduled.filter((r) => {
-    const end = minutesOf(r.classInfo.schedule!.endTime);
-    const start = minutesOf(r.classInfo.schedule!.startTime);
-    return end <= DAY_START_HOUR * 60 || start >= DAY_END_HOUR * 60;
-  });
+  /*
+    A section whose hours fall outside the drawn window. Listed rather than
+    clipped — cropping the grid must never be the reason a class disappears.
+
+    EVERY window must be off-grid for the section to count, not just one: a
+    section meeting 5am and 1pm is drawn, and listing it here as well would tell
+    a teacher it is missing from a grid it is visibly on.
+  */
+  const offGrid = scheduled.filter((r) =>
+    scheduleBlocks(r.classInfo.schedule).every(
+      (b) =>
+        minutesOf(b.endTime) <= DAY_START_HOUR * 60 ||
+        minutesOf(b.startTime) >= DAY_END_HOUR * 60,
+    ),
+  );
 
   const hours = Array.from(
     { length: DAY_END_HOUR - DAY_START_HOUR },
@@ -229,7 +238,16 @@ function DayColumn({
   readonly rows: ScheduleRow[];
   readonly hours: number[];
 }) {
-  const todays = rows.filter((r) => r.classInfo.schedule!.days.includes(weekday));
+  /*
+    Flattened to MEETINGS: one entry per (section, window) that names this day.
+    Filtering sections and then reading `schedule[0]` would draw a section's
+    Monday window on Wednesday, at Monday's hour.
+  */
+  const todays = rows.flatMap((row) =>
+    scheduleBlocks(row.classInfo.schedule)
+      .filter((block) => block.days.includes(weekday))
+      .map((block) => ({ row, block })),
+  );
 
   return (
     <div className="relative flex-1 border-l border-[var(--border-subtle)]">
@@ -237,10 +255,9 @@ function DayColumn({
         <div key={h} style={{ height: HOUR_PX }} className="border-b border-[var(--border-subtle)]" />
       ))}
 
-      {todays.map((row) => {
-        const s = row.classInfo.schedule!;
-        const startMin = minutesOf(s.startTime);
-        const endMin = minutesOf(s.endTime);
+      {todays.map(({ row, block }) => {
+        const startMin = minutesOf(block.startTime);
+        const endMin = minutesOf(block.endTime);
         // Clamped to the drawn window so a class starting at 5am still shows its
         // visible portion rather than being pushed above the grid.
         const top = ((Math.max(startMin, DAY_START_HOUR * 60) - DAY_START_HOUR * 60) / 60) * HOUR_PX;
@@ -251,7 +268,7 @@ function DayColumn({
 
         return (
           <Link
-            key={row.classInfo.id}
+            key={`${row.classInfo.id}-${block.startTime}`}
             href={`/teacher/classes/${row.classInfo.id}`}
             title={`${row.sectionLabel} — ${row.courseLabel} · ${row.window}`}
             style={{ top, height: Math.max(height, 22) }}
@@ -262,7 +279,7 @@ function DayColumn({
           >
             <span className="block truncate font-semibold">{row.sectionLabel}</span>
             <span className="block truncate tabular-nums opacity-80">
-              {formatTime12(s.startTime)}–{formatTime12(s.endTime)}
+              {formatTime12(block.startTime)}–{formatTime12(block.endTime)}
             </span>
           </Link>
         );

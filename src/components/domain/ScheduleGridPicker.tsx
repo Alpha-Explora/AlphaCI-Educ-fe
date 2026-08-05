@@ -7,36 +7,38 @@
 // already taken. The admin typed a time, was told it clashed, typed another, and
 // hunted for a gap by trial and error. Here the gaps are the empty cells.
 //
-// HOW A CLASS SCHEDULE MAPS ONTO A GRID
+// EVERY DRAG IS ITS OWN WINDOW
 //
-// ClassSchedule is `{ days[], startTime, endTime }` — ONE window applied to
-// several days, not a different time per day. So the grid is not free-form: a
-// selection is a time RANGE plus a set of DAYS, and dragging in a second column
-// moves the shared window rather than giving that day its own. Drag once to set
-// the hours; click day headers to add days at those same hours.
+// This grid used to hold a single `{ days[], startTime, endTime }`, which meant
+// one time range applied to every selected day. Dragging Monday 8–10 and then
+// Wednesday 1–3 did not produce two windows — the second drag MOVED the shared
+// range, and Monday silently became 1–3 as well. A real timetable is per-day, so
+// the value is a LIST of windows and each drag adds one.
+//
+// It still collapses back to the compact shape wherever it can: three days
+// dragged to the same hours are stored as ONE window with three days, not three.
+// That is `toBlocks` in models/schedule-grid.ts — which also owns the slot
+// arithmetic and the run merging, because those have edge cases at every
+// boundary and none of them need React to be exercised.
 //
 // BUSY CELLS ARE NOT CLICKABLE. Greying alone would let an admin drag across a
 // booked slot and only learn at Save; the pointer refuses instead, and a drag
 // that would cross a busy cell stops at its edge.
 // ============================================================================
-import { useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import { DAY_SHORT, formatTime12 } from "@/models/schedule";
-import type { ScheduleBooking } from "@/models/types";
+import {
+  GRID_SLOTS_PER_HOUR as SLOTS_PER_HOUR,
+  GRID_TOTAL_SLOTS as TOTAL_SLOTS,
+  mergeRuns,
+  slotToTime,
+  timeToSlot,
+  toBlocks,
+  toRuns,
+  type Run,
+} from "@/models/schedule-grid";
+import type { ClassSchedule, ScheduleBooking } from "@/models/types";
 import { cn } from "@/components/ui";
-
-/**
- * The bookable day, in 30-minute steps.
- *
- * 6am–10pm covers a school day; 30 minutes is the coarsest step that still
- * expresses the timetables this product already has (13:00–15:40 exists, so
- * hour-only steps would have been unable to represent real data).
- */
-const START_HOUR = 6;
-const END_HOUR = 22;
-const STEP_MIN = 30;
-const SLOTS_PER_HOUR = 60 / STEP_MIN;
-const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
-const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 /*
   ROW HEIGHT IS THE WHOLE DIALOG'S HEIGHT. Thirty-two half-hour rows at 20px is
@@ -45,24 +47,10 @@ const DAYS = [0, 1, 2, 3, 4, 5, 6];
   hours are 448px and the dialog fits without scrolling, while a 30-minute slot
   is still a comfortable pointer target.
 */
-const SLOT_H = "h-3.5"; // 14px — see above.
+const SLOT_PX = 14;
+const SLOT_H = "h-3.5"; // Must equal SLOT_PX — the overlays position in pixels.
 
-/** Slot index -> "HH:MM". Index 0 is START_HOUR:00. */
-function slotToTime(slot: number): string {
-  const mins = START_HOUR * 60 + slot * STEP_MIN;
-  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-}
-
-function timeToSlot(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h * 60 + m - START_HOUR * 60) / STEP_MIN;
-}
-
-export interface GridSelection {
-  days: number[];
-  startTime: string;
-  endTime: string;
-}
+const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 export function ScheduleGridPicker({
   bookings,
@@ -70,14 +58,21 @@ export function ScheduleGridPicker({
   onChange,
 }: {
   readonly bookings: ScheduleBooking[];
-  readonly value: GridSelection | null;
-  readonly onChange: (next: GridSelection | null) => void;
+  /** Every window currently chosen. Empty means the section has no timetable. */
+  readonly value: readonly ClassSchedule[];
+  readonly onChange: (next: ClassSchedule[]) => void;
 }) {
   // Anchor slot of a drag in progress, or null. Held in state (not a ref) so the
   // preview repaints as the pointer moves.
   const [anchor, setAnchor] = useState<{ day: number; slot: number } | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const dragging = useRef(false);
+  /*
+    Set when a drag STARTS on a slot that is already selected. A press-and-release
+    there means "remove this window"; the same press dragged elsewhere means
+    "extend it", so the intent is only settled at pointer-up.
+  */
+  const removeCandidate = useRef<{ day: number; slot: number } | null>(null);
 
   /*
     Which (day, slot) pairs are already taken, and by what. Built once per
@@ -86,11 +81,16 @@ export function ScheduleGridPicker({
   */
   const busy = useMemo(() => {
     const map = new Map<string, ScheduleBooking>();
-    for (const b of bookings) {
-      const from = Math.max(0, timeToSlot(b.schedule.startTime));
-      const to = Math.min(TOTAL_SLOTS, timeToSlot(b.schedule.endTime));
-      for (const day of b.schedule.days) {
-        for (let slot = from; slot < to; slot += 1) map.set(`${day}:${slot}`, b);
+    for (const booking of bookings) {
+      // A booking is a LIST of windows now — a section meeting twice occupies
+      // the room twice, and reading only the first would leave its second
+      // window looking free.
+      for (const block of booking.schedule) {
+        const from = Math.max(0, timeToSlot(block.startTime));
+        const to = Math.min(TOTAL_SLOTS, timeToSlot(block.endTime));
+        for (const day of block.days) {
+          for (let slot = from; slot < to; slot += 1) map.set(`${day}:${slot}`, booking);
+        }
       }
     }
     return map;
@@ -98,9 +98,7 @@ export function ScheduleGridPicker({
 
   const isBusy = (day: number, slot: number) => busy.get(`${day}:${slot}`);
 
-  const selectedDays = value?.days ?? [];
-  const selStart = value ? timeToSlot(value.startTime) : null;
-  const selEnd = value ? timeToSlot(value.endTime) : null;
+  const runs = useMemo(() => toRuns(value), [value]);
 
   /** The range a drag currently describes, clamped before any booked slot. */
   const previewRange = (() => {
@@ -119,85 +117,85 @@ export function ScheduleGridPicker({
     return end < lo ? null : { day: anchor.day, from: lo, to: end };
   })();
 
-  const commit = (day: number, from: number, to: number) => {
-    const start = slotToTime(from);
-    const end = slotToTime(to + 1); // end-exclusive: a slot's end is the next one
-    // Keep any days already chosen, and make sure the dragged one is included.
-    const days = [...new Set([...(value?.days ?? []), day])].sort((a, b) => a - b);
-    onChange({ days, startTime: start, endTime: end });
+  const emit = (next: Map<number, Run[]>) => {
+    for (const [day, dayRuns] of next) {
+      if (dayRuns.length === 0) next.delete(day);
+    }
+    onChange(toBlocks(next));
   };
 
-  const toggleDay = (day: number) => {
-    if (!value) return; // Nothing to apply the day to yet.
-    const on = value.days.includes(day);
-    // Refuse a day whose slots are taken at these hours — the grid must not let
-    // you select something Save will reject.
-    if (!on && selStart !== null && selEnd !== null) {
-      for (let s = selStart; s < selEnd; s += 1) if (isBusy(day, s)) return;
-    }
-    const days = on ? value.days.filter((d) => d !== day) : [...value.days, day];
-    onChange(days.length === 0 ? null : { ...value, days: days.sort((a, b) => a - b) });
+  /** Adds a window. Overlapping or abutting ones on that day become one. */
+  const commit = (day: number, from: number, to: number) => {
+    const next = new Map(runs);
+    next.set(day, mergeRuns([...(next.get(day) ?? []), { from, to: to + 1 }]));
+    emit(next);
   };
+
+  /** Drops the one window covering this slot, leaving that day's others alone. */
+  const removeAt = (day: number, slot: number) => {
+    const next = new Map(runs);
+    next.set(day, (next.get(day) ?? []).filter((r) => slot < r.from || slot >= r.to));
+    emit(next);
+  };
+
+  const endGesture = () => {
+    dragging.current = false;
+    removeCandidate.current = null;
+    setAnchor(null);
+    setHover(null);
+  };
+
+  const blocks = toBlocks(runs);
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[var(--text-muted)]">
-          Drag down a column to set the hours, then click other day names to add
-          them. Shaded slots are already taken.
+          Drag down a column for each meeting — drag again on another day to add a
+          second one. Click a blue block to remove it. Shaded slots are taken.
         </p>
-        {value && (
+        {blocks.length > 0 && (
           <button
             type="button"
-            onClick={() => onChange(null)}
+            onClick={() => onChange([])}
             className="text-xs font-medium text-platform underline underline-offset-2 hover:text-platform-700"
           >
-            Clear
+            Clear all
           </button>
         )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
         <div className="min-w-[560px] select-none">
-          {/* Day headers double as the day toggles. */}
           <div className="flex border-b border-[var(--border-subtle)] bg-slate-50/70">
             <div className="w-14 shrink-0" />
-            {DAYS.map((d) => {
-              const on = selectedDays.includes(d);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={!value}
-                  onClick={() => toggleDay(d)}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs font-medium transition-colors",
-                    on
-                      ? "bg-platform-600 text-white"
-                      : "text-[var(--text-muted)] hover:bg-slate-100",
-                    !value && "cursor-not-allowed opacity-60",
-                  )}
-                >
-                  {DAY_SHORT[d]}
-                </button>
-              );
-            })}
+            {DAYS.map((d) => (
+              <div
+                key={d}
+                className={cn(
+                  "flex-1 py-1.5 text-center text-xs font-medium",
+                  (runs.get(d)?.length ?? 0) > 0
+                    ? "text-platform-700"
+                    : "text-[var(--text-muted)]",
+                )}
+              >
+                {DAY_SHORT[d]}
+              </div>
+            ))}
           </div>
 
           <div
             className="flex"
             onPointerUp={() => {
-              if (previewRange) commit(previewRange.day, previewRange.from, previewRange.to);
-              dragging.current = false;
-              setAnchor(null);
-              setHover(null);
+              const pending = removeCandidate.current;
+              // A press that never moved, on a slot already selected, removes it.
+              if (pending && hover === pending.slot) removeAt(pending.day, pending.slot);
+              else if (previewRange) {
+                commit(previewRange.day, previewRange.from, previewRange.to);
+              }
+              endGesture();
             }}
-            onPointerLeave={() => {
-              dragging.current = false;
-              setAnchor(null);
-              setHover(null);
-            }}
+            onPointerLeave={endGesture}
           >
             <div className="w-14 shrink-0">
               {Array.from({ length: TOTAL_SLOTS }, (_, slot) => (
@@ -215,74 +213,185 @@ export function ScheduleGridPicker({
             </div>
 
             {DAYS.map((day) => (
-              <div key={day} className="flex-1 border-l border-[var(--border-subtle)]">
-                {Array.from({ length: TOTAL_SLOTS }, (_, slot) => {
-                  const taken = isBusy(day, slot);
-                  const inPreview =
-                    previewRange?.day === day &&
-                    slot >= previewRange.from &&
-                    slot <= previewRange.to;
-                  const inSelection =
-                    !previewRange &&
-                    selectedDays.includes(day) &&
-                    selStart !== null &&
-                    selEnd !== null &&
-                    slot >= selStart &&
-                    slot < selEnd;
-
-                  return (
-                    <div
-                      key={slot}
-                      role="button"
-                      tabIndex={-1}
-                      aria-disabled={Boolean(taken)}
-                      title={
-                        taken
-                          ? `${taken.classLabel} — ${taken.reasons.includes("TEACHER") ? "this teacher" : "this laboratory"} is busy`
-                          : `${DAY_SHORT[day]} ${formatTime12(slotToTime(slot))}`
-                      }
-                      onPointerDown={() => {
-                        if (taken) return;
-                        dragging.current = true;
-                        setAnchor({ day, slot });
-                        setHover(slot);
-                      }}
-                      onPointerEnter={() => {
-                        if (dragging.current && anchor?.day === day) setHover(slot);
-                      }}
-                      className={cn(
-                        SLOT_H,
-                        "border-b transition-colors",
-                        slot % SLOTS_PER_HOUR === 0
-                          ? "border-[var(--border-subtle)]"
-                          : "border-transparent",
-                        taken &&
-                          "cursor-not-allowed bg-slate-200/80 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(100,116,139,0.25)_3px,rgba(100,116,139,0.25)_6px)]",
-                        !taken && "cursor-pointer hover:bg-platform-50",
-                        (inPreview || inSelection) && "bg-platform-500 hover:bg-platform-500",
-                      )}
-                    />
+              <DayColumn
+                key={day}
+                day={day}
+                busy={busy}
+                selected={runs.get(day) ?? EMPTY_RUNS}
+                preview={
+                  previewRange?.day === day
+                    ? { from: previewRange.from, to: previewRange.to + 1 }
+                    : null
+                }
+                onPointerDownSlot={(slot) => {
+                  if (busy.get(`${day}:${slot}`)) return;
+                  dragging.current = true;
+                  const inSelection = (runs.get(day) ?? []).some(
+                    (r) => slot >= r.from && slot < r.to,
                   );
-                })}
-              </div>
+                  removeCandidate.current = inSelection ? { day, slot } : null;
+                  setAnchor({ day, slot });
+                  setHover(slot);
+                }}
+                onPointerMoveSlot={(slot) => {
+                  if (!dragging.current || anchor?.day !== day) return;
+                  // Moved off the pressed slot: this is a drag, not a click, so
+                  // it can no longer mean "remove".
+                  if (removeCandidate.current && slot !== removeCandidate.current.slot) {
+                    removeCandidate.current = null;
+                  }
+                  setHover(slot);
+                }}
+              />
             ))}
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-[var(--text-muted)]">
-        {value ? (
-          <>
-            <span className="font-medium text-[var(--text-strong)]">
-              {value.days.map((d) => DAY_SHORT[d]).join(", ")} ·{" "}
-              {formatTime12(value.startTime)}–{formatTime12(value.endTime)}
-            </span>{" "}
+      {blocks.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {blocks.map((block) => (
+            <li key={`${block.startTime}-${block.endTime}-${block.days.join()}`}>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-platform-50 px-2.5 py-1 text-xs font-medium text-platform-700">
+                {block.days.map((d) => DAY_SHORT[d]).join(", ")} ·{" "}
+                {formatTime12(block.startTime)}–{formatTime12(block.endTime)}
+                <button
+                  type="button"
+                  aria-label={`Remove ${block.days.map((d) => DAY_SHORT[d]).join(", ")} ${formatTime12(block.startTime)} to ${formatTime12(block.endTime)}`}
+                  onClick={() =>
+                    onChange(blocks.filter((other) => other !== block))
+                  }
+                  className="text-platform-500 transition-colors hover:text-platform-800"
+                >
+                  ×
+                </button>
+              </span>
+            </li>
+          ))}
+          <li className="self-center text-xs text-[var(--text-muted)]">
             (Philippine time)
-          </>
-        ) : (
-          "No hours selected — the section will be created without a timetable."
-        )}
-      </p>
+          </li>
+        </ul>
+      ) : (
+        <p className="text-xs text-[var(--text-muted)]">
+          No hours selected — the section will be created without a timetable.
+        </p>
+      )}
     </div>
   );
 }
+
+/** Shared empty array, so an unselected column keeps the same prop identity. */
+const EMPTY_RUNS: Run[] = [];
+
+/**
+ * One day, drawn as a STATIC grid with positioned overlays.
+ *
+ * The version this replaced rendered 32 interactive cells per column — 224 in
+ * total — each rebuilding a tooltip string and a six-argument class list. A drag
+ * calls setHover on every pointer move, so all 224 re-rendered on every mouse
+ * step and the drag visibly lagged behind the cursor.
+ *
+ * Now the rows are inert background, the booked runs are one element each rather
+ * than one per half-hour, and each selected window is a single absolutely
+ * positioned div. A pointer move re-renders one column and repaints one
+ * rectangle.
+ *
+ * The slot is derived from the pointer's offset rather than from per-cell
+ * handlers, which is also what lets a drag keep tracking when the pointer moves
+ * faster than the cells can fire enter events.
+ */
+const DayColumn = memo(function DayColumn({
+  day,
+  busy,
+  selected,
+  preview,
+  onPointerDownSlot,
+  onPointerMoveSlot,
+}: {
+  readonly day: number;
+  readonly busy: Map<string, ScheduleBooking>;
+  /** Every window chosen on this day. Several, since each drag adds one. */
+  readonly selected: readonly Run[];
+  readonly preview: Run | null;
+  readonly onPointerDownSlot: (slot: number) => void;
+  readonly onPointerMoveSlot: (slot: number) => void;
+}) {
+  /*
+    Contiguous booked runs, not one block per half-hour. A two-hour class is one
+    rectangle with one tooltip instead of four abutting ones whose borders read
+    as four separate bookings.
+  */
+  const bookedRuns = useMemo(() => {
+    const out: { from: number; to: number; booking: ScheduleBooking }[] = [];
+    let current: { from: number; to: number; booking: ScheduleBooking } | null = null;
+    for (let slot = 0; slot < TOTAL_SLOTS; slot += 1) {
+      const b = busy.get(`${day}:${slot}`);
+      if (b && current && current.booking.classId === b.classId) {
+        current.to = slot + 1;
+      } else if (b) {
+        if (current) out.push(current);
+        current = { from: slot, to: slot + 1, booking: b };
+      } else if (current) {
+        out.push(current);
+        current = null;
+      }
+    }
+    if (current) out.push(current);
+    return out;
+  }, [busy, day]);
+
+  const slotFromEvent = (e: React.PointerEvent<HTMLDivElement>) => {
+    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+    return Math.min(TOTAL_SLOTS - 1, Math.max(0, Math.floor(y / SLOT_PX)));
+  };
+
+  return (
+    <div
+      className="relative flex-1 cursor-pointer border-l border-[var(--border-subtle)]"
+      style={{ height: TOTAL_SLOTS * SLOT_PX }}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onPointerDownSlot(slotFromEvent(e));
+      }}
+      onPointerMove={(e) => onPointerMoveSlot(slotFromEvent(e))}
+    >
+      {/* Inert hour rules. Rendered once; nothing here reacts to a drag. */}
+      {Array.from({ length: TOTAL_SLOTS }, (_, slot) => (
+        <div
+          key={slot}
+          className={cn(
+            SLOT_H,
+            slot % SLOTS_PER_HOUR === 0
+              ? "border-b border-[var(--border-subtle)]"
+              : "border-b border-transparent",
+          )}
+        />
+      ))}
+
+      {bookedRuns.map((run) => (
+        <div
+          key={`${run.from}-${run.booking.classId}`}
+          title={`${run.booking.classLabel} — ${run.booking.reasons.includes("TEACHER") ? "this teacher" : "this laboratory"} is busy`}
+          style={{ top: run.from * SLOT_PX, height: (run.to - run.from) * SLOT_PX }}
+          className="absolute inset-x-0 cursor-not-allowed bg-slate-200/80 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(100,116,139,0.25)_3px,rgba(100,116,139,0.25)_6px)]"
+        />
+      ))}
+
+      {selected.map((run) => (
+        <div
+          key={run.from}
+          style={{ top: run.from * SLOT_PX, height: (run.to - run.from) * SLOT_PX }}
+          className="pointer-events-none absolute inset-x-0 rounded-sm bg-platform-500/90"
+        />
+      ))}
+
+      {preview && preview.to > preview.from && (
+        <div
+          style={{ top: preview.from * SLOT_PX, height: (preview.to - preview.from) * SLOT_PX }}
+          className="pointer-events-none absolute inset-x-0 rounded-sm bg-platform-500/70 ring-1 ring-inset ring-white/60"
+        />
+      )}
+    </div>
+  );
+});

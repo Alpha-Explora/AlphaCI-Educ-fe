@@ -20,7 +20,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/viewmodels/useSession";
 import { useCourseCatalog } from "@/viewmodels/useCourseCatalog";
 import { useAdminCreateSection } from "@/viewmodels/useAdminCreateSection";
-import { ScheduleGridPicker, type GridSelection } from "./ScheduleGridPicker";
+import { ScheduleGridPicker } from "./ScheduleGridPicker";
+import type { ClassSchedule } from "@/models/types";
 import {
   Banner,
   Button,
@@ -56,9 +57,13 @@ export function AdminCreateSectionModal({
   const [section, setSection] = useState("");
   const [term, setTerm] = useState("");
   const [labIds, setLabIds] = useState<string[]>([orgId]);
-  // One object, because the grid produces days and hours together — three
-  // separate pieces of state could hold a half-valid slot the grid cannot draw.
-  const [slot, setSlot] = useState<GridSelection | null>(null);
+  /*
+    A LIST of windows, because a section genuinely meets more than once. Held as
+    whole windows rather than as separate day and time state: the grid produces
+    days and hours together, and three separate pieces of state could hold a
+    half-valid slot the grid cannot draw.
+  */
+  const [slots, setSlots] = useState<ClassSchedule[]>([]);
 
   // Declared AFTER the state it reads: the grid shades whatever the current
   // teacher and rooms already have booked, so occupancy is keyed on both and
@@ -79,17 +84,18 @@ export function AdminCreateSectionModal({
   }, [course]);
 
   /*
-    A slot is only checkable once it is a real window: at least one day, and an
-    end after a start. Below that there is nothing to ask about, and asking
-    anyway would flash "no conflicts" at a form that is not yet filled in.
+    Only worth checking once at least one window exists. With none there is
+    nothing to ask about, and asking anyway would flash "no conflicts" at a form
+    that is not yet filled in. The grid can only produce whole windows, so any
+    non-empty list is already a real one.
   */
-  const slotIsComplete = slot !== null && slot.days.length > 0 && slot.endTime > slot.startTime;
+  const slotIsComplete = slots.length > 0;
 
   useEffect(() => {
     if (!open || !slotIsComplete) return;
     const id = setTimeout(() => {
       vm.check({
-        schedule: slot!,
+        schedule: slots,
         teacherId: teacherId || undefined,
         labOrgIds: labIds,
       });
@@ -97,7 +103,7 @@ export function AdminCreateSectionModal({
     return () => clearTimeout(id);
     // vm identity changes each render; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, slotIsComplete, slot, teacherId, labIds]);
+  }, [open, slotIsComplete, slots, teacherId, labIds]);
 
   const labChoices = useMemo(
     () => labs.map((l) => ({ id: l.id, name: l.name })),
@@ -122,7 +128,7 @@ export function AdminCreateSectionModal({
       section: section.trim(),
       term: term.trim(),
       meetingLabOrgIds: labIds,
-      ...(slotIsComplete ? { schedule: slot! } : {}),
+      ...(slotIsComplete ? { schedule: slots } : {}),
     });
   };
 
@@ -302,8 +308,8 @@ export function AdminCreateSectionModal({
               {teacherId ? (
                 <ScheduleGridPicker
                   bookings={vm.bookings}
-                  value={slot}
-                  onChange={setSlot}
+                  value={slots}
+                  onChange={setSlots}
                 />
               ) : (
                 <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
@@ -319,7 +325,7 @@ export function AdminCreateSectionModal({
             would be missed by the admin who caused it. */}
         <div className="shrink-0 space-y-3 border-t border-[var(--border-subtle)] px-6 py-4">
         {blocked && (
-          <Banner tone="error" title="This slot is already taken">
+          <Banner tone="error" title="These hours are already taken">
             <ul className="mt-1 space-y-1">
               {teacherConflicts.map((c) => (
                 <li key={`t-${c.classId}`}>{c.message}</li>
@@ -332,7 +338,8 @@ export function AdminCreateSectionModal({
         )}
         {slotIsComplete && !blocked && !vm.isChecking && (
           <Banner tone="success">
-            This slot is free for the teacher and the laboratory.
+            {slots.length === 1 ? "This slot is" : "All of these slots are"} free
+            for the teacher and the laboratory.
           </Banner>
         )}
 

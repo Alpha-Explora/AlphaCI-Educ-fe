@@ -13,15 +13,20 @@
 // where conflict checking lives with it.
 // ============================================================================
 import { Card, GenericPill } from "@/components/ui";
-import { describeDays, formatTime12, isEnforceable } from "@/models/schedule";
+import { DAY_SHORT, WEEK_ORDER, formatTime12, isEnforceable, scheduleBlocks } from "@/models/schedule";
 import type { ClassSchedule } from "@/models/types";
 
 export function ClassHoursSummary({
   schedule,
 }: {
-  readonly schedule: ClassSchedule | undefined;
+  readonly schedule: ClassSchedule[] | ClassSchedule | undefined;
 }) {
   const scheduled = isEnforceable(schedule);
+  // One row per window. A section meeting Mon 8–10 and Wed 1–3 has no single
+  // "Days" and "Time" to state, and collapsing it to one row would have to drop
+  // one of the two meetings — the teacher would plan around a class that is not
+  // when the card says it is.
+  const blocks = scheduleBlocks(schedule);
 
   return (
     <Card className="p-5 animate-fade-up sm:max-w-2xl">
@@ -44,18 +49,21 @@ export function ClassHoursSummary({
       <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
         {scheduled ? (
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">Days</dt>
-              <dd className="font-medium text-[var(--text-strong)]">
-                {describeDays(schedule)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">Time</dt>
-              <dd className="font-medium tabular-nums text-[var(--text-strong)]">
-                {formatTime12(schedule!.startTime)} – {formatTime12(schedule!.endTime)}
-              </dd>
-            </div>
+            {blocks.map((block) => (
+              <div
+                key={`${block.days.join()}-${block.startTime}`}
+                className="flex justify-between gap-4"
+              >
+                <dt className="text-[var(--text-muted)]">
+                  {WEEK_ORDER.filter((d) => block.days.includes(d))
+                    .map((d) => DAY_SHORT[d])
+                    .join(", ")}
+                </dt>
+                <dd className="font-medium tabular-nums text-[var(--text-strong)]">
+                  {formatTime12(block.startTime)} – {formatTime12(block.endTime)}
+                </dd>
+              </div>
+            ))}
           </dl>
         ) : (
           <p className="text-sm text-[var(--text-muted)]">

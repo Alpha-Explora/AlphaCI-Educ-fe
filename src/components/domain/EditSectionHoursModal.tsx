@@ -15,8 +15,9 @@ import { useEffect, useState } from "react";
 import { useAdminCreateSection } from "@/viewmodels/useAdminCreateSection";
 import type { AdminSectionRow } from "@/viewmodels/useAdminSections";
 import type { ClassSchedule } from "@/models/types";
+import { scheduleBlocks } from "@/models/schedule";
 import { Banner, Button, Modal } from "@/components/ui";
-import { ScheduleGridPicker, type GridSelection } from "./ScheduleGridPicker";
+import { ScheduleGridPicker } from "./ScheduleGridPicker";
 import type { PresentableError } from "@/viewmodels/errors";
 
 export function EditSectionHoursModal({
@@ -28,35 +29,32 @@ export function EditSectionHoursModal({
 }: {
   readonly row: AdminSectionRow;
   readonly onClose: () => void;
-  readonly onSave: (schedule: ClassSchedule | null) => void;
+  readonly onSave: (schedule: ClassSchedule[] | null) => void;
   readonly isSaving: boolean;
   readonly error: PresentableError | null;
 }) {
   const classId = row.classInfo.id;
 
   // Opens on what the section currently has, so "change Tuesday to 9am" is an
-  // edit rather than a re-entry of the whole slot from memory.
-  const [slot, setSlot] = useState<GridSelection | null>(
-    row.classInfo.schedule
-      ? {
-          days: row.classInfo.schedule.days,
-          startTime: row.classInfo.schedule.startTime,
-          endTime: row.classInfo.schedule.endTime,
-        }
-      : null,
+  // edit rather than a re-entry of the whole slot from memory. Through
+  // scheduleBlocks because a section saved before the field became a list still
+  // holds a bare object, and opening THAT on an empty grid would look like the
+  // hours had been lost.
+  const [blocks, setBlocks] = useState<ClassSchedule[]>(() =>
+    scheduleBlocks(row.classInfo.schedule),
   );
 
   const vm = useAdminCreateSection({ classId });
 
-  const complete = slot !== null && slot.days.length > 0 && slot.endTime > slot.startTime;
+  const complete = blocks.length > 0;
 
   useEffect(() => {
     if (!complete) return;
-    const id = setTimeout(() => vm.check({ schedule: slot!, classId }), 250);
+    const id = setTimeout(() => vm.check({ schedule: blocks, classId }), 250);
     return () => clearTimeout(id);
     // vm identity changes each render; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complete, slot, classId]);
+  }, [complete, blocks, classId]);
 
   const blocked = vm.conflicts.length > 0;
 
@@ -65,13 +63,13 @@ export function EditSectionHoursModal({
       open
       onClose={onClose}
       title={`Class hours — ${row.label}`}
-      description="Drag to re-book. Shaded slots are taken by this teacher or laboratory."
+      description="Drag once per meeting. Shaded slots are taken by this teacher or laboratory."
       size="lg"
     >
       <div className="space-y-4">
         {error && <Banner tone="error">{error.message}</Banner>}
 
-        <ScheduleGridPicker bookings={vm.bookings} value={slot} onChange={setSlot} />
+        <ScheduleGridPicker bookings={vm.bookings} value={blocks} onChange={setBlocks} />
 
         {blocked && (
           <Banner tone="error" title="This slot is already taken">
@@ -101,7 +99,7 @@ export function EditSectionHoursModal({
             <Button
               loading={isSaving}
               disabled={!complete || blocked || isSaving}
-              onClick={() => onSave(slot)}
+              onClick={() => onSave(blocks)}
             >
               Save hours
             </Button>

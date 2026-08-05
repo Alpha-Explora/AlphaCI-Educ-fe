@@ -35,6 +35,7 @@ import {
   minutesUntilClose,
   minutesUntilOpen,
   nextMeetingDay,
+  nextOpeningTime,
 } from "@/models/schedule";
 import { Banner, Button, GenericPill, Spinner, cn } from "@/components/ui";
 import { JoinCodeDisplay } from "./JoinCodeDisplay";
@@ -227,7 +228,7 @@ function NextUpPill({
   const when =
     mins < 60
       ? `in ${humaniseMinutes(mins)}`
-      : `${day} ${formatTime12(schedule?.startTime ?? '')}`;
+      : `${day} ${formatTime12(nextOpeningTime(schedule, now) ?? "")}`;
   return <GenericPill tone="neutral">Next · {when}</GenericPill>;
 }
 

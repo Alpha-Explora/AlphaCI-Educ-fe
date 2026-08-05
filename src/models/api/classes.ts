@@ -89,7 +89,7 @@ export const classesApi = {
     });
   },
 
-  setSchedule(id: string, schedule: ClassSchedule | null) {
+  setSchedule(id: string, schedule: ClassSchedule[] | null) {
     return apiRequest<ClassCohort>(`/classes/${id}/schedule`, {
       method: "PATCH",
       body: { schedule },

@@ -24,6 +24,7 @@ import {
   minutesUntilClose,
   minutesUntilOpen,
   nextMeetingDay,
+  nextOpeningTime,
 } from "@/models/schedule";
 import type { PresentableError } from "./errors";
 
@@ -139,7 +140,7 @@ export function useTeacherSchedule(
               // teacher wants the weekday — "in 3 days" does not say which.
               mins < 60
               ? `in ${humaniseMinutes(mins)}`
-              : `${nextMeetingDay(schedule, now)} ${formatTime12(schedule?.startTime ?? '')}`;
+              : `${nextMeetingDay(schedule, now)} ${formatTime12(nextOpeningTime(schedule, now) ?? "")}`;
       }
 
       /*
