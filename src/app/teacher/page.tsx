@@ -6,17 +6,10 @@
 // that course's own page (/teacher/courses/[id]), where they are also created.
 // Data/derivation live in the ViewModels (useTeacherCourseBoard).
 // ============================================================================
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSession } from "@/viewmodels/useSession";
 import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
-import {
-  Button,
-  EmptyState,
-  SkeletonCard,
-  Stat,
-  StateBoundary,
-} from "@/components/ui";
-import { CreateClassModal } from "@/components/domain/CreateClassModal";
+import { EmptyState, SkeletonCard, Stat, StateBoundary } from "@/components/ui";
 import { CourseCard } from "@/components/domain/CourseCard";
 import { ClassCard } from "@/components/domain/ClassCard";
 import { ClassAccessCard } from "@/components/domain/ClassAccessCard";
@@ -24,7 +17,6 @@ import { ClassAccessCard } from "@/components/domain/ClassAccessCard";
 export default function TeacherDashboardPage() {
   const { user, selectedOrgId } = useSession();
   const board = useTeacherCourseBoard(user?.id ?? null, selectedOrgId);
-  const [createOpen, setCreateOpen] = useState(false);
 
   /*
     Every section this teacher runs in this lab, flattened for the access-code
@@ -53,17 +45,17 @@ export default function TeacherDashboardPage() {
       */}
       <ClassAccessCard classes={allClasses} />
 
-      {/* Title on the left, summary rollup on the right of the same row. */}
+      {/*
+        Title on the left, summary rollup on the right of the same row.
+
+        NO "Create class" HERE. A class is always a section OF a course, and this
+        page is a level above that — the button had to open with a course picker
+        just to establish what it was creating, which is a question the course
+        page has already answered. It lives on /teacher/courses/[id], where the
+        course is the page you are standing on.
+      */}
       <div className="flex flex-wrap items-center justify-between gap-4 animate-fade-up">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold text-[var(--text-strong)]">My Courses</h1>
-          {/* Unscoped create: the one place a teacher can pick a laboratory and
-              build a section in a lab other than the one they're viewing. The
-              per-course button on a course page stays scoped to that course. */}
-          <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
-            <span aria-hidden="true">＋</span> Create class
-          </Button>
-        </div>
+        <h1 className="text-2xl font-semibold text-[var(--text-strong)]">My Courses</h1>
 
         {!board.isLoading && !board.error && (
           <div className="grid grid-cols-4 gap-6 rounded-xl border border-[var(--border-subtle)] bg-white px-5 py-4 shadow-card">
@@ -142,11 +134,6 @@ export default function TeacherDashboardPage() {
         </section>
       )}
 
-      {/* Mount on open so the lab/course pickers initialise from freshly
-          loaded courses rather than a stale first render. */}
-      {createOpen && (
-        <CreateClassModal open onClose={() => setCreateOpen(false)} />
-      )}
     </div>
   );
 }

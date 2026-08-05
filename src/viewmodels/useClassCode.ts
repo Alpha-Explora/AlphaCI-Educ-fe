@@ -19,7 +19,12 @@ import type { StudentClassState } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
 
 export interface ClassCodeVM {
-  submit: (code: string) => void;
+  /**
+   * `onSuccess` fires only when the code was accepted. The prompt uses it to
+   * close itself — the card behind turning open at that moment IS the
+   * confirmation, so a dialog that lingered would just be in the way.
+   */
+  submit: (code: string, opts?: { onSuccess?: () => void }) => void;
   isSubmitting: boolean;
   submitError: PresentableError | null;
   /** Clears a stale error so the field looks fresh as soon as they retype. */
@@ -46,7 +51,7 @@ export function useClassCode(): ClassCodeVM {
   });
 
   return {
-    submit: (code: string) => redeemMutation.mutate(code),
+    submit: (code, opts) => redeemMutation.mutate(code, { onSuccess: opts?.onSuccess }),
     isSubmitting: redeemMutation.isPending,
     submitError: redeemMutation.error ? toPresentableError(redeemMutation.error) : null,
     clearError: () => redeemMutation.reset(),

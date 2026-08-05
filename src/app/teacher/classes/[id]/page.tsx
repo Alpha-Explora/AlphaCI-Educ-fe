@@ -42,6 +42,7 @@ import {
 import { PageHeader } from "@/components/domain/PageHeader";
 import { TeacherProjectList } from "@/components/domain/TeacherProjectList";
 import { ClassScheduleCard } from "@/components/domain/ClassScheduleCard";
+import { ClassAccessPanel } from "@/components/domain/ClassAccessPanel";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { ClassOverviewTab } from "@/components/domain/ClassOverviewTab";
 import { JoinCodeStrip } from "@/components/domain/JoinCodeButton";
@@ -321,7 +322,19 @@ export default function ClassRosterPage() {
             >
               {/* Configuration first, destruction last. The danger zone used to
                   be the only thing on this tab, so it opened on a red card;
-                  ordinary settings belong above it. */}
+                  ordinary settings belong above it.
+
+                  Access sits ABOVE the timetable: starting the class is the thing
+                  a teacher comes here to do in the moment, whereas the hours are
+                  set once a term. */}
+              <ClassAccessPanel
+                classId={classId}
+                sectionLabel={
+                  info ? `${info.code} · ${info.section}` : "this section"
+                }
+                hasSchedule={Boolean(info?.schedule)}
+              />
+
               <ClassScheduleCard classId={classId} schedule={info?.schedule} />
 
               <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">

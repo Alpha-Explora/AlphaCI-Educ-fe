@@ -19,8 +19,10 @@
 // Everything on it comes from data the hub already holds, so a class costs no
 // extra request to summarise.
 // ============================================================================
+import { useState } from "react";
 import Link from "next/link";
 import { CardDecor, GenericPill, cn, patternFor } from "@/components/ui";
+import { ClassCodePrompt } from "./ClassCodePrompt";
 import { manilaMoment } from "@/models/manila";
 import { CLASS_STATE_COPY } from "@/viewmodels/useClassCode";
 import type { ClassSection } from "@/viewmodels/useStudentDashboard";
@@ -47,6 +49,25 @@ export function StudentClassCard({
   const copy = CLASS_STATE_COPY[state];
   const locked = state !== "open";
 
+  /*
+    THREE BEHAVIOURS, NOT TWO.
+
+      open        → a link to the class
+      needs-code  → clickable, and asks for the code (the teacher HAS started it,
+                    so there is something to unlock — including during async)
+      not-started
+      outside-hours → dead. Nothing the student can do from here, so the card is
+                      not a control at all: no pointer, no tab stop, no
+                      destination a screen reader would announce.
+
+    The middle case is the one worth being careful about. It looks closed because
+    it IS closed, but it is one code away from opening — so it keeps a pointer and
+    a hover, and the greying is lighter than the dead states.
+  */
+  const unlockable = state === "needs-code";
+  const dead = locked && !unlockable;
+  const [promptOpen, setPromptOpen] = useState(false);
+
   const href = `/student/classes/${classInfo.id}`;
 
   const card = (
@@ -54,13 +75,16 @@ export function StudentClassCard({
       className={cn(
         "relative flex h-full flex-col overflow-hidden rounded-xl border p-5 pt-6 shadow-card",
         "animate-fade-up transition-all duration-200",
-        locked
-          ? // GREYED, AND MEANT TO LOOK IT. A closed class is background
-            // information — desaturating the whole surface is what makes the one
-            // class a student can actually work on findable in a grid of six
-            // without reading a single word.
-            "border-slate-200 bg-slate-50"
-          : "border-platform-200 bg-gradient-to-br from-platform-50 via-platform-50 to-white " +
+        // GREYED, AND MEANT TO LOOK IT. A closed class is background information
+        // — desaturating the surface is what makes the class a student can
+        // actually work on findable in a grid of six without reading a word.
+        dead && "border-slate-200 bg-slate-50",
+        // Waiting for a code: lighter than dead, and it moves under the cursor,
+        // because something DOES happen when you click it.
+        unlockable &&
+          "border-slate-300 bg-white group-hover:-translate-y-0.5 group-hover:border-platform-300 group-hover:shadow-card-hover",
+        !locked &&
+          "border-platform-200 bg-gradient-to-br from-platform-50 via-platform-50 to-white " +
             "group-hover:-translate-y-0.5 group-hover:border-platform-300 group-hover:shadow-card-hover",
       )}
       style={{ animationDelay: `${index * 50}ms` }}
@@ -70,16 +94,14 @@ export function StudentClassCard({
           otherwise grey card reads as a rendering fault rather than a state. */}
       <CardDecor
         pattern={patternFor(classInfo.id)}
-        ink={locked ? "rgb(100 116 139 / 0.12)" : "rgb(37 99 235 / 0.16)"}
+        ink={dead ? "rgb(100 116 139 / 0.12)" : "rgb(37 99 235 / 0.16)"}
       />
       {/* Colour bar — reads as the tab on a folder. */}
       <span
         aria-hidden="true"
         className={cn(
           "absolute inset-x-0 top-0 h-1",
-          locked
-            ? "bg-slate-300"
-            : "bg-gradient-to-r from-platform-600 to-platform-400",
+          dead ? "bg-slate-300" : "bg-gradient-to-r from-platform-600 to-platform-400",
         )}
       />
 
@@ -91,7 +113,7 @@ export function StudentClassCard({
           <span
             className={cn(
               "rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide text-white shadow-sm",
-              locked ? "bg-slate-400" : "bg-platform-600",
+              dead ? "bg-slate-400" : "bg-platform-600",
             )}
           >
             {classInfo.code}
@@ -113,7 +135,7 @@ export function StudentClassCard({
       <h2
         className={cn(
           "relative mt-2 text-base font-semibold",
-          locked ? "text-slate-600" : "text-[var(--text-strong)]",
+          dead ? "text-slate-600" : "text-[var(--text-strong)]",
         )}
       >
         {classInfo.name}
@@ -131,7 +153,7 @@ export function StudentClassCard({
           <p
             className={cn(
               "mt-0.5 text-2xl font-semibold tabular-nums",
-              locked ? "text-slate-400" : "text-platform-700",
+              dead ? "text-slate-400" : "text-platform-700",
             )}
           >
             {active.length}
@@ -144,7 +166,7 @@ export function StudentClassCard({
           <p
             className={cn(
               "mt-0.5 text-2xl font-semibold tabular-nums",
-              locked ? "text-slate-400" : "text-[var(--text-strong)]",
+              dead ? "text-slate-400" : "text-[var(--text-strong)]",
             )}
           >
             {past.length}
@@ -164,11 +186,12 @@ export function StudentClassCard({
         </p>
       )}
 
-      {/* No arrow when closed: an arrow is a promise that something happens when
-          you click, and nothing does. */}
-      {!locked && (
+      {/* An arrow is a promise that something happens when you click. Shown for
+          the two states where something does — opening the class, or being asked
+          for the code — and withheld from the dead ones. */}
+      {!dead && (
         <span className="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-platform-700">
-          {total === 0 ? "No projects yet" : "Open class"}
+          {unlockable ? "Enter code" : total === 0 ? "No projects yet" : "Open class"}
           <span
             aria-hidden="true"
             className="transition-transform duration-200 group-hover:translate-x-0.5"
@@ -181,23 +204,55 @@ export function StudentClassCard({
   );
 
   /*
-    A CLOSED CARD IS NOT A LINK AT ALL.
+    A DEAD CARD IS NOT A CONTROL AT ALL.
 
-    Not a link with pointer-events disabled, and not a link that navigates to a
-    page that then refuses everything: a closed class has nothing to open, so the
-    honest markup is not an anchor. Dropping the <Link> also takes it out of the
-    tab order and off the screen-reader's list of links, which a CSS-only
-    treatment would leave behind — a keyboard user would still land on it and a
-    screen reader would still announce a destination.
+    Not a link with pointer-events disabled, and not a link to a page that then
+    refuses everything: a class the teacher has not started has nothing to open,
+    so the honest markup is neither an anchor nor a button. That also keeps it out
+    of the tab order and off a screen reader's list of links, which a CSS-only
+    treatment would leave behind.
 
     `cursor-not-allowed` is the browser's own "you cannot do this" cursor (the
     circle-slash); there is no standard X-shaped cursor to ask for.
   */
-  if (locked) {
+  if (dead) {
     return (
       <div aria-disabled="true" className="cursor-not-allowed rounded-xl">
         {card}
       </div>
+    );
+  }
+
+  /*
+    Waiting for a code: a real <button>, because clicking it does something. The
+    accessible name says what — "Enter the code for AT-1234" rather than the
+    class name alone, which would announce identically to the open card next to it
+    and give no clue that a dialog is about to appear.
+  */
+  if (unlockable) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setPromptOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`Enter the code for ${classInfo.code} — ${classInfo.name}`}
+          className="group w-full rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+        >
+          {card}
+        </button>
+        {/* Mounted only while open so the field starts empty on every attempt —
+            a stale code left in the box after a failure looks like the value was
+            accepted. */}
+        {promptOpen && (
+          <ClassCodePrompt
+            open
+            onClose={() => setPromptOpen(false)}
+            classCode={classInfo.code}
+            className={classInfo.name}
+          />
+        )}
+      </>
     );
   }
 
