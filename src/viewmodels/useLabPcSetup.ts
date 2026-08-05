@@ -152,8 +152,11 @@ function buildSteps(info: LabSetupInfo | null, policy: WorkDirPolicy): RolloutSt
             "live under %TEMP% and are already wiped when VS Code closes. Add this only as " +
             "a belt-and-braces measure for machines that get killed or lose power mid-session."
           : "Recommended with the persistent policy you selected, because checkouts survive " +
-            "between sessions. On a SHARED PC add -WipePersistent so the next student cannot " +
-            "read the previous student's work. On assigned machines or VDI, leave it off.",
+            "between sessions. Leave it off only where nobody else can log in, or where the " +
+            "whole desktop is discarded at logoff (non-persistent VDI). If another student " +
+            "could ever log into this machine — including pooled VDI that keeps profiles — " +
+            "add -WipePersistent, so the next student cannot read the previous student's work " +
+            "or their GitHub token.",
       command:
         policy === "ephemeral"
           ? String.raw`powershell -ExecutionPolicy Bypass -File "C:\LabTools\logoff-cleanup.ps1"`

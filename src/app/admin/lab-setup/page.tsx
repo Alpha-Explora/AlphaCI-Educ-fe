@@ -291,10 +291,26 @@ function DownloadsCard({ vm }: { readonly vm: LabPcSetupVM }) {
           aria-label="Workspace policy"
           className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
         >
+          {/*
+            LABELLED BY WHO CAN READ THE FOLDER, NOT BY WHAT THE HARDWARE IS.
+
+            The right-hand option used to read "Assigned / VDI", which asked the
+            admin to classify the machine. That is a PROXY for the thing that
+            actually decides whether `persistent` is safe -- can another student
+            log in and read this checkout? -- and the proxy breaks on pooled VDI
+            that keeps profiles between students. That configuration answers
+            "yes", but "VDI" is in the label, so it lands here and then reads
+            guidance telling it to leave the cleanup task off.
+
+            What is left on disk is not only coursework: the work dir holds a
+            live `ghs_` GitHub token. See EPHEMERAL_STORAGE.md, which records a
+            machine found holding nine checkouts and three token files, one still
+            valid, because the wipe had never once run.
+          */}
           {(
             [
               ["ephemeral", "Shared PCs"],
-              ["persistent", "Assigned / VDI"],
+              ["persistent", "One student per machine"],
             ] as [WorkDirPolicy, string][]
           ).map(([value, label]) => (
             <button
@@ -316,9 +332,26 @@ function DownloadsCard({ vm }: { readonly vm: LabPcSetupVM }) {
         </div>
         <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)]">
           {vm.policy === "ephemeral"
-            ? "Each session clones to a temp folder that is wiped when VS Code closes — the right default for a machine many students share."
-            : "The checkout is reused and updated with git pull, which is faster on a machine one student keeps."}
+            ? "Each session clones to a temp folder that is wiped when VS Code closes — the right default for a machine many students share. The cost is a fresh clone and dependency install each session."
+            : "The checkout is reused and updated with git pull, so there is no re-clone or dependency install each session. Choose this only when nobody else can log into the machine, or when the whole desktop is discarded at logoff (non-persistent VDI)."}
         </p>
+        {/*
+          Shown ONLY on the persistent side, and not as a general note: it is the
+          one configuration where the choice above is wrong in a way the admin
+          cannot see. Pooled VDI that keeps profiles looks like "one student per
+          machine" from the desk and behaves like a shared PC on disk.
+        */}
+        {vm.policy === "persistent" && (
+          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[var(--text-strong)]">
+            <strong>Virtual desktops:</strong> this is safe on{" "}
+            <em>non-persistent</em> VDI, where the profile is rebuilt at every
+            logon. If your VDI <em>keeps</em> each profile and students are given
+            whatever desktop is free, it is a shared PC — choose{" "}
+            <strong>Shared PCs</strong> instead. To check: save a file to the
+            desktop, log off, log back on. If it is still there, treat it as
+            shared.
+          </p>
+        )}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
