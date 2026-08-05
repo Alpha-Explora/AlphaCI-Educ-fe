@@ -38,6 +38,15 @@ const SLOTS_PER_HOUR = 60 / STEP_MIN;
 const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+/*
+  ROW HEIGHT IS THE WHOLE DIALOG'S HEIGHT. Thirty-two half-hour rows at 20px is
+  640px of grid, which pushed the modal past a laptop viewport and made the very
+  fields that decide what the grid shades scroll away. At 14px the same sixteen
+  hours are 448px and the dialog fits without scrolling, while a 30-minute slot
+  is still a comfortable pointer target.
+*/
+const SLOT_H = "h-3.5"; // 14px — see above.
+
 /** Slot index -> "HH:MM". Index 0 is START_HOUR:00. */
 function slotToTime(slot: number): string {
   const mins = START_HOUR * 60 + slot * STEP_MIN;
@@ -195,7 +204,8 @@ export function ScheduleGridPicker({
                 <div
                   key={slot}
                   className={cn(
-                    "h-5 pr-1 text-right text-[10px] leading-5 text-[var(--text-muted)]",
+                    SLOT_H,
+                    "pr-1 text-right text-[10px] leading-[14px] text-[var(--text-muted)]",
                     slot % SLOTS_PER_HOUR !== 0 && "invisible",
                   )}
                 >
@@ -241,7 +251,8 @@ export function ScheduleGridPicker({
                         if (dragging.current && anchor?.day === day) setHover(slot);
                       }}
                       className={cn(
-                        "h-5 border-b transition-colors",
+                        SLOT_H,
+                        "border-b transition-colors",
                         slot % SLOTS_PER_HOUR === 0
                           ? "border-[var(--border-subtle)]"
                           : "border-transparent",

@@ -68,7 +68,7 @@ export const classesApi = {
    * Drives the booking grid. A conflict list can only say what is wrong; this
    * says what is there, which is what an admin needs to find a free slot.
    */
-  occupancy(input: { teacherId?: string; labOrgIds?: string[] }) {
+  occupancy(input: { classId?: string; teacherId?: string; labOrgIds?: string[] }) {
     return apiRequest<{ bookings: ScheduleBooking[] }>("/classes/occupancy", {
       method: "POST",
       body: input,

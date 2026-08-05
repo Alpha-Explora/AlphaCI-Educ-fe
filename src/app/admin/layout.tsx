@@ -11,6 +11,9 @@ const NAV: NavItem[] = [
   { href: "/admin/teachers", label: "Manage Teachers", icon: "users" },
   { href: "/admin/students", label: "Manage Students", icon: "cap" },
   { href: "/admin/courses", label: "Manage School Courses", icon: "book" },
+  // Directly after Courses: a section is created from its course and managed
+  // here, so the two sit together in the order the work actually happens.
+  { href: "/admin/sections", label: "Class Sections", icon: "calendar" },
   { href: "/admin/incidents", label: "Incident Management", icon: "alert" },
   { href: "/admin/lab-setup", label: "Set up Lab PCs", icon: "desktop" },
   { href: "/admin/settings", label: "Settings", icon: "gear" },
