@@ -28,6 +28,7 @@ import {
   Banner,
   Button,
   Card,
+  EmptyState,
   Field,
   GenericPill,
   Select,
@@ -138,86 +139,124 @@ export function SubmitForReviewPanel({
                 teacher if it keeps happening.
               </Banner>
             ) : (
-              <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Your branch">
-                    {({ id }) => (
-                      <Select
-                        id={id}
-                        value={head}
-                        onChange={(e) => setHeadChoice(e.target.value)}
-                      >
-                        {sourceBranches.map((b) => (
-                          <option key={b.name} value={b.name}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </Select>
+              <div className="space-y-5">
+                {/*
+                  SAY THAT THE LIST IS EMPTY, rather than only offering the form.
+
+                  This tab used to render a bare pair of dropdowns on an
+                  otherwise blank page, which reads as "something failed to
+                  load" — there was nothing to tell a student whether they were
+                  looking at an empty list or a broken one.
+
+                  It matters most straight after a merge. The list is GitHub's
+                  OPEN pull requests only (the API call fixes `state=open`), so a
+                  merged pull request leaves it and the tab a student was just
+                  working in goes blank. Without this, the most common reading of
+                  a successful merge is that the merge lost the work.
+                */}
+                <EmptyState
+                  icon="🔀"
+                  title="No pull requests open"
+                  description="Nothing is waiting for review right now. Anything you already merged has left this list — that is what a finished pull request looks like."
+                />
+
+                {/* Ruled off, and labelled. Inside one card a gap alone does not
+                    say that the notice above is a STATUS and this is an ACTION. */}
+                <div className="space-y-3 border-t border-[var(--border-subtle)] pt-5">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+                    Open a pull request
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Your branch">
+                      {({ id }) => (
+                        <Select
+                          id={id}
+                          value={head}
+                          onChange={(e) => setHeadChoice(e.target.value)}
+                        >
+                          {sourceBranches.map((b) => (
+                            <option key={b.name} value={b.name}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Field>
+                    <Field label="Merge into">
+                      {({ id }) => (
+                        <Select
+                          id={id}
+                          value={base}
+                          onChange={(e) => setBaseChoice(e.target.value)}
+                        >
+                          {targetBranches.map((b) => (
+                            <option key={b} value={b}>
+                              {b}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Field>
+                  </div>
+                  <Button
+                    onClick={() => vm.open({ head, base })}
+                    loading={vm.isOpening}
+                    disabled={!head || !base}
+                  >
+                    Open pull request
+                  </Button>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Opening a pull request does not merge anything. It asks for
+                    your work to be checked first — the pipeline runs, and{" "}
+                    {isGroup
+                      ? "a teammate reviews it"
+                      : "you merge it once the checks pass"}
+                    .
+                    {/*
+                      The promotion path, spelled out, and only when there IS one.
+                      A two-stage project is the case where "merge into uat" looks
+                      like a detour — saying where it leads is the difference
+                      between a confusing extra step and the lesson the setting
+                      exists to teach. Read off the branches that exist, so it
+                      cannot contradict the dropdown beside it.
+                    */}
+                    {targetBranches.length > 1 && (
+                      <>
+                        {" "}
+                        Work reaches <code>main</code> through{" "}
+                        <code>{targetBranches[0]}</code> first — one pull request
+                        per hop, each checked by the pipeline.
+                      </>
                     )}
-                  </Field>
-                  <Field label="Merge into">
-                    {({ id }) => (
-                      <Select
-                        id={id}
-                        value={base}
-                        onChange={(e) => setBaseChoice(e.target.value)}
-                      >
-                        {targetBranches.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </Field>
+                  </p>
                 </div>
-                <Button
-                  onClick={() => vm.open({ head, base })}
-                  loading={vm.isOpening}
-                  disabled={!head || !base}
-                >
-                  Open pull request
-                </Button>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Opening a pull request does not merge anything. It asks for your
-                  work to be checked first — the pipeline runs, and{" "}
-                  {isGroup
-                    ? "a teammate reviews it"
-                    : "you merge it once the checks pass"}
-                  .
-                  {/*
-                    The promotion path, spelled out, and only when there IS one.
-                    A two-stage project is the case where "merge into uat" looks
-                    like a detour — saying where it leads is the difference
-                    between a confusing extra step and the lesson the setting
-                    exists to teach. Read off the branches that exist, so it
-                    cannot contradict the dropdown beside it.
-                  */}
-                  {targetBranches.length > 1 && (
-                    <>
-                      {" "}
-                      Work reaches <code>main</code> through{" "}
-                      <code>{targetBranches[0]}</code> first — one pull request
-                      per hop, each checked by the pipeline.
-                    </>
-                  )}
-                </p>
               </div>
             )}
           </div>
         ) : (
-          <ul className="mt-4 space-y-4">
-            {vm.pullRequests.map((pr) => (
-              <PullRequestRow
-                key={pr.number}
-                pr={pr}
-                vm={vm}
-                audience={audience}
-                repoId={repoId}
-                viewer={viewer}
-              />
-            ))}
-          </ul>
+          <div className="mt-4">
+            {/* Counted and labelled OPEN, matching the "N workflow runs" header
+                on the Actions tab. It also names what this list is: the API call
+                behind it fixes `state=open`, so a merged pull request is absent
+                rather than listed as done, and a student who is not told that
+                reads the shrinking list as work disappearing. */}
+            <p className="border-b border-[var(--border-subtle)] pb-2 text-sm font-semibold text-[var(--text-strong)]">
+              {vm.pullRequests.length} open pull{" "}
+              {vm.pullRequests.length === 1 ? "request" : "requests"}
+            </p>
+            <ul className="mt-4 space-y-4">
+              {vm.pullRequests.map((pr) => (
+                <PullRequestRow
+                  key={pr.number}
+                  pr={pr}
+                  vm={vm}
+                  audience={audience}
+                  repoId={repoId}
+                  viewer={viewer}
+                />
+              ))}
+            </ul>
+          </div>
         )}
       </StateBoundary>
     </Card>
