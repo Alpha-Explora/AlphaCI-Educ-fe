@@ -14,6 +14,11 @@ const NAV: NavItem[] = [
   // from any page. The grading reference is the one document a teacher needs
   // before setting an assignment, so it cannot be reachable only by typing a URL.
   { href: "/teacher/rubric", label: "Grading", icon: "check" },
+  // Immediately after Grading, because the two are halves of one answer: the
+  // rubric says what a stage is worth, this says which command produced the
+  // result. A teacher explaining a mark to a student needs both, and needs to
+  // get from one to the other without going through Home.
+  { href: "/teacher/languages", label: "Languages", icon: "layers" },
   { href: "/teacher/settings", label: "Settings", icon: "gear" },
 ];
 

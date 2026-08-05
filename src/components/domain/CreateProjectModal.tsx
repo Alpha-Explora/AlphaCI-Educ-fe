@@ -54,10 +54,12 @@ import type {
   ClassCohort,
   CreateProjectInput,
   ProjectRepoStructure,
+  ProjectTemplateOption,
   ProjectType,
   Stack,
   SystemUser,
 } from "@/models/types";
+import { customProjectIdOf } from "@/models/customProjects";
 import {
   Avatar,
   Banner,
@@ -73,6 +75,7 @@ import {
 } from "@/components/ui";
 import { ProvisionResultSummary } from "./ProvisionResultSummary";
 import { StarterGalleryModal } from "./StarterGalleryModal";
+import { CustomProjectEditorModal } from "./CustomProjectEditorModal";
 
 interface GroupDraft {
   id: string;
@@ -417,6 +420,17 @@ export function CreateProjectModal({
   const [galleryOpen, setGalleryOpen] = useState(false);
 
   /**
+   * The custom-project editor, when it is open.
+   *
+   * `{ projectId: null }` is "writing a new one"; an id is "editing that one".
+   * A distinct object rather than two booleans so the two states cannot both be
+   * true, which is what would put the editor in create mode over an id.
+   *
+   * It replaces the gallery rather than stacking on it — see the render below.
+   */
+  const [editor, setEditor] = useState<{ projectId: string | null } | null>(null);
+
+  /**
    * How many promotion stages this project's pipeline has.
    *
    * MAIN_ONLY is the first-year setting: main is still protected and a pull
@@ -565,8 +579,16 @@ export function CreateProjectModal({
               </span>
               <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-strong)]">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text-strong)]">
                     {selectedTemplate?.label ?? "None available"}
+                    {/* Named on the card, not only inside the gallery. A
+                        teacher's own project and a built-in are chosen the same
+                        way and provisioned the same way, but only one of them
+                        is something they can still change — and the difference
+                        has to survive closing the gallery. */}
+                    {selectedTemplate?.custom && (
+                      <GenericPill tone="info">Yours</GenericPill>
+                    )}
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                     {selectedTemplate?.summary}
@@ -694,9 +716,15 @@ export function CreateProjectModal({
         : {
             repoStructure,
             stack,
+            // The REFERENCE, not the catalogue id: a teacher's own project is
+            // named `custom:cpt_…` on the wire so the server knows which
+            // catalogue to resolve it from. See templateRefFor.
+            //
             // Omitted when the catalogue is unavailable, so the server's own
             // default applies rather than this component guessing at one.
-            ...(templateChoice && { template: templateChoice }),
+            ...(starters.selectedTemplateRef && {
+              template: starters.selectedTemplateRef,
+            }),
           };
     const base = {
       title: title.trim(),
@@ -1318,16 +1346,57 @@ export function CreateProjectModal({
           scrolling container inherits that container's clipping, and the
           gallery is the taller of the two. Only mounted while open, so its
           two-pane state resets between visits instead of reopening on whatever
-          was last previewed. */}
-      {galleryOpen && (
+          was last previewed.
+
+          Hidden while the editor is up rather than layered under it. Two open
+          dialogs each install their own Escape handler and their own backdrop,
+          so one Escape would close both and the wrong one would be on top on
+          the way back. `galleryOpen` is untouched, so closing the editor
+          returns the teacher to the list they left. */}
+      {galleryOpen && editor === null && (
         <StarterGalleryModal
           open
           onClose={() => setGalleryOpen(false)}
-          starters={starters.options}
+          builtIn={starters.builtIn}
+          mine={starters.mine}
           isLoading={starters.isLoading}
           stack={stack}
           selectedId={templateChoice}
           onSelect={setTemplate}
+          onNew={() => setEditor({ projectId: null })}
+          onEdit={(starter: ProjectTemplateOption) =>
+            setEditor({ projectId: customProjectIdOf(starter) })
+          }
+        />
+      )}
+
+      {editor && (
+        <CustomProjectEditorModal
+          open
+          projectId={editor.projectId}
+          onClose={() => setEditor(null)}
+          onSaved={(saved) => {
+            const creating = editor.projectId === null;
+            setEditor(null);
+            if (!creating) return;
+            // A project just written is almost certainly the one the teacher
+            // came here to use, so it is selected and the gallery closes —
+            // landing them back on the wizard with their own work chosen,
+            // rather than in a list they now have to find it in.
+            //
+            // If they wrote it for a language this project is not set in, the
+            // catalogue filter drops it and useStarterSelection falls back. That
+            // is the honest outcome: the picker cannot offer a project that
+            // cannot build in the chosen language.
+            setTemplate(saved.id);
+            setGalleryOpen(false);
+          }}
+          onRemoved={() => {
+            // The catalogue refetch removes it from the list; if it was the
+            // selected one, useStarterSelection falls back to the first
+            // available starter on the next render.
+            setEditor(null);
+          }}
         />
       )}
     </>
