@@ -1043,6 +1043,33 @@ export interface RemoveStaffResponse {
   };
 }
 
+/**
+ * DELETE /organizations/admins/:userId — a platform operator removes an IT admin.
+ *
+ * NO `accountDeleted` FLAG, unlike RemoveStaffResponse. A teacher may be merely
+ * DETACHED from one laboratory because another school still employs them; an IT
+ * admin has no such split — the role spans every laboratory at once — so this
+ * always deletes and there is nothing for a flag to distinguish.
+ */
+export interface RemoveAdminResponse {
+  /** The deleted record, returned so the console can name who went. */
+  user: SystemUser;
+  /** One entry per laboratory: an admin holds a GitHub seat in every one. */
+  orgRemovals: Array<{
+    orgId: string;
+    orgName: string;
+    githubOrgName: string;
+    live: boolean;
+    removed: boolean;
+    nothingToRemove?: boolean;
+    warning?: string;
+  }>;
+  /** What went with the account. Courses they created deliberately survive. */
+  removed: { labs: number; courseGrants: number; enrollments: number };
+  /** Set when some laboratory's GitHub org still lists them. */
+  warning?: string;
+}
+
 /** POST /organizations/:id/staff/reconcile */
 export interface ReconcileResponse {
   /** false when GitHub could not be read — in which case NOTHING was changed. */

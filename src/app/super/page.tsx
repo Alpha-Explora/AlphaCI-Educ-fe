@@ -30,6 +30,7 @@ import {
 } from "@/viewmodels/useSuperAdminConsole";
 import { useAddLabAdmin } from "@/viewmodels/useAddLabAdmin";
 import { AddLabAdminModal } from "@/components/domain/AddLabAdminModal";
+import { RemoveLabAdminModal } from "@/components/domain/RemoveLabAdminModal";
 import { Button } from "@/components/ui";
 import { useEffect, useState } from "react";
 
@@ -125,6 +126,31 @@ export default function SuperAdminConsolePage() {
       )}
 
       {vm.openLabError && <Banner tone="error" title="Couldn't open laboratory">{vm.openLabError}</Banner>}
+
+      {/*
+        The removal succeeded, but GitHub is a separate system that can refuse.
+        A WARNING tone rather than success when a seat is stuck: the account is
+        gone either way, and the half that still needs a human is the half the
+        operator has to be told about, by name.
+      */}
+      {vm.removedAdmin && (
+        <Banner
+          tone={vm.removedAdmin.warning ? "warning" : "success"}
+          title={`${vm.removedAdmin.user.fullName} removed`}
+          action={
+            <Button variant="ghost" size="sm" onClick={vm.dismissRemovedAdmin}>
+              Dismiss
+            </Button>
+          }
+        >
+          {vm.removedAdmin.warning ??
+            `Their account is deleted and their seat released in ${
+              vm.removedAdmin.orgRemovals.length === 1
+                ? "1 laboratory"
+                : `all ${vm.removedAdmin.orgRemovals.length} laboratories`
+            }.`}
+        </Banner>
+      )}
 
       <StateBoundary
         isLoading={vm.isLoading}
@@ -261,6 +287,23 @@ export default function SuperAdminConsolePage() {
                               : `Last signed in ${formatDateTime(person.lastSignInAt)}`}
                           </span>
                           <PresencePill presence={person.presence} />
+                          {/*
+                            IT admins only. Teachers are removed by their own
+                            laboratory's admin, where the detach-vs-delete rule
+                            that protects a shared teacher lives; students are
+                            not removed from this console at all. Offering the
+                            button on those rows would be offering an action the
+                            API refuses.
+                          */}
+                          {person.role === "ADMIN" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => vm.askRemoveAdmin(person)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -278,6 +321,14 @@ export default function SuperAdminConsolePage() {
         onClose={closeAddAdmin}
         vm={addAdminVm}
         labCount={vm.labs.length}
+      />
+      <RemoveLabAdminModal
+        person={vm.removingAdmin}
+        labCount={vm.labs.length}
+        onCancel={vm.cancelRemoveAdmin}
+        onConfirm={vm.confirmRemoveAdmin}
+        isRemoving={vm.isRemovingAdmin}
+        error={vm.removeAdminError}
       />
     </div>
   );
