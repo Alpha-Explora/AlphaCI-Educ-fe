@@ -23,7 +23,11 @@
 // ============================================================================
 import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
-import { useTeacherSchedule, type ScheduleRow } from "@/viewmodels/useTeacherSchedule";
+import {
+  SECTION_STATE_LABEL,
+  useTeacherSchedule,
+  type ScheduleRow,
+} from "@/viewmodels/useTeacherSchedule";
 import { OutsideHoursToggle } from "@/components/domain/OutsideHoursToggle";
 import {
   Card,
@@ -141,21 +145,10 @@ export default function TeacherSchedulePage() {
   );
 }
 
-/** Copy and colour per state, in one place so the two cannot drift apart. */
-const STATE_LABEL: Record<
-  ScheduleRow["state"],
-  { text: string; tone: "success" | "warning" | "neutral" | "info" }
-> = {
-  "in-session": { text: "In session", tone: "success" },
-  "outside-hours-open": { text: "Open after hours", tone: "warning" },
-  closed: { text: "Closed", tone: "neutral" },
-  unscheduled: { text: "No hours set", tone: "info" },
-};
-
 function ScheduleTableRow({ row }: { readonly row: ScheduleRow }) {
   const { classInfo, state, courseLabel, sectionLabel, window: meetingWindow, nextChange } =
     row;
-  const badge = STATE_LABEL[state];
+  const badge = SECTION_STATE_LABEL[state];
 
   /*
     CLOSED SECTIONS ARE GREYED. Nobody can work on them right now, so they are

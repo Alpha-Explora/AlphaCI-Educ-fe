@@ -52,6 +52,21 @@ export interface ScheduleRow {
   sortKey: number;
 }
 
+/**
+ * Copy and colour per state, in one place so two screens cannot describe the
+ * same section differently. Read by the Schedule tab's table and by the Home
+ * page's upcoming list.
+ */
+export const SECTION_STATE_LABEL: Record<
+  SectionState,
+  { text: string; tone: "success" | "warning" | "neutral" | "info" }
+> = {
+  "in-session": { text: "In session", tone: "success" },
+  "outside-hours-open": { text: "Open after hours", tone: "warning" },
+  closed: { text: "Closed", tone: "neutral" },
+  unscheduled: { text: "No hours set", tone: "info" },
+};
+
 export interface TeacherScheduleVM {
   /** Every section, one row, already sorted by what happens soonest. */
   rows: ScheduleRow[];

@@ -152,43 +152,61 @@ function StatusRail({
   readonly inSession: boolean;
   readonly now: Date;
 }) {
+  /*
+    STACKED, NOT A ROW. This lived in a full-width banner and could lay the
+    heading, the section and a pill carrying the whole timetable side by side. In
+    a 24rem rail that line wraps into an unreadable pile — the schedule pill alone
+    ("Mon, Tue, Wed, Thu, Fri, Sat · 19:30–20:30") is wider than the column.
+
+    So it stacks, and the timetable drops out of the pill onto its own muted line
+    where length costs nothing. The pill keeps only the part that is scanned: is
+    this on now, or when is it next.
+  */
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-3 px-5 py-3",
+        "space-y-1.5 px-5 py-3",
         // Emerald, not `success/10` — see the note on the section border above.
         isOpen ? "bg-emerald-50" : "bg-slate-50",
       )}
     >
-      <div className="flex flex-wrap items-center gap-2.5">
-        <span
-          aria-hidden="true"
-          className={cn(
-            "inline-block h-2.5 w-2.5 rounded-full",
-            isOpen ? "animate-pulse bg-success" : "bg-slate-300",
-          )}
-        />
-        <h2 id="class-access-heading" className="text-sm font-semibold text-[var(--text-strong)]">
-          Class access
-        </h2>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className={cn(
+              "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
+              isOpen ? "animate-pulse bg-success" : "bg-slate-300",
+            )}
+          />
+          <h2
+            id="class-access-heading"
+            className="truncate text-sm font-semibold text-[var(--text-strong)]"
+          >
+            Class access
+          </h2>
+        </div>
 
-        {section && (
-          <span className="text-sm font-medium text-[var(--text-strong)]">
-            {labelFor(section)}
-          </span>
-        )}
-
-        {/* Why THIS section — so the teacher can tell at a glance whether the
-            guess is right, instead of having to open the picker to check. */}
-        {scheduled && inSession && (
-          <GenericPill tone="success">Now · {describeSchedule(schedule)}</GenericPill>
-        )}
+        {/* Whether the guess is right, in the two words that decide it. */}
+        {scheduled && inSession && <GenericPill tone="success">Now</GenericPill>}
         {scheduled && !inSession && <NextUpPill schedule={schedule} now={now} />}
-        {!scheduled && <GenericPill tone="neutral">No schedule set</GenericPill>}
-
-        {outsideHours && <GenericPill tone="warning">Outside hours open</GenericPill>}
+        {!scheduled && <GenericPill tone="neutral">No hours set</GenericPill>}
       </div>
 
+      {section && (
+        <p className="text-sm font-medium text-[var(--text-strong)]">
+          {labelFor(section)}
+        </p>
+      )}
+
+      {/* The timetable itself, where its length is free. */}
+      {scheduled && (
+        <p className="text-xs text-[var(--text-muted)]">{describeSchedule(schedule)}</p>
+      )}
+
+      {outsideHours && (
+        <GenericPill tone="warning">Outside hours open</GenericPill>
+      )}
     </div>
   );
 }
@@ -229,8 +247,8 @@ function ClosedState({
   const closesIn = minutesUntilClose(schedule, now);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="max-w-xl space-y-1">
+    <div className="space-y-3">
+      <div className="space-y-1">
         <p className="text-sm text-[var(--text-muted)]">
           Students can sign in, but cannot open their dashboard until you start the
           class and they type the code.
@@ -248,7 +266,7 @@ function ClosedState({
         )}
       </div>
 
-      <Button onClick={onStart} loading={isStarting}>
+      <Button onClick={onStart} loading={isStarting} className="w-full justify-center">
         Start {sectionLabel}
       </Button>
     </div>
