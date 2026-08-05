@@ -1,10 +1,17 @@
 "use client";
 // ============================================================================
-// VIEW LAYER — IT-Admin course catalog (ADDENDUM H)
-// Create catalog courses and invite teachers onto them. Inviting a teacher
-// grants them immediate access to create class sections under that course —
-// but NOT visibility into other teachers' classes. All state/mutations live in
-// useCourseCatalog; this component is presentation + local form state only.
+// VIEW LAYER — IT-Admin course catalog.
+//
+// Create catalog courses, invite teachers onto them, and create each course's
+// class sections. Inviting a teacher makes them assignable to a section of that
+// course — it does NOT let them create one, and never shows them another
+// teacher's classes.
+//
+// The section button lives on each COURSE card rather than above the list: a
+// section is always a section of a course, so a page-level button would have to
+// open with a course picker to establish what it was creating. All
+// state/mutations live in useCourseCatalog; this is presentation + local form
+// state only.
 // ============================================================================
 import { useState } from "react";
 import { useCourseCatalog } from "@/viewmodels/useCourseCatalog";
@@ -21,7 +28,14 @@ import {
 import { CreateCourseModal } from "@/components/domain/CreateCourseModal";
 import type { CourseWithInstructors, SystemUser } from "@/models/types";
 
-export function CourseCatalogCard({ orgId }: { readonly orgId: string | null }) {
+export function CourseCatalogCard({
+  orgId,
+  onCreateSection,
+}: {
+  readonly orgId: string | null;
+  /** Open the section builder already scoped to this course. */
+  readonly onCreateSection: (courseId: string) => void;
+}) {
   const vm = useCourseCatalog(orgId);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -34,7 +48,8 @@ export function CourseCatalogCard({ orgId }: { readonly orgId: string | null }) 
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-strong)]">Course catalog</h2>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-            Create courses and assign instructors. A teacher can only build class sections under
+            Create courses and assign the teachers who will run them. Sections are
+            created per course, below — a teacher only sees
             a course you&apos;ve added them to — and they never see another teacher&apos;s classes.
           </p>
         </div>
@@ -76,6 +91,7 @@ export function CourseCatalogCard({ orgId }: { readonly orgId: string | null }) 
               onRemoveInstructor={(teacherId) =>
                 vm.removeInstructor(course.id, teacherId)
               }
+              onCreateSection={() => onCreateSection(course.id)}
               removingInstructorKey={vm.removingInstructorKey}
               isRemovingInstructor={vm.isRemovingInstructor}
               removeInstructorError={vm.removeInstructorError}
@@ -104,6 +120,7 @@ function CourseRow({
   isDeleting,
   deleteError,
   onRemoveInstructor,
+  onCreateSection,
   removingInstructorKey,
   isRemovingInstructor,
   removeInstructorError,
@@ -117,6 +134,7 @@ function CourseRow({
   readonly isDeleting: boolean;
   readonly deleteError: string | null;
   readonly onRemoveInstructor: (teacherId: string) => void;
+  readonly onCreateSection: () => void;
   readonly removingInstructorKey: string | null;
   readonly isRemovingInstructor: boolean;
   readonly removeInstructorError: string | null;
@@ -143,6 +161,33 @@ function CourseRow({
           </h3>
         </div>
         <Stat label="Sections" value={course.classCount} />
+      </div>
+
+      {/*
+        SCOPED TO THIS COURSE. A class section is always a section OF a course,
+        so the button belongs where the course is the thing you are standing on —
+        a page-level one had to open with a course picker just to establish what
+        it was creating, which is the question this card has already answered.
+
+        Disabled until the course has a teacher: a section names the teacher who
+        runs it, and offering the action with nobody to assign would open a form
+        whose only choice is empty.
+      */}
+      <div className="mt-3">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full justify-center"
+          disabled={course.instructors.length === 0}
+          title={
+            course.instructors.length === 0
+              ? "Assign a teacher to this course first — a section names the teacher who runs it"
+              : undefined
+          }
+          onClick={onCreateSection}
+        >
+          <span aria-hidden="true">＋</span> Create class section
+        </Button>
       </div>
 
       {/* Delete course (IT-Admin). Blocked while the course still has sections. */}

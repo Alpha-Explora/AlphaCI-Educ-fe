@@ -6,10 +6,10 @@ import { useSession } from "@/viewmodels/useSession";
 import { useState } from "react";
 import { CourseCatalogCard } from "@/components/domain/CourseCatalogCard";
 import { AdminCreateSectionModal } from "@/components/domain/AdminCreateSectionModal";
-import { Button } from "@/components/ui";
 
 export default function AdminCoursesPage() {
-  const [createOpen, setCreateOpen] = useState(false);
+  // The course a section is being created under, or null when the builder is closed.
+  const [sectionCourseId, setSectionCourseId] = useState<string | null>(null);
   const { user, labs, selectedOrgId } = useSession();
   const orgId = selectedOrgId ?? user?.orgId ?? null;
   const activeLab = labs.find((l) => l.id === orgId) ?? null;
@@ -22,31 +22,29 @@ export default function AdminCoursesPage() {
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Create courses and assign teachers for{" "}
-          <strong>{activeLab?.name ?? "the active laboratory"}</strong>. Teachers can
-          then create class sections under the courses you assign them.
+          <strong>{activeLab?.name ?? "the active laboratory"}</strong>, then create
+          the class sections under each course and set their hours. A section never
+          double-books a teacher or a laboratory.
         </p>
       </div>
 
       {orgId && (
         <>
           {/*
-            Sections are created HERE, not by the teacher. A section's hours book
-            a teacher and a laboratory, so the person who can see the whole
-            timetable is the one who should be placing it.
+            Sections are created per COURSE, from each course's own card — a
+            section is always a section OF a course, so a page-level button
+            would have to open with a course picker just to establish what it
+            was creating. The admin owns the timetable, not the teacher: a
+            section's hours book a person and a room.
           */}
-          <div className="flex justify-end animate-fade-up">
-            <Button onClick={() => setCreateOpen(true)}>
-              <span aria-hidden="true">＋</span> Create class section
-            </Button>
-          </div>
+          <CourseCatalogCard orgId={orgId} onCreateSection={setSectionCourseId} />
 
-          <CourseCatalogCard orgId={orgId} />
-
-          {createOpen && (
+          {sectionCourseId && (
             <AdminCreateSectionModal
               open
-              onClose={() => setCreateOpen(false)}
+              onClose={() => setSectionCourseId(null)}
               orgId={orgId}
+              courseId={sectionCourseId}
             />
           )}
         </>

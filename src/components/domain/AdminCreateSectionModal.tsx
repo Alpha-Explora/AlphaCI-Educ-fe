@@ -36,17 +36,24 @@ export function AdminCreateSectionModal({
   open,
   onClose,
   orgId,
+  courseId: scopedCourseId,
 }: {
   readonly open: boolean;
   readonly onClose: () => void;
   /** The laboratory whose catalogue is being managed. */
   readonly orgId: string;
+  /**
+   * The course this section belongs to — always supplied, because the builder is
+   * opened from a course's own card. A picker would ask a question the page the
+   * admin is standing on has already answered.
+   */
+  readonly courseId: string;
 }) {
   const { labs } = useSession();
   const catalog = useCourseCatalog(orgId);
   const vm = useAdminCreateSection();
 
-  const [courseId, setCourseId] = useState("");
+  const courseId = scopedCourseId;
   const [teacherId, setTeacherId] = useState("");
   const [section, setSection] = useState("");
   const [term, setTerm] = useState("");
@@ -146,25 +153,20 @@ export function AdminCreateSectionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Create a class section"
+      title={course ? `New section of ${course.code}` : "Create a class section"}
       description="You choose the teacher and the hours. A section cannot double-book a teacher or a laboratory."
       size="lg"
     >
       <form onSubmit={submit} className="space-y-5">
         {vm.createError && <Banner tone="error">{vm.createError.message}</Banner>}
 
-        <Field label="Course" required>
-          {({ id }) => (
-            <Select id={id} value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-              <option value="">Choose a course…</option>
-              {catalog.courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.title}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        {/* Stated, not chosen — the course is the card this was opened from. */}
+        <div className="rounded-lg bg-[var(--bg-subtle)] px-4 py-3">
+          <p className="text-xs text-[var(--text-muted)]">Course</p>
+          <p className="mt-0.5 text-sm font-medium text-[var(--text-strong)]">
+            {course ? `${course.code} — ${course.title}` : "Loading…"}
+          </p>
+        </div>
 
         <Field
           label="Teacher"
