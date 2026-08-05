@@ -38,6 +38,16 @@ export const queryKeys = {
     assignments: (id: string) => ["classes", id, "assignments"] as const,
     joinCode: (id: string) => ["classes", id, "join-code"] as const,
   },
+  // The code on the board. Deliberately NOT nested under `classes`: the student
+  // side has no class id to key on (it asks "am I in?", not "is CS101 open?"),
+  // and hanging it off the classes key would make every roster mutation
+  // invalidate a teacher's live code panel mid-class.
+  classAccess: {
+    /** Teacher: one class's code + arrivals. */
+    forClass: (classId: string) => ["class-access", "class", classId] as const,
+    /** Student: whether this sign-in is past the gate. */
+    me: ["class-access", "me"] as const,
+  },
   students: {
     classes: (id: string) => ["students", id, "classes"] as const,
   },

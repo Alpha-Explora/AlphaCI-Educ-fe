@@ -6,7 +6,7 @@
 // that course's own page (/teacher/courses/[id]), where they are also created.
 // Data/derivation live in the ViewModels (useTeacherCourseBoard).
 // ============================================================================
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSession } from "@/viewmodels/useSession";
 import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
 import {
@@ -19,14 +19,40 @@ import {
 import { CreateClassModal } from "@/components/domain/CreateClassModal";
 import { CourseCard } from "@/components/domain/CourseCard";
 import { ClassCard } from "@/components/domain/ClassCard";
+import { ClassAccessCard } from "@/components/domain/ClassAccessCard";
 
 export default function TeacherDashboardPage() {
   const { user, selectedOrgId } = useSession();
   const board = useTeacherCourseBoard(user?.id ?? null, selectedOrgId);
   const [createOpen, setCreateOpen] = useState(false);
 
+  /*
+    Every section this teacher runs in this lab, flattened for the access-code
+    picker. Both halves are needed: `entries` holds the sections filed under a
+    course, and `sharedClasses` the ones whose course belongs to another lab and
+    so has no card here. A section missing from this list is a class the teacher
+    cannot start — which would be indistinguishable from the feature being
+    broken. They cannot overlap (a shared section is only an "orphan" when no
+    course claimed its code), so no de-duplication is needed.
+  */
+  const allClasses = useMemo(
+    () => [
+      ...board.entries.flatMap((entry) => entry.classes.map((c) => c.classInfo)),
+      ...board.sharedClasses.map((s) => s.classInfo),
+    ],
+    [board.entries, board.sharedClasses],
+  );
+
   return (
     <div className="space-y-8">
+      {/*
+        FIRST on the page, above the courses. Starting the class is the action
+        that unblocks the entire room — until the code is up, every student is
+        looking at a locked screen — so it goes where the teacher's eye lands,
+        not below a grid of course cards.
+      */}
+      <ClassAccessCard classes={allClasses} />
+
       {/* Title on the left, summary rollup on the right of the same row. */}
       <div className="flex flex-wrap items-center justify-between gap-4 animate-fade-up">
         <div className="flex flex-wrap items-center gap-3">

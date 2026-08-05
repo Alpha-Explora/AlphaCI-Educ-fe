@@ -1436,6 +1436,51 @@ export interface JoinClassResult {
   alreadyEnrolled: boolean;
 }
 
+// --- CLASS ACCESS — the code on the board -----------------------------------
+//
+// NOT the same thing as JoinCode above, and the distinction matters at every
+// call site. A JoinCode ("CS101-XYZ") ENROLS a student in a section, once, and
+// stays valid between uses so a latecomer can still join. A class ACCESS code
+// ("4KMNPQ") admits them to the dashboard for one sign-in and dies when the
+// teacher ends the class. A student types the first on their first day and the
+// second at the start of every class.
+//
+// The server error code that means "you are signed in but still outside the
+// gate". Branch on this, never on the message — see ApiError.code.
+export const CLASS_CODE_REQUIRED = "CLASS_CODE_REQUIRED";
+
+/** One student who has typed the code, for the teacher's arrivals list. */
+export interface AdmittedStudent {
+  id: string;
+  name: string;
+  email: string;
+  grantedAt: string;
+}
+
+/** GET /class-access/classes/:classId — what the teacher's card renders. */
+export interface ClassAccessStatus {
+  classId: string;
+  className: string;
+  classCode: string;
+  open: boolean;
+  /** null when the class is closed — never a stale code. */
+  code: string | null;
+  openedAt: string | null;
+  admitted: AdmittedStudent[];
+}
+
+/** POST .../end also reports how many students were turned out. */
+export interface ClassAccessEndResult extends ClassAccessStatus {
+  revoked: number;
+}
+
+/** GET /class-access/me — whether the student is past the gate. */
+export interface StudentAccessStatus {
+  admitted: boolean;
+  classId: string | null;
+  className: string | null;
+}
+
 // --- ADDENDUM C — Teacher "Create Project" (solo assignment / group project) --
 export type ProjectType = "SOLO" | "GROUP";
 
