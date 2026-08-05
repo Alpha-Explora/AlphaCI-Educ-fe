@@ -8,6 +8,11 @@ import { AppShell, type NavItem } from "@/components/layout/AppShell";
 const NAV: NavItem[] = [
   { href: "/teacher", label: "Home", icon: "home" },
   { href: "/teacher/courses", label: "Courses", icon: "book" },
+  // Directly after Courses: a section's meeting hours are a property of the
+  // teaching, and this is the only screen that shows them across every course at
+  // once — including which section is running right now, which is what the Home
+  // card uses to pick a class to open.
+  { href: "/teacher/schedule", label: "Schedule", icon: "calendar" },
   { href: "/teacher/groups", label: "Groups", icon: "users" },
   { href: "/teacher/reports", label: "Report", icon: "chart" },
   // /teacher/rubric existed and was rendered by nobody — no nav entry, no link
@@ -25,7 +30,7 @@ const NAV: NavItem[] = [
 export default function TeacherLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) {
   return (
     <AppShell role="TEACHER" nav={NAV}>

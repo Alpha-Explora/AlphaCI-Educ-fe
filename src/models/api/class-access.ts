@@ -53,10 +53,27 @@ export const classAccessApi = {
     });
   },
 
-  /** End the class: the code stops working and every student is turned out. */
+  /**
+   * End the class: the code stops working, every student is turned out, and
+   * outside-hours access is switched off with it.
+   */
   end(classId: string) {
     return apiRequest<ClassAccessEndResult>(`/class-access/classes/${classId}/end`, {
       method: "POST",
     });
+  },
+
+  /**
+   * Suspend or restore this section's timetable.
+   *
+   * Enabling it also OPENS the class, because asynchronous work needs a code to
+   * exist — the returned status is the open one, carrying the code the teacher
+   * hands out for homework.
+   */
+  setOutsideHours(classId: string, allowed: boolean) {
+    return apiRequest<ClassAccessStatus>(
+      `/class-access/classes/${classId}/outside-hours`,
+      { method: "POST", body: { allowed } },
+    );
   },
 };
