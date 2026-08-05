@@ -16,11 +16,6 @@ import type {
 export const classAccessApi = {
   // --- Student ---
 
-  /** Am I past the gate? Also the shape the gate screen polls after a failure. */
-  me() {
-    return apiRequest<StudentAccessStatus>("/class-access/me");
-  },
-
   /**
    * Spend the code. 404 when it matches no open class — which deliberately
    * covers both a typo and a class that has ended, since the student's next

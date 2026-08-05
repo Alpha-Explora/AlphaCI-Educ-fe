@@ -391,6 +391,15 @@ export interface ClassAccessState {
   window: string | null;
   /** ISO instant the class next opens; null when open now or unscheduled. */
   opensAt: string | null;
+  /**
+   * The whole answer to "can this student work on this class right now", of
+   * which `inSession` is one input. Rides on the dashboard payload rather than a
+   * second endpoint, so a card can never say "open" over a project the server
+   * would refuse.
+   */
+  state: StudentClassState;
+  /** The teacher has suspended this section's timetable. */
+  outsideHoursAllowed: boolean;
 }
 
 export interface ClassCohort {
@@ -1488,11 +1497,33 @@ export interface ClassAccessEndResult extends ClassAccessStatus {
   revoked: number;
 }
 
-/** GET /class-access/me — whether the student is past the gate. */
+/**
+ * Why a course on the student's dashboard is closed, or that it is open.
+ *
+ * Four states, not a boolean: each one has a different thing the student should
+ * do next, and the card's copy is chosen from it — wait for your teacher, type
+ * the code, come back during class hours, or get on with it.
+ */
+export type StudentClassState =
+  | "not-started"
+  | "needs-code"
+  | "outside-hours"
+  | "open";
+
+/** What POST /class-access/redeem reports back. */
 export interface StudentAccessStatus {
   admitted: boolean;
   classId: string | null;
   className: string | null;
+  /**
+   * They typed an ENROLMENT code and were just added to that class.
+   *
+   * Only ever true on a redeem response — the status poll cannot know it and
+   * always reports false. Enrolment is a real change to a student's record, so it
+   * is confirmed rather than silently applied; a routine daily admission is not,
+   * and goes straight through.
+   */
+  justEnrolled: boolean;
 }
 
 // --- ADDENDUM C — Teacher "Create Project" (solo assignment / group project) --

@@ -45,8 +45,6 @@ export const queryKeys = {
   classAccess: {
     /** Teacher: one class's code + arrivals. */
     forClass: (classId: string) => ["class-access", "class", classId] as const,
-    /** Student: whether this sign-in is past the gate. */
-    me: ["class-access", "me"] as const,
   },
   students: {
     classes: (id: string) => ["students", id, "classes"] as const,
