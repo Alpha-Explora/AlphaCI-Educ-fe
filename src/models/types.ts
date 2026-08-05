@@ -420,6 +420,18 @@ export interface ClassCohort {
    * Enforced on the server; this copy drives the Settings form and the labels.
    */
   schedule?: ClassSchedule;
+  /**
+   * The timetable is suspended for this section — asynchronous work is allowed.
+   *
+   * While true, students can act on this section's projects at any hour. The
+   * `schedule` above is NOT cleared: it still says when the class meets, still
+   * drives the code card's auto-detection, and applies again as soon as this goes
+   * off. Absent means false.
+   *
+   * It does not lift the class code. A student working at home still types a code
+   * their teacher handed out, which is why switching this on keeps the class open.
+   */
+  outsideHoursAllowed?: boolean;
   createdAt: string;
   // ADDENDUM D — magic join code (teacher writes it on the whiteboard)
   magicJoinCode: string; // e.g. "CS101-XYZ"
@@ -1467,6 +1479,8 @@ export interface ClassAccessStatus {
   code: string | null;
   openedAt: string | null;
   admitted: AdmittedStudent[];
+  /** Whether this section's timetable is currently suspended. */
+  outsideHoursAllowed: boolean;
 }
 
 /** POST .../end also reports how many students were turned out. */

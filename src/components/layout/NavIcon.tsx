@@ -23,6 +23,7 @@ export type NavIconName =
   | "gear"
   | "help"
   | "cap"
+  | "calendar"
   | "alert"
   | "desktop"
   | "layers"
@@ -61,6 +62,9 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
     </>
   ),
   cap: <path d="m2.8 8.6 9.2-4 9.2 4-9.2 4-9.2-4Zm3.4 1.9v5.2c0 1.6 2.6 2.9 5.8 2.9s5.8-1.3 5.8-2.9v-5.2M20.4 9.4v5" />,
+  // Rail plus two posts and a divider — legible at the 56px collapsed width,
+  // where the date grid a busier calendar glyph would carry turns to mud.
+  calendar: <path d="M4 6.5h16v13H4Zm0 4.5h16M8.5 4v5m7-5v5" />,
   alert: (
     <>
       <path d="M10.6 3.9 2.5 18a1.6 1.6 0 0 0 1.4 2.4h16.2A1.6 1.6 0 0 0 21.5 18L13.4 3.9a1.6 1.6 0 0 0-2.8 0Z" />

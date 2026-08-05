@@ -45,6 +45,12 @@ export interface ClassAccessVM {
   isRotating: boolean;
   end: () => void;
   isEnding: boolean;
+
+  /** true while this section's timetable is suspended (asynchronous work). */
+  outsideHoursAllowed: boolean;
+  setOutsideHours: (allowed: boolean) => void;
+  isSettingOutsideHours: boolean;
+
   /** Whichever mutation failed last, ready to render. */
   actionError: PresentableError | null;
 }
@@ -87,11 +93,32 @@ export function useClassAccess(classId: string | null): ClassAccessVM {
 
   const endMutation = useMutation({
     mutationFn: () => classAccessApi.end(classId as string),
-    onSuccess: applyStatus,
+    onSuccess: (fresh) => {
+      applyStatus(fresh);
+      // Ending a class clears outsideHoursAllowed on the class record too, so the
+      // Schedule tab's rows are now stale. It reads classes from the teacher
+      // dashboard, not from here.
+      void queryClient.invalidateQueries({ queryKey: ["dashboards", "teacher"] });
+    },
+  });
+
+  const outsideHoursMutation = useMutation({
+    mutationFn: (allowed: boolean) =>
+      classAccessApi.setOutsideHours(classId as string, allowed),
+    onSuccess: (fresh) => {
+      applyStatus(fresh);
+      // Same reason as above: the flag lives on the class record, which the
+      // Schedule tab renders from the dashboard query.
+      void queryClient.invalidateQueries({ queryKey: ["dashboards", "teacher"] });
+    },
   });
 
   const firstError =
-    endMutation.error ?? rotateMutation.error ?? openMutation.error ?? null;
+    outsideHoursMutation.error ??
+    endMutation.error ??
+    rotateMutation.error ??
+    openMutation.error ??
+    null;
 
   return {
     data: query.data,
@@ -109,6 +136,11 @@ export function useClassAccess(classId: string | null): ClassAccessVM {
     isRotating: rotateMutation.isPending,
     end: () => endMutation.mutate(),
     isEnding: endMutation.isPending,
+
+    outsideHoursAllowed: Boolean(query.data?.outsideHoursAllowed),
+    setOutsideHours: (allowed: boolean) => outsideHoursMutation.mutate(allowed),
+    isSettingOutsideHours: outsideHoursMutation.isPending,
+
     actionError: firstError ? toPresentableError(firstError) : null,
   };
 }
