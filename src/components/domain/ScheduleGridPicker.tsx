@@ -78,9 +78,15 @@ export function ScheduleGridPicker({
     Which (day, slot) pairs are already taken, and by what. Built once per
     bookings change rather than asked per cell — 7 x 32 cells would otherwise
     re-scan every booking 224 times a paint.
+
+    A LIST per slot, not one booking. Two DIFFERENT sections can make the same
+    hour unavailable — this teacher is already teaching in another laboratory,
+    AND this laboratory already has someone else's class. Both are real reasons
+    and an admin needs to see both; keeping one booking per slot meant whichever
+    was iterated last silently replaced the other.
   */
   const busy = useMemo(() => {
-    const map = new Map<string, ScheduleBooking>();
+    const map = new Map<string, ScheduleBooking[]>();
     for (const booking of bookings) {
       // A booking is a LIST of windows now — a section meeting twice occupies
       // the room twice, and reading only the first would leave its second
@@ -89,14 +95,25 @@ export function ScheduleGridPicker({
         const from = Math.max(0, timeToSlot(block.startTime));
         const to = Math.min(TOTAL_SLOTS, timeToSlot(block.endTime));
         for (const day of block.days) {
-          for (let slot = from; slot < to; slot += 1) map.set(`${day}:${slot}`, booking);
+          for (let slot = from; slot < to; slot += 1) {
+            const key = `${day}:${slot}`;
+            const at = map.get(key);
+            if (at) {
+              // A section meeting twice in one slot is impossible, but the same
+              // section can be reached through both reasons — do not list it
+              // against itself.
+              if (!at.some((b) => b.classId === booking.classId)) at.push(booking);
+            } else {
+              map.set(key, [booking]);
+            }
+          }
         }
       }
     }
     return map;
   }, [bookings]);
 
-  const isBusy = (day: number, slot: number) => busy.get(`${day}:${slot}`);
+  const isBusy = (day: number, slot: number) => busy.get(`${day}:${slot}`)?.length;
 
   const runs = useMemo(() => toRuns(value), [value]);
 
@@ -152,7 +169,8 @@ export function ScheduleGridPicker({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[var(--text-muted)]">
           Drag down a column for each meeting — drag again on another day to add a
-          second one. Click a blue block to remove it. Shaded slots are taken.
+          second one. Click a blue block to remove it. Shaded slots name the
+          section already booked there.
         </p>
         {blocks.length > 0 && (
           <button
@@ -285,6 +303,24 @@ export function ScheduleGridPicker({
 const EMPTY_RUNS: Run[] = [];
 
 /**
+ * Why this booking blocks the slot, in two words.
+ *
+ * A section can be BOTH — the same teacher in the same room — in which case the
+ * teacher is the more specific fact and the one named. Knowing which of the two
+ * it is decides what an admin can do about it: a laboratory clash is solved by
+ * moving the room, a teacher clash is not.
+ */
+function reasonLabel(booking: ScheduleBooking): string {
+  return booking.reasons.includes("TEACHER") ? "teacher busy" : "lab in use";
+}
+
+/** The full sentence, for the tooltip that still carries everything. */
+function describeBooking(booking: ScheduleBooking): string {
+  const who = booking.reasons.includes("TEACHER") ? "this teacher" : "this laboratory";
+  return `${booking.classLabel} — ${booking.className} (${who} is busy)`;
+}
+
+/**
  * One day, drawn as a STATIC grid with positioned overlays.
  *
  * The version this replaced rendered 32 interactive cells per column — 224 in
@@ -310,7 +346,7 @@ const DayColumn = memo(function DayColumn({
   onPointerMoveSlot,
 }: {
   readonly day: number;
-  readonly busy: Map<string, ScheduleBooking>;
+  readonly busy: Map<string, ScheduleBooking[]>;
   /** Every window chosen on this day. Several, since each drag adds one. */
   readonly selected: readonly Run[];
   readonly preview: Run | null;
@@ -319,19 +355,27 @@ const DayColumn = memo(function DayColumn({
 }) {
   /*
     Contiguous booked runs, not one block per half-hour. A two-hour class is one
-    rectangle with one tooltip instead of four abutting ones whose borders read
-    as four separate bookings.
+    labelled rectangle instead of four abutting ones whose borders read as four
+    separate bookings.
+
+    Broken on the SET of sections holding the slot, not on one classId: an hour
+    held by AT-1234 alone and the next hour held by AT-1234 *and* CS-101 are
+    different facts, and merging them would put one label on a block where the
+    label is only true for half of it.
   */
   const bookedRuns = useMemo(() => {
-    const out: { from: number; to: number; booking: ScheduleBooking }[] = [];
-    let current: { from: number; to: number; booking: ScheduleBooking } | null = null;
+    const signature = (at: ScheduleBooking[]) =>
+      at.map((b) => b.classId).sort().join("|");
+
+    const out: { from: number; to: number; at: ScheduleBooking[] }[] = [];
+    let current: { from: number; to: number; at: ScheduleBooking[] } | null = null;
     for (let slot = 0; slot < TOTAL_SLOTS; slot += 1) {
-      const b = busy.get(`${day}:${slot}`);
-      if (b && current && current.booking.classId === b.classId) {
+      const at = busy.get(`${day}:${slot}`);
+      if (at?.length && current && signature(current.at) === signature(at)) {
         current.to = slot + 1;
-      } else if (b) {
+      } else if (at?.length) {
         if (current) out.push(current);
-        current = { from: slot, to: slot + 1, booking: b };
+        current = { from: slot, to: slot + 1, at };
       } else if (current) {
         out.push(current);
         current = null;
@@ -369,14 +413,51 @@ const DayColumn = memo(function DayColumn({
         />
       ))}
 
-      {bookedRuns.map((run) => (
-        <div
-          key={`${run.from}-${run.booking.classId}`}
-          title={`${run.booking.classLabel} — ${run.booking.reasons.includes("TEACHER") ? "this teacher" : "this laboratory"} is busy`}
-          style={{ top: run.from * SLOT_PX, height: (run.to - run.from) * SLOT_PX }}
-          className="absolute inset-x-0 cursor-not-allowed bg-slate-200/80 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(100,116,139,0.25)_3px,rgba(100,116,139,0.25)_6px)]"
-        />
-      ))}
+      {bookedRuns.map((run) => {
+        const slots = run.to - run.from;
+        // When two sections hold the slot, name the TEACHER clash: a laboratory
+        // clash is solved by moving the room, a teacher clash is not, so it is
+        // the one that decides whether this hour is usable at all.
+        const [primary, ...rest] = [...run.at].sort(
+          (a, b) =>
+            Number(b.reasons.includes("TEACHER")) - Number(a.reasons.includes("TEACHER")),
+        );
+        return (
+          <div
+            key={`${run.from}-${run.at.map((b) => b.classId).join()}`}
+            title={[primary, ...rest].map(describeBooking).join("\n")}
+            style={{ top: run.from * SLOT_PX, height: slots * SLOT_PX }}
+            className="absolute inset-x-0 flex flex-col items-center justify-center overflow-hidden px-0.5 text-center leading-[1.15] cursor-not-allowed bg-slate-200/80 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(100,116,139,0.25)_3px,rgba(100,116,139,0.25)_6px)]"
+          >
+            {/*
+              WHO is in the room, written in the block. It was a `title` alone,
+              which meant an admin had to hover each grey stripe and wait for a
+              native tooltip to find out what they were being blocked by — on the
+              one screen whose whole purpose is showing what is already there.
+
+              Only from two slots (28px) up: below that the text would be clipped
+              to a sliver, which reads as a rendering fault. The tooltip still
+              carries the full detail at every size.
+            */}
+            {slots >= 2 && (
+              <>
+                {/* max-w-full so `truncate` has something to truncate against —
+                    a centered flex item sizes to its content otherwise. */}
+                <span className="max-w-full truncate text-[9px] font-semibold text-slate-700">
+                  {primary.classLabel}
+                </span>
+                {rest.length > 0 ? (
+                  <span className="text-[9px] text-slate-600">+{rest.length} more</span>
+                ) : (
+                  slots >= 4 && (
+                    <span className="text-[9px] text-slate-600">{reasonLabel(primary)}</span>
+                  )
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
 
       {selected.map((run) => (
         <div
