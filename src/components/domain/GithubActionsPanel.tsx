@@ -8,21 +8,25 @@
 // subject being taught, and the vocabulary should be the one they will meet
 // again in industry — run, job, step, conclusion.
 //
-// ONE CONTAINER PER COMMIT, with that commit's runs inside it. GitHub lists
-// runs flat and repeats the commit on every row, which works when you already
-// know that a run comes FROM a push. That is exactly the causal link a beginner
-// has not made yet — "I pushed, therefore this ran" — so the commit is the
-// container and the runs sit inside it, where the relationship is structural
-// rather than something you have to infer from a repeated sha.
+// TWO SCREENS, NOT ONE SCROLL. A flat list of runs, newest first, and — when a
+// run is opened — GitHub's run page: the jobs in a rail down the left, the
+// selected job's steps and console output in the panel beside it. Both replace
+// earlier accordion designs, and for the same reason each time: nesting a run
+// inside a commit, then a job inside a run, then a 500-line console inside a
+// job meant the deeper you looked the narrower the column got, and the thing a
+// student actually came for — the compiler error — ended up in the thinnest
+// column on the page, several screens below the fold.
 //
-// A commit with no run gets a container too. "Nothing happened" is a result a
-// student needs to see: it means the push landed but no workflow matched it,
-// which is otherwise an invisible failure that looks like CI being slow.
+// A commit with no run is still reported, as a footnote under the runs.
+// "Nothing happened" is a result a student needs to see: it means the push
+// landed but no workflow matched it, which is otherwise an invisible failure
+// that looks like CI being slow.
 //
-// Data/polling live in useRepoActivity; per-run jobs load on expand via
-// useWorkflowRunJobs, so a page showing ten runs still costs one request.
+// Data/polling live in useRepoActivity; per-run jobs load on open via
+// useWorkflowRunJobs and a job's console via useJobLog, so a page showing ten
+// runs still costs one request and an opened run costs at most one log.
 // ============================================================================
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useRepoActivity } from "@/viewmodels/useRepoActivity";
 import { useWorkflowRunJobs } from "@/viewmodels/useWorkflowRunJobs";
 import { useJobLog } from "@/viewmodels/useJobLog";
@@ -526,12 +530,17 @@ function RunRow({
 // ---------------------------------------------------------------------------
 
 /**
- * The jobs and steps of a single run, with a way back to the list.
+ * One run, opened: the run's own facts, its jobs in a rail, and the selected
+ * job's steps and console beside them.
  *
- * Laid out like the page GitHub sends you to when you click a run: the run's own
- * title and number as the heading, a summary strip of the facts that describe it
- * (status, duration, branch, trigger, commit), then the jobs. A student who
- * learns this screen can read the real one.
+ * Laid out like the page GitHub sends you to when you click a run, because a
+ * student who learns this screen can read the real one — and because the shape
+ * is the right one on its own merits. A run is a SET of jobs of which usually
+ * exactly one matters, so the jobs belong in a narrow index and the one you
+ * picked belongs in the wide column. The previous stacked version gave every
+ * job the full width whether or not you were reading it, and put the console —
+ * the widest artefact in the product, and the reason anyone opens a run — at
+ * the bottom of the tallest one.
  */
 function RunDetail({
   repoId,
@@ -553,6 +562,31 @@ function RunDetail({
   });
   const jobs = hasInlineJobs ? run.jobs : lazy.data?.jobs ?? [];
 
+  // WHICH JOB IS OPEN — by name, not by `job.id`.
+  //
+  // `job.id` is 0 on any run recorded before the id was carried through, so on
+  // such a run every job would share one key and selecting any of them would
+  // select all. The name is what this list is already keyed on and GitHub
+  // requires job names to be unique within a run.
+  //
+  // Null means "nothing chosen yet" rather than seeding state from the first
+  // render's data — same sentinel pattern as the branch filter above. This
+  // component polls while a run is live, so a name written into state on load
+  // could outlive the job that carried it.
+  const [jobChoice, setJobChoice] = useState<string | null>(null);
+
+  // Opens on the FAILURE, and stays wherever the student put it afterwards.
+  //
+  // Derived on every render rather than written into state once, so a run being
+  // watched live moves its own selection onto the job that breaks — while an
+  // explicit click still wins, because `jobChoice` is consulted first. A
+  // student arrives here with one question, and the answer is never in a job
+  // that passed.
+  const failedJob = jobs.find((j) => j.conclusion === "failure");
+  const selected =
+    jobs.find((j) => j.name === jobChoice) ?? failedJob ?? jobs[0] ?? null;
+  const selectedIndex = selected ? jobs.indexOf(selected) : -1;
+
   const duration = running
     ? null
     : formatDuration(run.startedAt ?? run.createdAt, run.updatedAt);
@@ -563,6 +597,9 @@ function RunDetail({
     { label: "Branch", value: <span className="font-mono text-xs">{run.branch}</span> },
     { label: "Triggered by", value: describeTrigger(run) },
   ];
+
+  const jobsUnavailable =
+    lazy.isLoading || Boolean(lazy.error) || Boolean(lazy.data?.error);
 
   return (
     <div>
@@ -597,147 +634,338 @@ function RunDetail({
         ))}
       </dl>
 
-      <div className="mt-4">
-        {lazy.isLoading && <Skeleton className="h-24 w-full rounded-lg" />}
+      {lazy.isLoading && <Skeleton className="mt-4 h-64 w-full rounded-lg" />}
 
-        {lazy.error && (
-          <p className="text-sm text-[var(--text-muted)]">
-            Couldn&rsquo;t load this run&rsquo;s steps
-            {lazy.error.isNetworkError ? " — the backend didn't answer." : "."}
-          </p>
-        )}
+      {lazy.error && (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Couldn&rsquo;t load this run&rsquo;s steps
+          {lazy.error.isNetworkError ? " — the backend didn't answer." : "."}
+        </p>
+      )}
 
-        {/* A server-side problem GitHub reported (an expired run, usually) comes
-            back as a successful response carrying `error`. */}
-        {lazy.data?.error && (
-          <p className="text-sm text-[var(--text-muted)]">{lazy.data.error}</p>
-        )}
+      {/* A server-side problem GitHub reported (an expired run, usually) comes
+          back as a successful response carrying `error`. */}
+      {lazy.data?.error && (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">{lazy.data.error}</p>
+      )}
 
-        {!lazy.isLoading && !lazy.error && !lazy.data?.error && (
-          <JobList jobs={jobs} running={running} repoId={repoId} />
-        )}
+      {!jobsUnavailable && jobs.length === 0 && (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          {running
+            ? "This run has started but no job has been picked up yet."
+            : "No jobs were recorded for this run."}
+        </p>
+      )}
+
+      {/*
+        THE TWO PANES. `items-start` so the rail can be sticky — a stretched
+        flex child is already as tall as the scroll area and has nowhere to
+        stick to (the same constraint SideTabs documents).
+
+        `min-w-0` on the right pane is load-bearing, not tidiness: a flex item
+        defaults to `min-width: auto`, which means it refuses to shrink below
+        its content. A 300-character stack trace inside would push the pane
+        wider than the card and take the whole page's horizontal scrollbar with
+        it, instead of scrolling inside the console where it belongs.
+      */}
+      {!jobsUnavailable && jobs.length > 0 && selected && (
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
+          <JobRail
+            jobs={jobs}
+            selectedIndex={selectedIndex}
+            onSelect={setJobChoice}
+          />
+          {/* Keyed on the job, so switching jobs REMOUNTS the pane. The console
+              holds its own view state — an "Errors only" filter and a scroll
+              position parked on the previous job's failure — and carrying that
+              across to a different job's output would silently misrepresent
+              it. */}
+          <JobPane
+            key={selected.name}
+            job={selected}
+            repoId={repoId}
+            running={running}
+            labelledBy={`runjob-tab-${selectedIndex}`}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The jobs rail
+// ---------------------------------------------------------------------------
+
+/**
+ * The one line about a job worth reading BEFORE opening it.
+ *
+ * On a failure that is where it stopped. A rail that only repeats "failure"
+ * makes you open a job to learn what the index should have told you, and on a
+ * run whose jobs are named `alphaci / ⓵ Sandbox — Boot & parse` the name alone
+ * says nothing about the outcome.
+ */
+function jobSummary(job: GithubWorkflowJob): string {
+  if (job.status !== "completed") {
+    const active = job.steps.find((s) => s.status === "in_progress");
+    return active ? `running ${active.name}` : job.status.replace(/_/g, " ");
+  }
+  const broke = job.steps.find((s) => s.conclusion === "failure");
+  if (broke) return `stopped at ${broke.name}`;
+  const ran = job.steps.length;
+  return ran > 0 ? `${ran} ${ran === 1 ? "step" : "steps"}` : "no steps recorded";
+}
+
+/**
+ * The jobs of a run, as a vertical tablist.
+ *
+ * A tablist and not a list of links, because that is what it behaves like: one
+ * of N selected, swapping the panel beside it, no navigation. Modelled on
+ * SideTabs — Up/Down rather than Left/Right, wrapping at both ends, follow-focus
+ * — but not built on it, because SideTabs takes a plain string label and the
+ * whole point of this rail is the status glyph and the summary line under each
+ * name.
+ *
+ * NEUTRAL SURFACE, where SideTabs is brand-tinted. Every row here already
+ * carries a colour that means something (emerald passed, red failed, sky
+ * running); laying them on a blue tint puts the chrome in competition with the
+ * only signal on the screen. So the rail recedes and the statuses carry the
+ * colour.
+ */
+function JobRail({
+  jobs,
+  selectedIndex,
+  onSelect,
+}: {
+  readonly jobs: GithubWorkflowJob[];
+  readonly selectedIndex: number;
+  readonly onSelect: (name: string) => void;
+}) {
+  const refs = useRef<Record<number, HTMLButtonElement | null>>({});
+
+  function onKeyDown(event: React.KeyboardEvent) {
+    const delta =
+      event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    let next = -1;
+
+    if (delta !== 0) {
+      // Wrap around — the ARIA pattern expects a ring, not a dead end.
+      next = (selectedIndex + delta + jobs.length) % jobs.length;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = jobs.length - 1;
+    }
+    if (next < 0) return;
+
+    event.preventDefault();
+    onSelect(jobs[next].name);
+    // Follow-focus: with automatic activation the focused tab IS the selected
+    // one, so focus has to move with the selection or the next arrow press
+    // would start over from the old tab.
+    refs.current[next]?.focus();
+  }
+
+  return (
+    <div
+      className={cn(
+        "w-full shrink-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2",
+        // Sticky, so the rail is still there after scrolling a long console.
+        // Needs the parent row to be items-start — a stretched flex child is
+        // already as tall as the scroll area and has nowhere to stick to.
+        "lg:sticky lg:top-6 lg:w-72",
+        // Capped and scrollable, because a run's job count is not small: the
+        // master pipeline has fifteen. A rail taller than the viewport cannot
+        // stick to anything and would take its own bottom half off-screen with
+        // no way back to it.
+        "lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto",
+      )}
+    >
+      <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+        {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+      </p>
+      <div
+        role="tablist"
+        aria-label="Jobs in this run"
+        aria-orientation="vertical"
+        onKeyDown={onKeyDown}
+        className="flex flex-col gap-0.5"
+      >
+        {jobs.map((job, index) => {
+          const isSelected = index === selectedIndex;
+          return (
+            <button
+              key={job.name}
+              ref={(el) => {
+                refs.current[index] = el;
+              }}
+              type="button"
+              role="tab"
+              // Indexed rather than named: a job name carries spaces, slashes
+              // and em dashes, none of which belong in an id another attribute
+              // has to point at.
+              id={`runjob-tab-${index}`}
+              aria-selected={isSelected}
+              aria-controls="runjob-panel"
+              // Only the selected tab is reachable by Tab; arrows do the rest.
+              tabIndex={isSelected ? 0 : -1}
+              onClick={() => onSelect(job.name)}
+              className={cn(
+                // The left border is always present — transparent when
+                // unselected — so the selected accent bar never shifts the
+                // label's horizontal position.
+                "flex w-full items-start gap-2 rounded-lg border-l-[3px] px-2 py-2 text-left transition-colors",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform",
+                isSelected
+                  ? "border-platform bg-[var(--bg-surface)] shadow-sm"
+                  : "border-transparent hover:bg-[var(--border-subtle)]",
+              )}
+            >
+              <JobStatusIcon job={job} />
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    "block truncate text-xs",
+                    isSelected
+                      ? "font-semibold text-[var(--text-strong)]"
+                      : "font-medium text-[var(--text-strong)]",
+                  )}
+                  // The names are long and the rail is narrow, so the full one
+                  // has to be reachable somehow.
+                  title={job.name}
+                >
+                  {job.name}
+                </span>
+                <span
+                  className={cn(
+                    "mt-0.5 block truncate text-[11px]",
+                    job.conclusion === "failure"
+                      ? "text-red-700"
+                      : "text-[var(--text-muted)]",
+                  )}
+                >
+                  {jobSummary(job)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function JobList({
-  jobs,
-  running,
-  repoId,
-}: {
-  jobs: GithubWorkflowJob[];
-  running: boolean;
-  repoId: string;
-}) {
-  if (jobs.length === 0) {
-    return (
-      <p className="text-sm text-[var(--text-muted)]">
-        {running
-          ? "This run has started but no job has been picked up yet."
-          : "No jobs were recorded for this run."}
-      </p>
-    );
-  }
-
-  return (
-    <ul className="space-y-3">
-      {jobs.map((job) => (
-        <JobRow key={job.name} job={job} repoId={repoId} running={running} />
-      ))}
-    </ul>
-  );
-}
+// ---------------------------------------------------------------------------
+// The selected job — steps, then console
+// ---------------------------------------------------------------------------
 
 /**
- * One job: its steps, and its console output on demand.
+ * One job in full: its steps, then its console output.
  *
- * The console is COLLAPSED until asked for, and that is a data decision as much
- * as a visual one — `useJobLog` does not fetch until it is open, so a run with
- * six jobs costs one log request rather than six.
+ * THE CONSOLE IS NO LONGER BEHIND A CLICK. It used to be collapsed per job, and
+ * that was a data decision as much as a visual one — six stacked jobs could
+ * otherwise have meant six log fetches. Selecting one job at a time removes the
+ * problem the collapse was solving: at most one log is ever in flight, which is
+ * fewer than the old layout fetched the moment a run had two failing jobs
+ * (both auto-opened). And a finished job's log is immutable, so `useJobLog`
+ * caches it forever and coming back to a job costs nothing.
  *
- * It opens by default on a FAILED job. That is the whole point of the feature: a
- * student whose build broke should not have to discover that the answer is
- * behind one more click.
+ * Steps stay above it rather than being replaced by it. "How far did it get"
+ * and "what did it say" are two different questions and a student debugging
+ * needs both — the step list is the map, the console is the transcript.
  */
-function JobRow({
+function JobPane({
   job,
   repoId,
   running,
+  labelledBy,
 }: {
-  job: GithubWorkflowJob;
-  repoId: string;
-  running: boolean;
+  readonly job: GithubWorkflowJob;
+  readonly repoId: string;
+  readonly running: boolean;
+  /** The rail tab that names this panel, for the tabs ARIA contract. */
+  readonly labelledBy: string;
 }) {
-  const failed = job.conclusion === "failure";
-  const [open, setOpen] = useState(failed);
-  const log = useJobLog(repoId, open ? job.id : null, { isRunning: running });
+  // `job.id` is 0 on a run recorded before the id was carried through — there is
+  // no log endpoint to call for it, and `useJobLog` treats 0 as "don't fetch".
+  const hasLog = job.id > 0;
+  const log = useJobLog(repoId, hasLog ? job.id : null, { isRunning: running });
 
   return (
-    <li>
-          <div className="flex items-center gap-2">
-            <GenericPill tone={jobTone(job)}>
-              {job.status !== "completed" ? job.status.replace(/_/g, " ") : job.conclusion ?? "done"}
-            </GenericPill>
-            <span className="text-sm font-medium text-[var(--text-strong)]">
-              {job.name}
-            </span>
+    <div
+      id="runjob-panel"
+      role="tabpanel"
+      aria-labelledby={labelledBy}
+      // Focusable so the follow-focus arrow keys in the rail can be followed by
+      // a Tab into the panel that just changed under them.
+      tabIndex={-1}
+      className="min-w-0 flex-1"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <GenericPill tone={jobTone(job)}>
+          {job.status !== "completed"
+            ? job.status.replace(/_/g, " ")
+            : job.conclusion ?? "done"}
+        </GenericPill>
+        <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-strong)]">
+          {job.name}
+        </h4>
+      </div>
 
-            {/*
-              `job.id` is 0 for a run recorded before the id was carried through.
-              Offering a console that cannot be fetched would be a button that
-              only ever fails, so it is simply absent.
-            */}
-            {job.id > 0 && (
-              <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpen((on) => !on)}
-                className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-platform transition-colors hover:bg-platform-50"
+      {/* Every step, not only the failing ones. A student debugging needs to
+          know how far the run got before it stopped, and a list containing
+          nothing but failures cannot show that.
+
+          Numbered, because that is how a step is referred to out loud ("it died
+          on step 6") and the numbers are GitHub's own — the API returns steps in
+          execution order. */}
+      {job.steps.length > 0 && (
+        <ol className="mt-3 divide-y divide-[var(--border-subtle)] overflow-hidden rounded-lg border border-[var(--border-subtle)]">
+          {job.steps.map((step, index) => {
+            const failed = step.conclusion === "failure";
+            return (
+              <li
+                key={step.name}
+                className={cn(
+                  "flex items-start gap-2 px-3 py-1.5 text-xs",
+                  failed && "bg-red-50",
+                )}
               >
-                {open ? "Hide console" : "View console"}
-              </button>
-            )}
-          </div>
+                <span className="w-4 shrink-0 select-none text-right tabular-nums text-[var(--text-muted)]">
+                  {index + 1}
+                </span>
+                <StepGlyph conclusion={step.conclusion} status={step.status} />
+                <span
+                  className={cn(
+                    "min-w-0",
+                    failed ? "font-medium text-red-700" : "text-[var(--text-muted)]",
+                  )}
+                >
+                  {step.name}
+                  {failed && " — this is where it stopped"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
-          {/* Every step, not only the failing ones. A student debugging needs to
-              know how far the run got before it stopped, and a list containing
-              nothing but failures cannot show that. */}
-          {job.steps.length > 0 && (
-            <ul className="ml-1 mt-2 space-y-1">
-              {job.steps.map((step) => {
-                const failed = step.conclusion === "failure";
-                return (
-                  <li key={step.name} className="flex items-start gap-2 text-xs">
-                    <StepGlyph conclusion={step.conclusion} status={step.status} />
-                    <span
-                      className={cn(
-                        failed
-                          ? "font-medium text-red-700"
-                          : "text-[var(--text-muted)]",
-                      )}
-                    >
-                      {step.name}
-                      {failed && " — this is where it stopped"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-      {open && job.id > 0 && (
-        <div className="ml-1 mt-3">
+      <div className="mt-4">
+        {hasLog ? (
           <JobLogConsole
             log={log.log}
             isLoading={log.isLoading}
             error={log.error?.message ?? null}
-            jobName={job.name}
             onRetry={log.refetch}
           />
-        </div>
-      )}
-    </li>
+        ) : (
+          <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-3 text-sm text-[var(--text-muted)]">
+            This run was recorded before console output was kept, so there is no
+            log to show for it. A new run will have one.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -773,6 +1001,26 @@ function RunStatusIcon({ run }: { run: GithubWorkflowRunInfo }) {
       aria-label={runLabel(run)}
       className={cn(
         "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+        ICON_STYLES[tone],
+      )}
+    >
+      <span aria-hidden="true">{ICON_GLYPH[tone]}</span>
+    </span>
+  );
+}
+
+/** The run glyph's sibling, for a job. Same size, so the rail lines up. */
+function JobStatusIcon({ job }: { readonly job: GithubWorkflowJob }) {
+  const tone = jobTone(job);
+  const label =
+    job.status !== "completed" ? job.status.replace(/_/g, " ") : job.conclusion ?? "completed";
+
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={cn(
+        "mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
         ICON_STYLES[tone],
       )}
     >

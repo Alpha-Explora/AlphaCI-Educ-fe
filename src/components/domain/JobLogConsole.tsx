@@ -12,6 +12,12 @@
 // students are learning to read, and rendering it as prose would teach them a
 // shape they will never see again in this industry.
 //
+// IT OWNS THE RIGHT PANE of the run screen — one job's output at a time, with
+// the run's other jobs in a narrow rail beside it rather than stacked above it
+// (see GithubActionsPanel). That is what earns the width and the height: a stack
+// trace must not wrap, so a console needs horizontal room it cannot get from a
+// column shared with every other job in the run.
+//
 // THE ERROR IS FOUND FOR THEM, ONCE. `firstErrorLine` is computed on the server
 // (see job-log.util.ts) and this jumps to it on open. Two thousand lines of npm
 // output with "scroll until it turns red" as the instruction is the failure mode
@@ -37,13 +43,11 @@ export function JobLogConsole({
   log,
   isLoading,
   error,
-  jobName,
   onRetry,
 }: {
   readonly log: JobLogView | null;
   readonly isLoading: boolean;
   readonly error: string | null;
-  readonly jobName: string;
   readonly onRetry: () => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -149,10 +153,11 @@ export function JobLogConsole({
 
   return (
     <div className="space-y-2">
+      {/* Just "Console". It used to read "Console · {jobName}", which was
+          correct when the log sat inside a stack of jobs and wrong now that it
+          has a pane whose own heading, one inch above, is that job's name. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-[var(--text-strong)]">
-          Console · {jobName}
-        </span>
+        <span className="text-xs font-medium text-[var(--text-strong)]">Console</span>
 
         {/* The count is the headline. A student who sees "3 errors" knows to use
             the jump; one who sees nothing assumes the log is fine and scrolls. */}
@@ -212,7 +217,11 @@ export function JobLogConsole({
       */}
       <div
         ref={scroller}
-        className="max-h-[28rem] overflow-auto rounded-lg bg-slate-900 py-2 font-mono text-xs leading-relaxed"
+        // Taller than it used to be (28rem), because it no longer shares a
+        // column with every other job in the run — it has a pane, and a console
+        // that shows twelve lines at a time is a keyhole onto the one artefact
+        // this component exists to make readable.
+        className="max-h-[36rem] overflow-auto rounded-lg bg-slate-900 py-2 font-mono text-xs leading-relaxed"
       >
         <table className="w-full border-separate border-spacing-0">
           <tbody>
