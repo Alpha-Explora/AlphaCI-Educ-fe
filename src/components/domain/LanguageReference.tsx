@@ -34,9 +34,18 @@ import {
   type TabItem,
 } from "@/components/ui";
 
+/*
+  The tab names the project types it pools, not the runtime.
+
+  "Node.js / TypeScript" is the correct name for the pipeline and the wrong word
+  to scan for: a teacher who set a project to React reads four tabs, sees no
+  React, and stops — which is where this question actually gets asked, before any
+  clicking. Derived from `stacks` rather than written out, so adding a fifth
+  JavaScript project type updates the tab and the panel from one edit.
+*/
 const TABS: TabItem<LanguageKey>[] = LANGUAGES.map((l) => ({
   id: l.key,
-  label: l.label,
+  label: l.stacks.length > 1 ? l.stacks.join(" · ") : l.label,
 }));
 
 function stageQuestion(number: number): string {
@@ -93,6 +102,37 @@ function LanguagePanel({ profile }: { profile: LanguageProfile }) {
           title="Toolchain"
           subtitle="Installed on a clean runner for every push. Nothing is carried over between runs."
         />
+
+        {/*
+          FIRST, and above the toolchain detail, because it is the question this
+          page gets asked: "where is React?". A teacher picks from seven project
+          types and this page has four tabs, so without this the four JavaScript
+          types look unsupported rather than pooled. Only rendered when a language
+          really does pool several — a lone "Covers: PHP" would be noise.
+        */}
+        {profile.stacks.length > 1 && (
+          <div className="mt-4 rounded-lg border border-platform-200 bg-platform-50 px-4 py-3">
+            <p className="text-xs font-medium text-platform-800">
+              Covers these project types
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {profile.stacks.map((stack) => (
+                <span
+                  key={stack}
+                  className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-platform-800 ring-1 ring-inset ring-platform-200"
+                >
+                  {stack}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              All of them are {profile.detect.join(" / ")} projects, so the
+              pipeline runs exactly the commands below for each — there is no
+              separate React or Next.js build.
+            </p>
+          </div>
+        )}
+
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-[var(--text-muted)]">Runtime</dt>
