@@ -31,12 +31,12 @@ import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
 import { useTeacherSchedule } from "@/viewmodels/useTeacherSchedule";
 import { EmptyState, Skeleton, Stat, StateBoundary } from "@/components/ui";
 import { ClassAccessCard } from "@/components/domain/ClassAccessCard";
-import { CourseCard } from "@/components/domain/CourseCard";
+import { QuickCourses } from "@/components/domain/QuickCourses";
 import { UpcomingClasses } from "@/components/domain/UpcomingClasses";
 
 /** Sections shown before deferring to the Schedule tab. */
 const SCHEDULE_PREVIEW = 5;
-/** Courses shown before deferring to the Courses page. Two rows of two. */
+/** Courses shown before deferring to the Courses page. Four compact rows. */
 const COURSE_PREVIEW = 4;
 
 /** A Link that reads as a secondary button. Mirrors PageHeader's own back link. */
@@ -129,11 +129,7 @@ export default function TeacherDashboardPage() {
                 </Link>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                {shownCourses.map((entry, idx) => (
-                  <CourseCard key={entry.course.id} entry={entry} index={idx} />
-                ))}
-              </div>
+              <QuickCourses entries={shownCourses} />
             </section>
           )}
         </div>
