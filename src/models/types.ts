@@ -1455,6 +1455,16 @@ export interface ScheduleConflict {
   message: string;
 }
 
+/** One section already occupying part of the week. */
+export interface ScheduleBooking {
+  classId: string;
+  classLabel: string;
+  className: string;
+  schedule: ClassSchedule;
+  /** Why it is relevant: the teacher's own class, the room's, or both. */
+  reasons: Array<"TEACHER" | "LABORATORY">;
+}
+
 /** POST /classes/schedule-check — a dry run of the timetable rules. */
 export interface CheckScheduleInput {
   schedule: ClassSchedule;

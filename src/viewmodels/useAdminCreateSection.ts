@@ -12,12 +12,13 @@
 // `create` refuses them on save. Both run the same ScheduleConflictService on
 // the server, so the preview cannot promise a slot the save then denies.
 // ============================================================================
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { classesApi } from "@/models/api";
 import type {
   ClassCohort,
   ClassSchedule,
   CreateClassInput,
+  ScheduleBooking,
   ScheduleConflict,
 } from "@/models/types";
 import { toPresentableError, type PresentableError } from "./errors";
@@ -37,10 +38,33 @@ export interface AdminCreateSectionVM {
   }) => void;
   conflicts: ScheduleConflict[];
   isChecking: boolean;
+
+  /** What the teacher and rooms already have booked — the grid's shading. */
+  bookings: ScheduleBooking[];
+  isLoadingBookings: boolean;
 }
 
-export function useAdminCreateSection(): AdminCreateSectionVM {
+export function useAdminCreateSection(
+  /** Whose week to shade. Refetches as the admin changes either. */
+  occupancyFor: { teacherId?: string; labOrgIds?: string[] } = {},
+): AdminCreateSectionVM {
   const queryClient = useQueryClient();
+
+  /*
+    A QUERY, not a mutation: the answer depends only on who and where, so it is
+    cacheable and refetchable — and keying it on those inputs means switching
+    teacher back and forth does not re-hit the server.
+  */
+  const bookingsQuery = useQuery({
+    queryKey: [
+      "classes",
+      "occupancy",
+      occupancyFor.teacherId ?? "none",
+      [...(occupancyFor.labOrgIds ?? [])].sort().join(","),
+    ],
+    queryFn: () => classesApi.occupancy(occupancyFor),
+    enabled: Boolean(occupancyFor.teacherId) || (occupancyFor.labOrgIds?.length ?? 0) > 0,
+  });
 
   const checkMutation = useMutation({
     mutationFn: (input: {
@@ -72,5 +96,8 @@ export function useAdminCreateSection(): AdminCreateSectionVM {
     check: (input) => checkMutation.mutate(input),
     conflicts: checkMutation.data?.conflicts ?? [],
     isChecking: checkMutation.isPending,
+
+    bookings: bookingsQuery.data?.bookings ?? [],
+    isLoadingBookings: bookingsQuery.isLoading,
   };
 }
