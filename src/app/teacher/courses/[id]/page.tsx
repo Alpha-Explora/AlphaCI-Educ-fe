@@ -1,7 +1,8 @@
 "use client";
 // ============================================================================
 // VIEW LAYER — One course and the class sections under it (ADDENDUM H).
-// Classes are always created inside a course, so "Create class" lives here and
+// Classes are created by the IT ADMIN now — a section's hours book a teacher and
+// a laboratory, so it is not one teacher's setting. This page lists them and
 // is pre-scoped to this course — there is no standalone create-class surface.
 // ============================================================================
 import { useState } from "react";
@@ -17,7 +18,6 @@ import {
   StateBoundary,
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
-import { CreateClassModal } from "@/components/domain/CreateClassModal";
 import { ClassCard } from "@/components/domain/ClassCard";
 
 export default function TeacherCoursePage() {
@@ -25,7 +25,6 @@ export default function TeacherCoursePage() {
   const courseId = params?.id ?? null;
   const { user, selectedOrgId } = useSession();
   const board = useTeacherCourseBoard(user?.id ?? null, selectedOrgId);
-  const [createOpen, setCreateOpen] = useState(false);
 
   const entry = board.entryFor(courseId);
 
@@ -64,13 +63,6 @@ export default function TeacherCoursePage() {
             </>
           )
         }
-        actions={
-          entry && (
-            <Button variant="secondary" onClick={() => setCreateOpen(true)}>
-              <span aria-hidden="true">＋</span> Create class
-            </Button>
-          )
-        }
       />
 
       {/* Per-course rollup */}
@@ -95,12 +87,7 @@ export default function TeacherCoursePage() {
           <EmptyState
             icon="🏫"
             title="No classes in this course yet"
-            description="Create your first class section to get a join code students can use to enrol."
-            action={
-              <Button variant="secondary" onClick={() => setCreateOpen(true)}>
-                <span aria-hidden="true">＋</span> Create class
-              </Button>
-            }
+            description="Your IT admin creates the sections for this course and books their hours, so a section never double-books you or a laboratory. Ask them to add one."
           />
         }
         loadingFallback={
@@ -126,17 +113,6 @@ export default function TeacherCoursePage() {
         </div>
       </StateBoundary>
 
-      {/* Create class — always scoped to the course being viewed. */}
-      {entry && createOpen && (
-        <CreateClassModal
-          open
-          courseId={entry.course.id}
-          courseLabel={entry.label}
-          courseCode={entry.course.code}
-          courseOrgId={entry.course.orgId}
-          onClose={() => setCreateOpen(false)}
-        />
-      )}
     </div>
   );
 }

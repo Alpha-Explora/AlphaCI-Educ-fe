@@ -5,6 +5,8 @@ import type {
   ClassCohort,
   ClassRoster,
   ClassSchedule,
+  CheckScheduleInput,
+  ScheduleConflict,
   CreateAssignmentResult,
   CreateClassInput,
   CreateProjectInput,
@@ -59,6 +61,20 @@ export const classesApi = {
   // Teacher-of-class (or admin) sets this section's weekly meeting window, in
   // Philippine time. Pass null to remove it. This is a GATE, not a label: while
   // set, students cannot start a session, take a token or submit outside it.
+  /**
+   * What WOULD clash, saving nothing. Admin only.
+   *
+   * Called as the admin picks, so a refusal never arrives as a surprise at Save.
+   * It runs the same service the write path does — a preview computed by
+   * different code is a preview that lies.
+   */
+  checkSchedule(input: CheckScheduleInput) {
+    return apiRequest<{ conflicts: ScheduleConflict[] }>("/classes/schedule-check", {
+      method: "POST",
+      body: input,
+    });
+  },
+
   setSchedule(id: string, schedule: ClassSchedule | null) {
     return apiRequest<ClassCohort>(`/classes/${id}/schedule`, {
       method: "PATCH",

@@ -3,9 +3,13 @@
 // Create courses and assign instructors. Scoped to the lab selected in the top
 // bar, so the same admin can manage each laboratory separately.
 import { useSession } from "@/viewmodels/useSession";
+import { useState } from "react";
 import { CourseCatalogCard } from "@/components/domain/CourseCatalogCard";
+import { AdminCreateSectionModal } from "@/components/domain/AdminCreateSectionModal";
+import { Button } from "@/components/ui";
 
 export default function AdminCoursesPage() {
+  const [createOpen, setCreateOpen] = useState(false);
   const { user, labs, selectedOrgId } = useSession();
   const orgId = selectedOrgId ?? user?.orgId ?? null;
   const activeLab = labs.find((l) => l.id === orgId) ?? null;
@@ -23,7 +27,30 @@ export default function AdminCoursesPage() {
         </p>
       </div>
 
-      {orgId && <CourseCatalogCard orgId={orgId} />}
+      {orgId && (
+        <>
+          {/*
+            Sections are created HERE, not by the teacher. A section's hours book
+            a teacher and a laboratory, so the person who can see the whole
+            timetable is the one who should be placing it.
+          */}
+          <div className="flex justify-end animate-fade-up">
+            <Button onClick={() => setCreateOpen(true)}>
+              <span aria-hidden="true">＋</span> Create class section
+            </Button>
+          </div>
+
+          <CourseCatalogCard orgId={orgId} />
+
+          {createOpen && (
+            <AdminCreateSectionModal
+              open
+              onClose={() => setCreateOpen(false)}
+              orgId={orgId}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
