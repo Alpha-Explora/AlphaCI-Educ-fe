@@ -7,6 +7,7 @@ import type {
   ClassSchedule,
   CheckScheduleInput,
   ScheduleConflict,
+  ScheduleBooking,
   CreateAssignmentResult,
   CreateClassInput,
   CreateProjectInput,
@@ -61,6 +62,19 @@ export const classesApi = {
   // Teacher-of-class (or admin) sets this section's weekly meeting window, in
   // Philippine time. Pass null to remove it. This is a GATE, not a label: while
   // set, students cannot start a session, take a token or submit outside it.
+  /**
+   * What is already booked for a teacher and/or rooms. Admin only.
+   *
+   * Drives the booking grid. A conflict list can only say what is wrong; this
+   * says what is there, which is what an admin needs to find a free slot.
+   */
+  occupancy(input: { teacherId?: string; labOrgIds?: string[] }) {
+    return apiRequest<{ bookings: ScheduleBooking[] }>("/classes/occupancy", {
+      method: "POST",
+      body: input,
+    });
+  },
+
   /**
    * What WOULD clash, saving nothing. Admin only.
    *

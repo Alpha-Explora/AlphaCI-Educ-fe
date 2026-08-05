@@ -20,8 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/viewmodels/useSession";
 import { useCourseCatalog } from "@/viewmodels/useCourseCatalog";
 import { useAdminCreateSection } from "@/viewmodels/useAdminCreateSection";
-import { WEEKDAYS } from "@/viewmodels/useClassSchedule";
-import { formatTime12 } from "@/models/schedule";
+import { ScheduleGridPicker, type GridSelection } from "./ScheduleGridPicker";
 import {
   Banner,
   Button,
@@ -51,16 +50,23 @@ export function AdminCreateSectionModal({
 }) {
   const { labs } = useSession();
   const catalog = useCourseCatalog(orgId);
-  const vm = useAdminCreateSection();
 
   const courseId = scopedCourseId;
   const [teacherId, setTeacherId] = useState("");
   const [section, setSection] = useState("");
   const [term, setTerm] = useState("");
   const [labIds, setLabIds] = useState<string[]>([orgId]);
-  const [days, setDays] = useState<number[]>([]);
-  const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("10:00");
+  // One object, because the grid produces days and hours together — three
+  // separate pieces of state could hold a half-valid slot the grid cannot draw.
+  const [slot, setSlot] = useState<GridSelection | null>(null);
+
+  // Declared AFTER the state it reads: the grid shades whatever the current
+  // teacher and rooms already have booked, so occupancy is keyed on both and
+  // refetches as either changes.
+  const vm = useAdminCreateSection({
+    teacherId: teacherId || undefined,
+    labOrgIds: labIds,
+  });
 
   const course = catalog.courses.find((c) => c.id === courseId) ?? null;
 
@@ -77,21 +83,21 @@ export function AdminCreateSectionModal({
     end after a start. Below that there is nothing to ask about, and asking
     anyway would flash "no conflicts" at a form that is not yet filled in.
   */
-  const slotIsComplete = days.length > 0 && endTime > startTime;
+  const slotIsComplete = slot !== null && slot.days.length > 0 && slot.endTime > slot.startTime;
 
   useEffect(() => {
     if (!open || !slotIsComplete) return;
     const id = setTimeout(() => {
       vm.check({
-        schedule: { days, startTime, endTime },
+        schedule: slot!,
         teacherId: teacherId || undefined,
         labOrgIds: labIds,
       });
-    }, 300); // Debounced: the times change on every keystroke of a time input.
+    }, 250); // Debounced: a drag fires many updates before it settles.
     return () => clearTimeout(id);
     // vm identity changes each render; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, slotIsComplete, days, startTime, endTime, teacherId, labIds]);
+  }, [open, slotIsComplete, slot, teacherId, labIds]);
 
   const labChoices = useMemo(
     () => labs.map((l) => ({ id: l.id, name: l.name })),
@@ -116,7 +122,7 @@ export function AdminCreateSectionModal({
       section: section.trim(),
       term: term.trim(),
       meetingLabOrgIds: labIds,
-      ...(slotIsComplete ? { schedule: { days, startTime, endTime } } : {}),
+      ...(slotIsComplete ? { schedule: slot! } : {}),
     });
   };
 
@@ -259,72 +265,29 @@ export function AdminCreateSectionModal({
             Class hours
           </legend>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            Philippine time. Leave the days empty to create the section without hours
-            and set them later.
+            Philippine time. Leave it empty to create the section without hours and
+            set them later.
           </p>
 
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((d) => {
-              const on = days.includes(d.value);
-              return (
-                <button
-                  key={d.value}
-                  type="button"
-                  aria-pressed={on}
-                  aria-label={d.label}
-                  onClick={() =>
-                    setDays((cur) =>
-                      on ? cur.filter((x) => x !== d.value) : [...cur, d.value],
-                    )
-                  }
-                  className={cn(
-                    "h-9 w-12 rounded-lg text-sm font-medium ring-1 ring-inset transition-colors",
-                    on
-                      ? "bg-platform-600 text-white ring-platform-600"
-                      : "bg-white text-[var(--text-muted)] ring-[var(--border-subtle)] hover:bg-slate-50",
-                  )}
-                >
-                  {d.short}
-                </button>
-              );
-            })}
+          {/*
+            The grid needs to know WHOSE week to shade, so it only becomes useful
+            once a teacher is chosen. Before that it would show an empty week and
+            imply every slot was free.
+          */}
+          <div className="mt-2">
+            {teacherId ? (
+              <ScheduleGridPicker
+                bookings={vm.bookings}
+                value={slot}
+                onChange={setSlot}
+              />
+            ) : (
+              <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+                Choose a teacher first — the grid shades the slots they and the
+                laboratory already have booked.
+              </p>
+            )}
           </div>
-
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <Field label="From">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              )}
-            </Field>
-            <Field label="To">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              )}
-            </Field>
-          </div>
-
-          {slotIsComplete && (
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
-              {formatTime12(startTime)} – {formatTime12(endTime)}, {days.length}{" "}
-              {days.length === 1 ? "day" : "days"} a week.
-            </p>
-          )}
-          {days.length > 0 && endTime <= startTime && (
-            <Banner tone="warning" className="mt-2">
-              The end time must be after the start time. Overnight windows are not
-              supported.
-            </Banner>
-          )}
         </fieldset>
 
         {/* The whole point of moving this to the admin. */}
