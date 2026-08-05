@@ -161,9 +161,30 @@ export function AdminCreateSectionModal({
       onClose={onClose}
       title={course ? `New section of ${course.code}` : "Create a class section"}
       description="You choose the teacher and the hours. A section cannot double-book a teacher or a laboratory."
-      size="lg"
+      size="wide"
+      fitViewport
     >
-      <form onSubmit={submit} className="space-y-5">
+      {/*
+        LANDSCAPE, and capped at the viewport. Stacked, this dialog was a metre
+        of scroll: the booking grid alone is sixteen hours tall, so the fields
+        that decide WHOSE week it shades scrolled off the top exactly when the
+        admin needed them. Side by side, the grid and its inputs are visible at
+        once — which is the whole argument for a grid over two time fields.
+
+        `fitViewport` makes the panel a flex column that hands its height here,
+        so each side scrolls on its own and the footer never leaves the screen.
+      */}
+      <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+        {/*
+          `[22rem_1fr]`, NOT `[22rem_minmax(0,1fr)]`. Tailwind's class extractor
+          drops an arbitrary value containing a comma — it compiles to no rule at
+          all and the grid silently collapses to one column. Verified against the
+          built CSS. `min-w-0` on the grid child below does the job minmax(0,…)
+          would have done, keeping the picker from widening its own track.
+        */}
+        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[22rem_1fr] lg:overflow-hidden">
+          {/* Left: who and what. */}
+          <div className="min-h-0 space-y-5 lg:overflow-y-auto lg:pr-1">
         {vm.createError && <Banner tone="error">{vm.createError.message}</Banner>}
 
         {/* Stated, not chosen — the course is the card this was opened from. */}
@@ -260,37 +281,43 @@ export function AdminCreateSectionModal({
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend className="text-sm font-medium text-[var(--text-strong)]">
-            Class hours
-          </legend>
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            Philippine time. Leave it empty to create the section without hours and
-            set them later.
-          </p>
+          </div>
+
+          {/* Right: when. */}
+          <fieldset className="flex min-h-0 min-w-0 flex-col lg:overflow-hidden">
+            <legend className="text-sm font-medium text-[var(--text-strong)]">
+              Class hours
+            </legend>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+              Philippine time. Leave it empty to create the section without hours and
+              set them later.
+            </p>
 
           {/*
             The grid needs to know WHOSE week to shade, so it only becomes useful
             once a teacher is chosen. Before that it would show an empty week and
             imply every slot was free.
           */}
-          <div className="mt-2">
-            {teacherId ? (
-              <ScheduleGridPicker
-                bookings={vm.bookings}
-                value={slot}
-                onChange={setSlot}
-              />
-            ) : (
-              <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
-                Choose a teacher first — the grid shades the slots they and the
-                laboratory already have booked.
-              </p>
-            )}
-          </div>
-        </fieldset>
+            <div className="mt-2 min-h-0 flex-1 lg:overflow-y-auto">
+              {teacherId ? (
+                <ScheduleGridPicker
+                  bookings={vm.bookings}
+                  value={slot}
+                  onChange={setSlot}
+                />
+              ) : (
+                <p className="rounded-lg bg-[var(--bg-subtle)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+                  Choose a teacher first — the grid shades the slots they and the
+                  laboratory already have booked.
+                </p>
+              )}
+            </div>
+          </fieldset>
+        </div>
 
-        {/* The whole point of moving this to the admin. */}
+        {/* Pinned under both columns: a refusal that scrolled with the grid
+            would be missed by the admin who caused it. */}
+        <div className="shrink-0 space-y-3 border-t border-[var(--border-subtle)] px-6 py-4">
         {blocked && (
           <Banner tone="error" title="This slot is already taken">
             <ul className="mt-1 space-y-1">
@@ -309,13 +336,14 @@ export function AdminCreateSectionModal({
           </Banner>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+        <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" loading={vm.isCreating} disabled={!canSubmit}>
             Create section
           </Button>
+        </div>
         </div>
       </form>
     </Modal>

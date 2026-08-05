@@ -1468,6 +1468,12 @@ export interface ScheduleBooking {
 /** POST /classes/schedule-check — a dry run of the timetable rules. */
 export interface CheckScheduleInput {
   schedule: ClassSchedule;
+  /**
+   * The section being edited. The server resolves its teacher, its rooms and its
+   * own exclusion from this — an edit should not have to restate facts the
+   * server already holds and the client could only get stale.
+   */
+  classId?: string;
   teacherId?: string;
   labOrgIds?: string[];
   excludeClassId?: string;

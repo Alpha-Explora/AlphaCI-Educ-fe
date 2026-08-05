@@ -33,6 +33,7 @@ export interface AdminCreateSectionVM {
   /** Preview conflicts for a slot. Safe to call on every keystroke. */
   check: (input: {
     schedule: ClassSchedule;
+    classId?: string;
     teacherId?: string;
     labOrgIds?: string[];
   }) => void;
@@ -46,7 +47,7 @@ export interface AdminCreateSectionVM {
 
 export function useAdminCreateSection(
   /** Whose week to shade. Refetches as the admin changes either. */
-  occupancyFor: { teacherId?: string; labOrgIds?: string[] } = {},
+  occupancyFor: { classId?: string; teacherId?: string; labOrgIds?: string[] } = {},
 ): AdminCreateSectionVM {
   const queryClient = useQueryClient();
 
@@ -59,16 +60,21 @@ export function useAdminCreateSection(
     queryKey: [
       "classes",
       "occupancy",
+      occupancyFor.classId ?? "new",
       occupancyFor.teacherId ?? "none",
       [...(occupancyFor.labOrgIds ?? [])].sort().join(","),
     ],
     queryFn: () => classesApi.occupancy(occupancyFor),
-    enabled: Boolean(occupancyFor.teacherId) || (occupancyFor.labOrgIds?.length ?? 0) > 0,
+    enabled:
+      Boolean(occupancyFor.classId) ||
+      Boolean(occupancyFor.teacherId) ||
+      (occupancyFor.labOrgIds?.length ?? 0) > 0,
   });
 
   const checkMutation = useMutation({
     mutationFn: (input: {
       schedule: ClassSchedule;
+      classId?: string;
       teacherId?: string;
       labOrgIds?: string[];
     }) => classesApi.checkSchedule(input),
