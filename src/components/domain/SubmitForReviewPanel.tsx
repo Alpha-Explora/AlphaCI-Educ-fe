@@ -14,12 +14,15 @@
 import { useState } from "react";
 import { usePullRequests } from "@/viewmodels/usePullRequests";
 import { PullRequestDiff } from "./PullRequestDiff";
+import { PullRequestConversation } from "./PullRequestConversation";
+import { useSession } from "@/viewmodels/useSession";
 import {
   BRANCH_PROMOTION_ORDER,
   GRADED_BRANCHES,
   type MergeReadiness,
   type PullRequestView,
   type RepoBranch,
+  type SystemUser,
 } from "@/models/types";
 import {
   Banner,
@@ -48,6 +51,9 @@ export function SubmitForReviewPanel({
   isGroup: boolean;
 }) {
   const vm = usePullRequests(repoId);
+  // The signed-in account, for the comment thread: who may edit or delete a
+  // comment is decided from it (and re-decided on the server).
+  const { user: viewer } = useSession();
 
   // Only branches a student could propose FROM. Offering a graded branch as a
   // source would produce a pull request from a branch into itself, which the
@@ -208,6 +214,7 @@ export function SubmitForReviewPanel({
                 vm={vm}
                 audience={audience}
                 repoId={repoId}
+                viewer={viewer}
               />
             ))}
           </ul>
@@ -222,11 +229,14 @@ function PullRequestRow({
   vm,
   audience,
   repoId,
+  viewer,
 }: {
   pr: PullRequestView;
   vm: ReturnType<typeof usePullRequests>;
   audience: "student" | "teacher";
   repoId: string;
+  /** Who is reading — decides which comment controls are drawn. */
+  viewer: SystemUser | null;
 }) {
   const [reason, setReason] = useState("");
   const [showOverride, setShowOverride] = useState(false);
@@ -340,6 +350,18 @@ function PullRequestRow({
           <PullRequestDiff repoId={repoId} number={pr.number} />
         </div>
       )}
+
+      {/*
+        The conversation, always shown rather than behind a toggle.
+
+        The diff is collapsed because it costs a per-file GitHub read; a comment
+        thread is a single local query, and hiding it would hide the one place a
+        teacher's feedback lives. A student who has been asked to change
+        something must not have to go looking for the request.
+      */}
+      <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+        <PullRequestConversation repoId={repoId} number={pr.number} viewer={viewer} />
+      </div>
 
       {audience === "teacher" && showOverride && (
         <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">

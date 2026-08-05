@@ -1308,12 +1308,76 @@ export interface GithubWorkflowStep {
   conclusion: string | null;
 }
 export interface GithubWorkflowJob {
+  /** GitHub's job id — what the console log endpoint is keyed on. */
+  id: number;
   name: string;
   status: string;
   conclusion: string | null;
   url: string;
   steps: GithubWorkflowStep[];
 }
+/**
+ * One message on a pull request's conversation.
+ *
+ * Stored by US, not GitHub — students have no GitHub account, so a comment
+ * posted through the App would be authored by the bot and a whole class
+ * discussion would read as one participant. The author's name is resolved by the
+ * server at read time rather than stored on the row, so renaming an account does
+ * not leave a trail of comments under the old name.
+ */
+export interface PullRequestComment {
+  id: string;
+  repoId: string;
+  prNumber: number;
+  authorUserId: string;
+  authorName: string;
+  authorRole: UserRole | null;
+  authorAvatarColor: string | null;
+  body: string;
+  createdAt: string;
+  /** Set once the author changed it, so the UI can say "edited". */
+  editedAt?: string;
+  /** The top-level comment this replies to. Nesting never exceeds one level. */
+  replyToId?: string;
+}
+
+/** One parsed line of a job's console output. Mirrors the server exactly. */
+export interface JobLogLine {
+  /** 1-based over the lines that survived truncation — a real jump target. */
+  number: number;
+  /** ISO instant the runner emitted it, or null when the line carried none. */
+  at: string | null;
+  /** The line with its timestamp and `##[...]` marker already stripped. */
+  text: string;
+  level: "info" | "debug" | "notice" | "warning" | "error" | "command";
+  /** The `##[group]` it sits inside, or null at the top level. */
+  group: string | null;
+}
+
+/**
+ * A job's console output, parsed.
+ *
+ * The GRAMMAR is resolved on the server (timestamps, `##[group]`, `##[error]`)
+ * so the browser never has to track GitHub's log format — and so "which line is
+ * the error" is one answer everything agrees on rather than a second opinion.
+ */
+export interface JobLogView {
+  /** false = simulated mode; no GitHub call was made and there is no log. */
+  live: boolean;
+  /** The raw tail, for copying. The rendered console uses `lines`. */
+  text: string;
+  /** true when earlier lines were dropped to keep the response renderable. */
+  truncated: boolean;
+  totalLines: number;
+  error: string | null;
+  lines: JobLogLine[];
+  groups: string[];
+  /** Where the console scrolls on open. Null when nothing failed. */
+  firstErrorLine: number | null;
+  errorCount: number;
+  warningCount: number;
+}
+
 export interface GithubWorkflowRunInfo {
   id: number;
   name: string;

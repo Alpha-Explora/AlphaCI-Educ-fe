@@ -25,6 +25,8 @@
 import { useEffect, useState } from "react";
 import { useRepoActivity } from "@/viewmodels/useRepoActivity";
 import { useWorkflowRunJobs } from "@/viewmodels/useWorkflowRunJobs";
+import { useJobLog } from "@/viewmodels/useJobLog";
+import { JobLogConsole } from "./JobLogConsole";
 import type {
   GithubCommitInfo,
   GithubWorkflowJob,
@@ -612,7 +614,7 @@ function RunDetail({
         )}
 
         {!lazy.isLoading && !lazy.error && !lazy.data?.error && (
-          <JobList jobs={jobs} running={running} />
+          <JobList jobs={jobs} running={running} repoId={repoId} />
         )}
       </div>
     </div>
@@ -622,9 +624,11 @@ function RunDetail({
 function JobList({
   jobs,
   running,
+  repoId,
 }: {
   jobs: GithubWorkflowJob[];
   running: boolean;
+  repoId: string;
 }) {
   if (jobs.length === 0) {
     return (
@@ -639,7 +643,38 @@ function JobList({
   return (
     <ul className="space-y-3">
       {jobs.map((job) => (
-        <li key={job.name}>
+        <JobRow key={job.name} job={job} repoId={repoId} running={running} />
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One job: its steps, and its console output on demand.
+ *
+ * The console is COLLAPSED until asked for, and that is a data decision as much
+ * as a visual one — `useJobLog` does not fetch until it is open, so a run with
+ * six jobs costs one log request rather than six.
+ *
+ * It opens by default on a FAILED job. That is the whole point of the feature: a
+ * student whose build broke should not have to discover that the answer is
+ * behind one more click.
+ */
+function JobRow({
+  job,
+  repoId,
+  running,
+}: {
+  job: GithubWorkflowJob;
+  repoId: string;
+  running: boolean;
+}) {
+  const failed = job.conclusion === "failure";
+  const [open, setOpen] = useState(failed);
+  const log = useJobLog(repoId, open ? job.id : null, { isRunning: running });
+
+  return (
+    <li>
           <div className="flex items-center gap-2">
             <GenericPill tone={jobTone(job)}>
               {job.status !== "completed" ? job.status.replace(/_/g, " ") : job.conclusion ?? "done"}
@@ -647,6 +682,22 @@ function JobList({
             <span className="text-sm font-medium text-[var(--text-strong)]">
               {job.name}
             </span>
+
+            {/*
+              `job.id` is 0 for a run recorded before the id was carried through.
+              Offering a console that cannot be fetched would be a button that
+              only ever fails, so it is simply absent.
+            */}
+            {job.id > 0 && (
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen((on) => !on)}
+                className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-platform transition-colors hover:bg-platform-50"
+              >
+                {open ? "Hide console" : "View console"}
+              </button>
+            )}
           </div>
 
           {/* Every step, not only the failing ones. A student debugging needs to
@@ -674,9 +725,19 @@ function JobList({
               })}
             </ul>
           )}
-        </li>
-      ))}
-    </ul>
+
+      {open && job.id > 0 && (
+        <div className="ml-1 mt-3">
+          <JobLogConsole
+            log={log.log}
+            isLoading={log.isLoading}
+            error={log.error?.message ?? null}
+            jobName={job.name}
+            onRetry={log.refetch}
+          />
+        </div>
+      )}
+    </li>
   );
 }
 

@@ -73,7 +73,14 @@ export const queryKeys = {
     // jobs the moment the student changed that filter.
     workflowRunJobs: (id: string, runId: number) =>
       ["repositories", id, "workflow-runs", runId, "jobs"] as const,
+    // Keyed on the JOB, not the run: a run has several jobs and each has its
+    // own output, so nesting under the run would make them share one cache slot
+    // and show the last-opened job's log for every one of them.
+    jobLog: (id: string, jobId: number) =>
+      ["repositories", id, "jobs", jobId, "log"] as const,
     pullRequests: (id: string) => ["repositories", id, "pull-requests"] as const,
+    pullRequestComments: (id: string, number: number) =>
+      ["repositories", id, "pull-requests", number, "comments"] as const,
     // path and ref are part of the key: browsing is a different query per
     // location, and caching them separately is what makes going back instant.
     files: (id: string, path: string, ref: string | null) =>

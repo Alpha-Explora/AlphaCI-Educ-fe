@@ -4,6 +4,8 @@ import type {
   AssignmentRepository,
   GithubRepoActivity,
   GithubRunJobs,
+  JobLogView,
+  PullRequestComment,
   MergeResult,
   PipelineRun,
   PipelineRunDetail,
@@ -73,6 +75,50 @@ export const repositoriesApi = {
   workflowRunJobs(id: string, runId: number) {
     return apiRequest<GithubRunJobs>(
       `/repositories/${id}/github-activity/runs/${runId}/jobs`,
+    );
+  },
+
+  /** The conversation on a pull request, oldest first. */
+  pullRequestComments(id: string, number: number) {
+    return apiRequest<PullRequestComment[]>(
+      `/repositories/${id}/pull-requests/${number}/comments`,
+    );
+  },
+
+  createPullRequestComment(
+    id: string,
+    number: number,
+    body: { body: string; replyToId?: string },
+  ) {
+    return apiRequest<PullRequestComment>(
+      `/repositories/${id}/pull-requests/${number}/comments`,
+      { method: "POST", body },
+    );
+  },
+
+  updatePullRequestComment(id: string, number: number, commentId: string, body: string) {
+    return apiRequest<PullRequestComment>(
+      `/repositories/${id}/pull-requests/${number}/comments/${commentId}`,
+      { method: "PATCH", body: { body } },
+    );
+  },
+
+  deletePullRequestComment(id: string, number: number, commentId: string) {
+    return apiRequest<{ deleted: number }>(
+      `/repositories/${id}/pull-requests/${number}/comments/${commentId}`,
+      { method: "DELETE" },
+    );
+  },
+
+  /**
+   * One job's console output — the "why" behind a red step.
+   *
+   * On demand only. This is the largest response in the product and nothing
+   * polls it; a student fetches it when they open a failing step.
+   */
+  jobLogs(id: string, jobId: number) {
+    return apiRequest<JobLogView>(
+      `/repositories/${id}/github-activity/jobs/${jobId}/logs`,
     );
   },
 
