@@ -44,6 +44,15 @@ export const queryKeys = {
   assignments: {
     detail: (id: string) => ["assignments", id] as const,
     repositories: (id: string) => ["assignments", id, "repositories"] as const,
+    // The starter catalogue: built-ins AND the caller's own custom projects.
+    // Named here because writing a custom project has to invalidate it, and the
+    // key was previously inlined at its single reader in useCreateProject.
+    templates: ["assignments", "templates"] as const,
+  },
+  customProjects: {
+    all: ["custom-projects"] as const,
+    // Contents, which only the editor asks for — see customProjectsApi.get.
+    detail: (id: string) => ["custom-projects", id] as const,
   },
   repositories: {
     detail: (id: string) => ["repositories", id] as const,

@@ -75,8 +75,22 @@ export interface ProjectTemplateOption {
    * Files a student's repository is created with, keyed by stack. Paths only —
    * the server never sends content, so the gallery can show what a teacher gets
    * without ever being a route to the answer key.
+   *
+   * True of a teacher's OWN custom project too. The catalogue is one list and
+   * one shape; authorship changes who may see the entry, never how much of it
+   * travels.
    */
   filesByStack: Record<string, string[]>;
+  /**
+   * Set only on entries the CALLER wrote — see CustomProject.
+   *
+   * The catalogue endpoint returns the built-in starters plus the requesting
+   * teacher's own projects in one list, because the picker's job is "what may
+   * this project be built from" and the answer is both. The flag is what lets
+   * the picker group them without a second request, and it is why the field is
+   * optional: a built-in simply omits it.
+   */
+  custom?: boolean;
 }
 
 /**
@@ -97,6 +111,94 @@ export interface AnswerKey {
   templateLabel: string;
   builds: AnswerKeyBuild[];
 }
+
+// ---------------------------------------------------------------------------
+// Custom projects — a teacher's own reusable starter.
+//
+// The built-in starters are authored in the pipeline repository and shipped with
+// the product. A custom project is the same idea authored by a teacher: written
+// once, then chosen from the picker for any future assignment, in place of a
+// built-in.
+//
+// VISIBILITY IS AUTHOR-ONLY, and that is a deliberate stopping point rather
+// than a feature not finished yet. Sharing a project means sharing its solution
+// and its hidden tests, which are the two things this whole shape exists to keep
+// out of a student's reach; whether a colleague may hold another teacher's
+// answer key is a policy question for a school, not a default. Nothing here
+// carries an owner id for the same reason — the server answers only ever
+// describe the caller's own projects, so a field naming the owner could only
+// ever repeat "you".
+// ---------------------------------------------------------------------------
+
+/** One authored file. `path` is repository-relative; `content` is verbatim. */
+export interface CustomProjectFile {
+  path: string;
+  content: string;
+}
+
+/**
+ * The three file groups, for one language.
+ *
+ * THIS SPLIT IS THE SAFETY MODEL. `starter` is committed to the student's
+ * repository, which is public; the other two never leave the platform. They are
+ * separate fields rather than one list with a flag precisely so that shipping a
+ * solution to a student is not a one-character mistake — there is no value of
+ * any field in `starter` that could make it teacher-only, and none in
+ * `solution` that could publish it.
+ */
+export interface CustomProjectStackFiles {
+  /** Committed to the student's repository. Everything here becomes public. */
+  starter: CustomProjectFile[];
+  /** The reference answer. Served to staff only, via the answer-key route. */
+  solution: CustomProjectFile[];
+  /** Graded against, never shipped. Injected by the platform at grading time. */
+  hiddenTests: CustomProjectFile[];
+}
+
+/** One numbered step of the brief a student reads. */
+export interface CustomProjectTask {
+  name: string;
+  detail: string;
+}
+
+/**
+ * What the student is asked to build, in the teacher's own words.
+ *
+ * Separate from `summary` and `teaches`, which describe the project to the
+ * TEACHER choosing it in the picker. The brief is the assignment text.
+ */
+export interface CustomProjectBrief {
+  overview: string;
+  tasks: CustomProjectTask[];
+  /** Constraints, hints, submission notes. Absent rather than empty when unused. */
+  notes?: string[];
+}
+
+export interface CustomProject {
+  /** `cpt_…`. See templateRefFor() for how this reaches an assignment. */
+  id: string;
+  name: string;
+  /** One line, shown in the picker beside the built-in starters. */
+  summary: string;
+  /** What the student practises. Same role as ProjectTemplateOption.teaches. */
+  teaches: string;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  brief: CustomProjectBrief;
+  /**
+   * Files per language. PARTIAL on purpose: a teacher who only teaches Python
+   * writes Python, and the project is then simply not offered for anything else
+   * — which is the same rule `supportedStacks` already applies to a built-in.
+   */
+  stacks: Partial<Record<Stack, CustomProjectStackFiles>>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/update payload — the server owns id, createdAt and updatedAt. */
+export type CustomProjectInput = Omit<
+  CustomProject,
+  "id" | "createdAt" | "updatedAt"
+>;
 
 export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 
@@ -1001,6 +1103,19 @@ export interface LabSetupCheck {
   ok: boolean;
   detail: string;
   fix?: string;
+  /**
+   * Whether this is a property of the DEPLOYMENT or of one laboratory.
+   *
+   * Almost every check is `server` — credentials, feature flags and the published
+   * extension are one set of values for the whole installation and read identically
+   * whichever laboratory is selected. Only the GitHub App installation is
+   * `laboratory`, because each lab is its own GitHub organization.
+   *
+   * The server sends this rather than the client deriving it from a list of ids: a
+   * list here would be a second copy of the fact, stale the next time a check is
+   * added to the backend.
+   */
+  scope: "server" | "laboratory";
 }
 
 export interface LabSetupInfo {

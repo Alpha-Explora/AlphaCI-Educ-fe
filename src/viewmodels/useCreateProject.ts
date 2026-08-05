@@ -12,6 +12,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assignmentsApi, classesApi, sessionApi } from "@/models/api";
+import { customProjectIdOf, templateRefFor } from "@/models/customProjects";
 import type {
   Assignment,
   AssignmentRepository,
@@ -339,11 +340,31 @@ export const DEFAULT_TEMPLATE_ID = "calculator";
 export interface StarterSelection {
   /** Starters offerable for the current stack, in teaching order. */
   options: ProjectTemplateOption[];
+  /** The shipped catalogue — the primary choice, always shown first. */
+  builtIn: ProjectTemplateOption[];
+  /**
+   * The teacher's own reusable projects, offerable for this stack.
+   *
+   * Almost always empty. Kept separate from `builtIn` rather than sorted in
+   * among them because a teacher scanning the gallery is answering "is there
+   * something ready-made for this?" first and "did I write one?" second — and
+   * because a list of nine built-ins with one of the teacher's own hidden at
+   * position four is a list they will not find their own work in.
+   */
+  mine: ProjectTemplateOption[];
   isLoading: boolean;
   /** The effective choice — never an id absent from `options`. */
   selectedId: string | undefined;
   /** The chosen starter itself, for the card and the gallery's opening pane. */
   selected: ProjectTemplateOption | undefined;
+  /**
+   * What to send as the assignment's `template`.
+   *
+   * NOT the same as `selectedId` once a custom project can be chosen: the id
+   * identifies a catalogue entry, this identifies it across two catalogues. See
+   * templateRefFor.
+   */
+  selectedTemplateRef: string | undefined;
   /** What the project should be called if the teacher has not named it. */
   suggestedTitle: string;
   /** What it should be described as if the teacher has not described it. */
@@ -368,7 +389,9 @@ export function useStarterSelection(
   chosenId: string,
 ): StarterSelection {
   const query = useQuery({
-    queryKey: ["assignments", "templates"],
+    // Shared with the custom-project editor, which invalidates this key after a
+    // save so a project written mid-wizard appears in the picker behind it.
+    queryKey: queryKeys.assignments.templates,
     queryFn: () => assignmentsApi.templates(),
     staleTime: 10 * 60_000,
     retry: false,
@@ -381,18 +404,29 @@ export function useStarterSelection(
   const all = query.data ?? [];
   const options = stack ? all.filter((t) => t.supportedStacks.includes(stack)) : all;
 
-  // The chosen starter may not exist for a language picked afterwards. Falling
-  // back stops the card showing a name the repository will not contain.
-  const selectedId = options.some((t) => t.id === chosenId)
-    ? chosenId
-    : options[0]?.id;
-  const selected = options.find((t) => t.id === selectedId);
+  // The chosen starter may not exist for a language picked afterwards — and now
+  // also may not exist because the teacher just deleted their own project.
+  // Falling back stops the card showing a name the repository will not contain.
+  //
+  // Matched on the bare id as well as the literal one: a teacher who has just
+  // written a project selects it by the `cpt_…` the save returned, and the
+  // catalogue is free to list that same project as `custom:cpt_…`. Comparing
+  // only the literal ids would silently drop the teacher back to the first
+  // built-in at the exact moment they finished authoring an alternative to it.
+  const match = options.find(
+    (t) => t.id === chosenId || customProjectIdOf(t) === chosenId,
+  );
+  const selected = match ?? options[0];
+  const selectedId = selected?.id;
 
   return {
     options,
+    builtIn: options.filter((t) => !t.custom),
+    mine: options.filter((t) => t.custom),
     isLoading: query.isLoading,
     selectedId,
     selected,
+    selectedTemplateRef: selected ? templateRefFor(selected) : undefined,
     suggestedTitle: selected?.label ?? "",
     suggestedDescription: selected?.summary ?? "",
   };

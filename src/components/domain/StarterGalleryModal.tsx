@@ -15,47 +15,48 @@
 // Two panes: a scannable list on the left, the full detail of one starter on
 // the right. On a phone the list becomes the whole dialog and selecting a card
 // swaps to its detail, because two panes at 380px is neither.
+//
+// TWO ORIGINS, ONE LIST
+// ---------------------
+// The catalogue now holds the shipped starters AND the teacher's own reusable
+// projects. They are grouped rather than merged, and the built-ins lead: a
+// teacher opening this is asking "is there something ready for this?" before
+// "did I write one?", and nine built-ins with one of their own at position four
+// is a list they will not find their own work in.
+//
+// When a teacher has written nothing — which is almost all of them, almost
+// always — there are no group headings at all. The gallery is exactly what it
+// was, plus one quiet line at the end of the list offering to start one. An
+// empty "Yours" section with a dashed box in it would advertise a feature by
+// showing every teacher a hole in their own work.
 // ============================================================================
 import { useState } from "react";
 import type { ProjectTemplateOption, Stack } from "@/models/types";
 import { Button, GenericPill, Modal, Spinner, cn } from "@/components/ui";
-
-/** 1-5 from the registry, rendered as filled pips so it is scannable. */
-function DifficultyMeter({ level }: { readonly level: number }) {
-  return (
-    <span className="inline-flex items-center gap-1" title={`Difficulty ${level} of 5`}>
-      <span className="sr-only">Difficulty {level} of 5</span>
-      {[1, 2, 3, 4, 5].map((pip) => (
-        <span
-          key={pip}
-          aria-hidden="true"
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            pip <= level ? "bg-platform" : "bg-slate-200",
-          )}
-        />
-      ))}
-    </span>
-  );
-}
+import { DifficultyMeter } from "./DifficultyMeter";
 
 /**
  * One starter's full detail.
  *
  * The file list is the part a dropdown can never show, and it is what actually
- * answers "what will my students see when they open this?". It comes from the
- * server, computed by the same builder that provisions the repository, so it
- * cannot describe a shape the teacher will not get.
+ * answers "what will my students see when they open this?". For a built-in it
+ * comes from the server, computed by the same builder that provisions the
+ * repository, so it cannot describe a shape the teacher will not get. For a
+ * custom project it is the starter group the teacher wrote — the same promise,
+ * kept by the same route.
  */
 function StarterDetail({
   starter,
   stack,
   onUse,
+  onEdit,
   isCurrent,
 }: {
   readonly starter: ProjectTemplateOption;
   readonly stack: Stack;
   readonly onUse: () => void;
+  /** Only offered for the teacher's own projects. */
+  readonly onEdit: () => void;
   readonly isCurrent: boolean;
 }) {
   const files = starter.filesByStack[stack] ?? [];
@@ -63,16 +64,21 @@ function StarterDetail({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--text-strong)]">
-            {starter.label}
-          </h3>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-[var(--text-strong)]">
+              {starter.label}
+            </h3>
+            {starter.custom && <GenericPill tone="info">Yours</GenericPill>}
+          </div>
           <p className="mt-1 text-sm text-[var(--text-muted)]">{starter.summary}</p>
         </div>
-        <DifficultyMeter level={starter.difficulty} />
+        <span className="mt-1 shrink-0">
+          <DifficultyMeter level={starter.difficulty} />
+        </span>
       </div>
 
-      <div className="mt-4 rounded-lg bg-slate-50 p-3">
+      <div className="mt-4 rounded-lg bg-[var(--bg-subtle)] p-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           What it teaches
         </span>
@@ -100,47 +106,130 @@ function StarterDetail({
             Not available for this language.
           </p>
         )}
-        {/* Said once, here, rather than repeated on every card: it is the
-            reassurance a teacher needs before setting a strict gate, and it is
-            true of every starter by construction. */}
+        {/* Said once, here, rather than repeated on every card. The two
+            sentences differ because only one of them is true by construction:
+            AlphaCI writes the built-ins and can promise their tests pass, and
+            cannot promise anything about files a teacher wrote this morning.
+            Printing the built-in reassurance over a custom project would be a
+            guarantee the product is in no position to make. */}
         <p className="mt-3 text-xs text-[var(--text-muted)]">
-          Plus the build config and the CI pipeline for your chosen language.
-          Every starter ships passing tests that fully cover its own code, so it
-          will not fail whatever coverage gate you set.
+          {starter.custom ? (
+            <>
+              Plus the build config and the CI pipeline for your chosen language.
+              Your solution and hidden tests are held separately and are never
+              part of this list.
+            </>
+          ) : (
+            <>
+              Plus the build config and the CI pipeline for your chosen language.
+              Every starter ships passing tests that fully cover its own code, so
+              it will not fail whatever coverage gate you set.
+            </>
+          )}
         </p>
       </div>
 
-      <div className="mt-auto pt-5">
-        <Button onClick={onUse} disabled={isCurrent} className="w-full">
+      <div className="mt-auto flex flex-wrap gap-2 pt-5">
+        <Button onClick={onUse} disabled={isCurrent} className="flex-1">
           {isCurrent ? "Currently selected" : `Use ${starter.label}`}
         </Button>
+        {starter.custom && (
+          <Button variant="secondary" onClick={onEdit}>
+            Edit
+          </Button>
+        )}
       </div>
     </div>
+  );
+}
+
+/** One card in the left-hand list. */
+function StarterCard({
+  starter,
+  active,
+  selected,
+  onPreview,
+}: {
+  readonly starter: ProjectTemplateOption;
+  /** Being previewed in the right-hand pane. */
+  readonly active: boolean;
+  /** The wizard's current choice. */
+  readonly selected: boolean;
+  readonly onPreview: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onPreview}
+        aria-current={active ? "true" : undefined}
+        className={cn(
+          "w-full rounded-lg border p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
+          active
+            ? "border-platform bg-platform-50"
+            : "border-[var(--border-subtle)] hover:border-platform-200 hover:bg-slate-50",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          {/* Truncates rather than wraps: in a two-up grid a long name would
+              otherwise push the pill onto its own line and make one card taller
+              than its neighbour. */}
+          <span className="truncate text-sm font-medium text-[var(--text-strong)]">
+            {starter.label}
+          </span>
+          {selected && (
+            <span className="shrink-0">
+              <GenericPill tone="success">Selected</GenericPill>
+            </span>
+          )}
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
+          {starter.summary}
+        </p>
+        <div className="mt-2">
+          <DifficultyMeter level={starter.difficulty} />
+        </div>
+      </button>
+    </li>
   );
 }
 
 export function StarterGalleryModal({
   open,
   onClose,
-  starters,
+  builtIn,
+  mine,
   isLoading,
   stack,
   selectedId,
   onSelect,
+  onNew,
+  onEdit,
 }: {
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly starters: ProjectTemplateOption[];
+  /** The shipped catalogue, filtered to the current language. */
+  readonly builtIn: ProjectTemplateOption[];
+  /** The teacher's own projects, same filter. Usually empty. */
+  readonly mine: ProjectTemplateOption[];
   readonly isLoading: boolean;
   readonly stack: Stack;
   readonly selectedId: string | undefined;
   readonly onSelect: (id: string) => void;
+  /** Start writing a new one. The caller closes this dialog and opens the editor. */
+  readonly onNew: () => void;
+  /** Edit one of `mine`, by catalogue entry. */
+  readonly onEdit: (starter: ProjectTemplateOption) => void;
 }) {
+  const starters = [...builtIn, ...mine];
+
   // Opens on whatever is already chosen, so the gallery explains the current
   // answer before offering alternatives.
   const [previewId, setPreviewId] = useState<string | undefined>(selectedId);
   const preview =
-    starters.find((s) => s.id === previewId) ?? starters.find((s) => s.id === selectedId) ?? starters[0];
+    starters.find((s) => s.id === previewId) ??
+    starters.find((s) => s.id === selectedId) ??
+    starters[0];
 
   // Mobile: one pane at a time. `detail` is only reachable by picking a card,
   // so the back control always has somewhere to go.
@@ -151,72 +240,93 @@ export function StarterGalleryModal({
     onClose();
   }
 
+  // Headings appear only once there is something to tell apart. With no custom
+  // projects the list is one unlabelled grid — exactly as it was before this
+  // existed.
+  const grouped = mine.length > 0;
+
+  function renderGrid(items: ProjectTemplateOption[]) {
+    return (
+      // Two-up. With nine starters a single column is a scroll; two columns fit
+      // the whole catalogue in view, which is the point of a gallery over a
+      // dropdown. One column below `lg`, where two would be too cramped to read.
+      <ul className="grid content-start gap-2 sm:grid-cols-2">
+        {items.map((starter) => (
+          <StarterCard
+            key={starter.id}
+            starter={starter}
+            active={starter.id === preview?.id}
+            selected={starter.id === selectedId}
+            onPreview={() => {
+              setPreviewId(starter.id);
+              setMobilePane("detail");
+            }}
+          />
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <Modal open={open} onClose={onClose} title="Starter projects" size="wide">
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-muted)]">
           <Spinner /> Loading starters…
         </div>
-      ) : starters.length === 0 ? (
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">
-          No starters are available for this language yet.
-        </p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
           {/* List */}
-          {/* Two-up. With nine starters a single column is a scroll; two
-              columns fit the whole catalogue in view, which is the point of a
-              gallery over a dropdown. One column below `lg`, where two would be
-              too cramped to read. */}
-          <ul
+          <div
             className={cn(
-              "grid content-start gap-2 sm:grid-cols-2",
-              "max-h-[60vh] overflow-y-auto pr-1",
-              mobilePane === "detail" && "hidden lg:grid",
+              "max-h-[60vh] space-y-5 overflow-y-auto pr-1",
+              mobilePane === "detail" && "hidden lg:block",
             )}
           >
-            {starters.map((starter) => {
-              const active = starter.id === preview?.id;
-              return (
-                <li key={starter.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewId(starter.id);
-                      setMobilePane("detail");
-                    }}
-                    aria-current={active ? "true" : undefined}
-                    className={cn(
-                      "w-full rounded-lg border p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
-                      active
-                        ? "border-platform bg-platform-50"
-                        : "border-[var(--border-subtle)] hover:border-platform-200 hover:bg-slate-50",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Truncates rather than wraps: in a two-up grid a long
-                          name would otherwise push the pill onto its own line
-                          and make one card taller than its neighbour. */}
-                      <span className="truncate text-sm font-medium text-[var(--text-strong)]">
-                        {starter.label}
-                      </span>
-                      {starter.id === selectedId && (
-                        <span className="shrink-0">
-                          <GenericPill tone="success">Selected</GenericPill>
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
-                      {starter.summary}
-                    </p>
-                    <div className="mt-2">
-                      <DifficultyMeter level={starter.difficulty} />
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+            {starters.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+                No starters are available for this language yet.
+              </p>
+            ) : (
+              <>
+                <section>
+                  {grouped && (
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      Starter projects
+                    </h3>
+                  )}
+                  {renderGrid(builtIn)}
+                </section>
+
+                {grouped && (
+                  <section>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      Yours
+                    </h3>
+                    {renderGrid(mine)}
+                  </section>
+                )}
+              </>
+            )}
+
+            {/* The entry point. Deliberately the quietest thing in the dialog —
+                a dashed outline at the end of the list rather than a primary
+                button beside the catalogue. Authoring a project is an hour of
+                work and the wrong answer for almost every teacher opening this,
+                so it has to be findable without being the suggestion. */}
+            <button
+              type="button"
+              onClick={onNew}
+              className="w-full rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-3 text-left transition-colors hover:border-platform hover:bg-platform-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform"
+            >
+              <span className="block text-sm font-medium text-[var(--text-strong)]">
+                <span aria-hidden="true">＋</span> New custom project
+              </span>
+              <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                Write your own brief and files once, then pick it for any class.
+                Only you can see it.
+              </span>
+            </button>
+          </div>
 
           {/* Detail */}
           <div
@@ -241,6 +351,7 @@ export function StarterGalleryModal({
                 stack={stack}
                 isCurrent={preview.id === selectedId}
                 onUse={() => choose(preview.id)}
+                onEdit={() => onEdit(preview)}
               />
             )}
           </div>
