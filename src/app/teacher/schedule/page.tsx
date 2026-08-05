@@ -57,7 +57,7 @@ export default function TeacherSchedulePage() {
           <h1 className="text-2xl font-semibold text-[var(--text-strong)]">Schedule</h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
             When each of your sections meets, and whether students can work on its
-            projects right now. All times are{" "}
+            projects right now. Your IT admin sets these hours. All times are{" "}
             <span className="font-medium text-[var(--text-strong)]">
               Philippine time.
             </span>
@@ -262,7 +262,7 @@ function ScheduleTableRow({ row }: { readonly row: ScheduleRow }) {
           href={`/teacher/classes/${classInfo.id}`}
           className="whitespace-nowrap text-xs font-medium text-platform underline underline-offset-2 hover:text-platform-700"
         >
-          Edit hours
+          Open
         </Link>
       </td>
     </tr>

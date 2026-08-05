@@ -1415,11 +1415,23 @@ export interface ArchiveSemesterResponse {
 // ADDENDUM H — a teacher now creates a class UNDER a course they were invited
 // to. The course supplies code/title/org; the teacher supplies section + term.
 export interface CreateClassInput {
-  courseId: string; // must be a course this teacher is an instructor of
+  courseId: string; // must be a course the named teacher instructs
+  /**
+   * The teacher who will run this section. Required at CREATION: a section with
+   * no teacher cannot be conflict-checked, so allowing one would mean a slot
+   * that looks free and is not.
+   */
+  teacherId: string;
   section: string; // e.g. "A"
   term: string; // e.g. "Fall 2026"
   name?: string; // optional display name; defaults to the course title
-  meetingLabOrgIds?: string[]; // optional laboratories the class meets in
+  /**
+   * The laboratories this class meets in. NO LONGER PURELY DESCRIPTIVE — this is
+   * what books a room, so two sections whose labs intersect cannot share an hour.
+   */
+  meetingLabOrgIds?: string[];
+  /** Meeting hours. Optional, but conflict-checked the moment it is supplied. */
+  schedule?: ClassSchedule;
 }
 
 // IT-Admin create-course + invite-instructor inputs.
@@ -1428,6 +1440,27 @@ export interface CreateCourseInput {
   title: string; // "Introduction to Programming"
   description?: string;
   orgId?: string; // defaults to the single seeded org
+}
+
+/** One reason a proposed slot is already taken. Mirrors the server exactly. */
+export interface ScheduleConflict {
+  kind: "TEACHER" | "LABORATORY";
+  classId: string;
+  classLabel: string;
+  className: string;
+  days: number[];
+  window: string;
+  withName: string;
+  /** One sentence an admin can act on — render this, do not rebuild it. */
+  message: string;
+}
+
+/** POST /classes/schedule-check — a dry run of the timetable rules. */
+export interface CheckScheduleInput {
+  schedule: ClassSchedule;
+  teacherId?: string;
+  labOrgIds?: string[];
+  excludeClassId?: string;
 }
 
 export interface AddInstructorInput {

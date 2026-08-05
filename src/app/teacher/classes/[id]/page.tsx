@@ -41,7 +41,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { TeacherProjectList } from "@/components/domain/TeacherProjectList";
-import { ClassScheduleCard } from "@/components/domain/ClassScheduleCard";
+import { ClassHoursSummary } from "@/components/domain/ClassHoursSummary";
 import { ClassAccessPanel } from "@/components/domain/ClassAccessPanel";
 import { CreateProjectModal } from "@/components/domain/CreateProjectModal";
 import { ClassOverviewTab } from "@/components/domain/ClassOverviewTab";
@@ -335,7 +335,13 @@ export default function ClassRosterPage() {
                 hasSchedule={Boolean(info?.schedule)}
               />
 
-              <ClassScheduleCard classId={classId} schedule={info?.schedule} />
+              {/*
+                READ-ONLY. Class hours are the IT admin's to set now: a section's
+                window books a person and a room, and neither is one teacher's to
+                claim. The card that edited them is gone rather than disabled —
+                a form whose Save always 403s is worse than no form.
+              */}
+              <ClassHoursSummary schedule={info?.schedule} />
 
               <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">
                 <h2 className="text-base font-semibold text-[var(--text-strong)]">
