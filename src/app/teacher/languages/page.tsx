@@ -13,6 +13,8 @@ export default function TeacherLanguagesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        // Teacher area: title at the right of the band. See PageHeader's titleAlign.
+        titleAlign="end"
         title="Languages & checks"
         subtitle="Every command the pipeline runs against a student's code, stage by stage, for each language AlphaCI supports."
       />
