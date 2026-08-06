@@ -8,11 +8,16 @@ import { AppShell, type NavItem } from "@/components/layout/AppShell";
 const NAV: NavItem[] = [
   { href: "/teacher", label: "Home", icon: "home" },
   { href: "/teacher/courses", label: "Courses", icon: "book" },
-  // Directly after Courses: a section's meeting hours are a property of the
-  // teaching, and this is the only screen that shows them across every course at
-  // once — including which section is running right now, which is what the Home
-  // card uses to pick a class to open.
-  { href: "/teacher/schedule", label: "Schedule", icon: "calendar" },
+  // NO Schedule entry. The week grid moved onto Home as a toggle beside the
+  // upcoming-sections list — both read the same ViewModel, so the rail was
+  // pointing at a second copy of a picture Home could already draw.
+  //
+  // /teacher/schedule still EXISTS and is still needed: it owns the outside-hours
+  // switches and the per-section class codes, which Home does not show. It is
+  // reached from the toggle's trailing link and from the "N more sections" link
+  // under the list. Both are load-bearing now — this is the /teacher/rubric
+  // lesson (a page reachable only by typing its URL is a page nobody opens),
+  // which is why the route was not simply deleted along with the nav item.
   { href: "/teacher/groups", label: "Groups", icon: "users" },
   { href: "/teacher/reports", label: "Report", icon: "chart" },
   // /teacher/rubric existed and was rendered by nobody — no nav entry, no link
