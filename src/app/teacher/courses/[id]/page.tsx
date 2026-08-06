@@ -33,7 +33,15 @@ export default function TeacherCoursePage() {
   if (!board.isLoading && !board.error && !entry) {
     return (
       <div className="space-y-8">
-        <PageHeader backHref="/teacher" backLabel="My Courses" title="Course not found" />
+        {/* Aligned like the loaded page. A not-found state that jumps the title
+            to the other side of the band reads as a different screen, not as the
+            same screen reporting a problem. */}
+        <PageHeader
+          titleAlign="end"
+          backHref="/teacher"
+          backLabel="My Courses"
+          title="Course not found"
+        />
         <EmptyState
           icon="🔍"
           title="This course isn't assigned to you"

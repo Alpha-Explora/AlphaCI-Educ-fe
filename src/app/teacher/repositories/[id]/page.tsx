@@ -81,6 +81,8 @@ export default function TeacherRepositoryPage() {
         {d && (
           <>
             <PageHeader
+              // Teacher area: title at the right of the band. See PageHeader's titleAlign.
+              titleAlign="end"
               // Back to the class this work belongs to, not the dashboard. A
               // teacher reaches this page by opening one student's project from
               // a roster they are working down, and sending them to the

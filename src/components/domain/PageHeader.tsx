@@ -62,14 +62,21 @@ export function PageHeader({
   meta?: React.ReactNode;
   actions?: React.ReactNode;
   /**
-   * Which end of the row the title block sits at. `start` — beside the back
-   * control — is the default and what every page inside a course still uses.
+   * Which end of the row the title block sits at.
    *
-   * OPT-IN, AND DELIBERATELY NOT THE DEFAULT. Right-aligned titles are what this
-   * header USED to do everywhere; the note at the top of this file records why
-   * that was undone, and none of it stopped being true. A page that asks for
-   * `end` is accepting that trade on its own screen — it is not a signal the
-   * default should move back.
+   * THE CONVENTION, so a new page does not have to guess:
+   *   TEACHER pages pass `end` — the title sits opposite the way back.
+   *   STUDENT pages keep the default `start`.
+   *
+   * Passed per page rather than derived from the URL. A presentational header
+   * that sniffs `usePathname()` to decide its own layout is a component with a
+   * private opinion about routing, and it would have to become a client
+   * component to hold the hook.
+   *
+   * `start` remains the DEFAULT deliberately. The note at the top of this file
+   * records why right-aligned titles were undone product-wide, and none of that
+   * stopped being true — a page asking for `end` is accepting the trade on its
+   * own screen, which is not the same as the trade being wrong to record.
    */
   titleAlign?: "start" | "end";
   className?: string;
@@ -108,16 +115,42 @@ export function PageHeader({
     <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>
   );
 
+  /*
+    With the title at the END and nothing to sit opposite it, `justify-between`
+    has a single child to distribute and parks it on the LEFT — the exact
+    opposite of what was asked for. Grading and Languages are precisely that
+    case: no back link, no actions, one child in the row.
+
+    Picked once as a WHOLE class name rather than layered on top of the other.
+    `cn` here is a plain string joiner with no tailwind-merge, so `justify-end`
+    added after `justify-between` would leave both in the DOM and let CSS source
+    order — not intent — decide the winner.
+  */
+  const rowJustify =
+    alignEnd && !backHref && !actionGroup ? "justify-end" : "justify-between";
+
   if (!backHref) {
     return (
       <div
         className={cn(
-          "flex flex-wrap items-start justify-between gap-4 animate-fade-up",
+          "flex flex-wrap items-start gap-4 animate-fade-up",
+          rowJustify,
           className,
         )}
       >
-        {titleBlock}
-        {actionGroup}
+        {/* Actions first when the title is at the end, so the row still reads
+            left-to-right as "what you can do" then "what this is". */}
+        {alignEnd ? (
+          <>
+            {actionGroup}
+            {titleBlock}
+          </>
+        ) : (
+          <>
+            {titleBlock}
+            {actionGroup}
+          </>
+        )}
       </div>
     );
   }
@@ -125,7 +158,8 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start justify-between gap-4 animate-fade-up",
+        "flex flex-wrap items-start gap-4 animate-fade-up",
+        rowJustify,
         className,
       )}
     >

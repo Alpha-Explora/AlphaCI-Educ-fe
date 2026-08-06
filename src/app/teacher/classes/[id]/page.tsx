@@ -96,6 +96,8 @@ export default function ClassRosterPage() {
   return (
     <div className="space-y-8">
       <PageHeader
+        // Teacher area: title at the right of the band. See PageHeader's titleAlign.
+        titleAlign="end"
         // Classes live under a course now, so go back to the course that owns
         // this section rather than all the way out to the dashboard.
         backHref={info ? `/teacher/courses/${info.courseId}` : "/teacher"}

@@ -11,6 +11,8 @@ export default function TeacherRubricPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        // Teacher area: title at the right of the band. See PageHeader's titleAlign.
+        titleAlign="end"
         title="How grading works"
         subtitle="What each pipeline stage measures, how points are awarded, and which failures stop a student's run."
       />
