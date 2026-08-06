@@ -93,14 +93,6 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="animate-fade-up">
-        <h1 className="text-2xl font-semibold text-[var(--text-strong)]">My Schedule</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Your sections, soonest first — or switch to the week to see how they sit
-          together. Open one to see its students and work.
-        </p>
-      </div>
-
       {/*
         `min-w-0` on the wide column because a grid track's default
         `min-width: auto` lets long content push the track wider than its share.
@@ -114,11 +106,11 @@ export default function TeacherDashboardPage() {
         <div className="min-w-0 space-y-8 lg:col-span-2">
           <section className="space-y-4 animate-fade-up">
             {/*
-              `trailing` carries the only remaining route to the full Schedule
-              page, which no longer has a rail entry. That page is not duplicated
-              here — it owns the outside-hours switches and the class codes — so
-              losing the last link to it would strand a screen a teacher needs
-              every time a student cannot sign in.
+              The page title shares the tab strip's row rather than stacking
+              above it. `leading` + no `trailing` leaves the wrapper's
+              justify-between to push the tabs to the right, so the heading and
+              the two views read as one band with the border under both — and the
+              grid starts a heading's height further up the page.
             */}
             <Tabs
               items={VIEW_TABS}
@@ -126,13 +118,10 @@ export default function TeacherDashboardPage() {
               onChange={setView}
               label="Schedule view"
               idPrefix="home-schedule"
-              trailing={
-                <Link
-                  href="/teacher/schedule"
-                  className="text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700"
-                >
-                  Hours &amp; class codes →
-                </Link>
+              leading={
+                <h1 className="text-2xl font-semibold text-[var(--text-strong)]">
+                  My Schedule
+                </h1>
               }
             />
 
@@ -161,16 +150,20 @@ export default function TeacherDashboardPage() {
                     <UpcomingClasses rows={shownRows} />
                     {/* The cap, said out loud. A list that quietly stops at five
                         is indistinguishable from a section having disappeared.
-                        The calendar has no such cap — it draws every section — so
-                        this belongs to the list view and not to the section. */}
+
+                        It sends you to the CALENDAR, not to another page: the
+                        grid draws every section without a cap, so the remainder
+                        is one tab away rather than one navigation away. This used
+                        to point at /teacher/schedule, which no longer exists. */}
                     {hiddenRows > 0 && (
-                      <Link
-                        href="/teacher/schedule"
-                        className="inline-flex text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700"
+                      <button
+                        type="button"
+                        onClick={() => setView("calendar")}
+                        className="inline-flex text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
                       >
-                        {hiddenRows} more {hiddenRows === 1 ? "section" : "sections"} — view
-                        full schedule →
-                      </Link>
+                        {hiddenRows} more {hiddenRows === 1 ? "section" : "sections"} — see
+                        the week →
+                      </button>
                     )}
                   </>
                 ) : (

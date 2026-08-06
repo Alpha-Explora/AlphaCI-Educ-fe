@@ -8,16 +8,14 @@ import { AppShell, type NavItem } from "@/components/layout/AppShell";
 const NAV: NavItem[] = [
   { href: "/teacher", label: "Home", icon: "home" },
   { href: "/teacher/courses", label: "Courses", icon: "book" },
-  // NO Schedule entry. The week grid moved onto Home as a toggle beside the
-  // upcoming-sections list — both read the same ViewModel, so the rail was
-  // pointing at a second copy of a picture Home could already draw.
-  //
-  // /teacher/schedule still EXISTS and is still needed: it owns the outside-hours
-  // switches and the per-section class codes, which Home does not show. It is
-  // reached from the toggle's trailing link and from the "N more sections" link
-  // under the list. Both are load-bearing now — this is the /teacher/rubric
-  // lesson (a page reachable only by typing its URL is a page nobody opens),
-  // which is why the route was not simply deleted along with the nav item.
+  // NO Schedule entry, and no /teacher/schedule route either — the whole page is
+  // gone. Its week grid lives on Home now as a toggle beside the upcoming list
+  // (both read the same ViewModel, so it was a second copy of a picture Home
+  // could already draw), and its Sections table was a cross-section index of
+  // controls that each section already owns: ClassAccessPanel on
+  // /teacher/classes/[id] carries the same outside-hours switch AND the join
+  // code. Deleting it removed a convenience, not a capability — which is the
+  // test a route has to pass before it goes.
   { href: "/teacher/groups", label: "Groups", icon: "users" },
   { href: "/teacher/reports", label: "Report", icon: "chart" },
   // /teacher/rubric existed and was rendered by nobody — no nav entry, no link
