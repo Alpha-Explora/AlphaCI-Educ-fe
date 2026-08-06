@@ -24,17 +24,40 @@
 // useTeacherCourseBoard for the courses and the rollup. Both read the same two
 // queries, so holding both costs no extra request.
 // ============================================================================
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "@/viewmodels/useSession";
 import { useTeacherCourseBoard } from "@/viewmodels/useTeacherCourseBoard";
 import { useTeacherSchedule } from "@/viewmodels/useTeacherSchedule";
-import { EmptyState, Skeleton, Stat, StateBoundary } from "@/components/ui";
+import { EmptyState, Skeleton, Stat, StateBoundary, Tabs, type TabItem } from "@/components/ui";
 import { ClassAccessCard } from "@/components/domain/ClassAccessCard";
 import { QuickCourses } from "@/components/domain/QuickCourses";
+import { ScheduleCalendar } from "@/components/domain/ScheduleCalendar";
 import { UpcomingClasses } from "@/components/domain/UpcomingClasses";
 
-/** Sections shown before deferring to the Schedule tab. */
+/**
+ * The two ways to read the same sections, and why BOTH are here.
+ *
+ * The list answers "what am I teaching next" — one row, soonest first, which is
+ * the question on the way into a laboratory. The week grid answers "where does
+ * my week have a hole in it", which the list cannot: a list has no shape, so a
+ * free Thursday afternoon or two sections stacked on one morning are invisible
+ * in it. Neither is a better version of the other, so this is a toggle rather
+ * than a replacement — the list stays the default because it is the question
+ * asked more often, and by someone in a hurry.
+ *
+ * The grid moved here from its own nav entry. It reads the SAME ViewModel this
+ * page already holds, so showing it costs no extra request — which is what makes
+ * a toggle honest rather than a second page wearing a tab.
+ */
+type ScheduleView = "upcoming" | "calendar";
+
+const VIEW_TABS: ReadonlyArray<TabItem<ScheduleView>> = [
+  { id: "upcoming", label: "Upcoming" },
+  { id: "calendar", label: "Calendar" },
+];
+
+/** Sections shown before deferring to the Schedule page. */
 const SCHEDULE_PREVIEW = 5;
 /** Courses shown before deferring to the Courses page. Four compact rows. */
 const COURSE_PREVIEW = 4;
@@ -62,6 +85,8 @@ export default function TeacherDashboardPage() {
     [schedule.rows],
   );
 
+  const [view, setView] = useState<ScheduleView>("upcoming");
+
   const shownRows = schedule.rows.slice(0, SCHEDULE_PREVIEW);
   const hiddenRows = schedule.rows.length - shownRows.length;
   const shownCourses = board.entries.slice(0, COURSE_PREVIEW);
@@ -71,7 +96,8 @@ export default function TeacherDashboardPage() {
       <div className="animate-fade-up">
         <h1 className="text-2xl font-semibold text-[var(--text-strong)]">My Schedule</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Your sections, soonest first. Open one to see its students and work.
+          Your sections, soonest first — or switch to the week to see how they sit
+          together. Open one to see its students and work.
         </p>
       </div>
 
@@ -86,35 +112,77 @@ export default function TeacherDashboardPage() {
       */}
       <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
         <div className="min-w-0 space-y-8 lg:col-span-2">
-          <StateBoundary
-            isLoading={schedule.isLoading}
-            error={schedule.error}
-            onRetry={schedule.refetch}
-            isEmpty={schedule.rows.length === 0}
-            emptyFallback={
-              <EmptyState
-                icon="🗓️"
-                title="Nothing scheduled yet"
-                description="Once you create a class section inside one of your courses, it appears here with its meeting hours."
-              />
-            }
-            loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
-          >
-            <div className="space-y-3 animate-fade-up">
-              <UpcomingClasses rows={shownRows} />
-              {/* The cap, said out loud. A list that quietly stops at five is
-                  indistinguishable from a section having disappeared. */}
-              {hiddenRows > 0 && (
+          <section className="space-y-4 animate-fade-up">
+            {/*
+              `trailing` carries the only remaining route to the full Schedule
+              page, which no longer has a rail entry. That page is not duplicated
+              here — it owns the outside-hours switches and the class codes — so
+              losing the last link to it would strand a screen a teacher needs
+              every time a student cannot sign in.
+            */}
+            <Tabs
+              items={VIEW_TABS}
+              value={view}
+              onChange={setView}
+              label="Schedule view"
+              idPrefix="home-schedule"
+              trailing={
                 <Link
                   href="/teacher/schedule"
-                  className="inline-flex text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700"
+                  className="text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700"
                 >
-                  {hiddenRows} more {hiddenRows === 1 ? "section" : "sections"} — view
-                  full schedule →
+                  Hours &amp; class codes →
                 </Link>
-              )}
-            </div>
-          </StateBoundary>
+              }
+            />
+
+            <StateBoundary
+              isLoading={schedule.isLoading}
+              error={schedule.error}
+              onRetry={schedule.refetch}
+              isEmpty={schedule.rows.length === 0}
+              emptyFallback={
+                <EmptyState
+                  icon="🗓️"
+                  title="Nothing scheduled yet"
+                  description="Once you create a class section inside one of your courses, it appears here with its meeting hours."
+                />
+              }
+              loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
+            >
+              <div
+                role="tabpanel"
+                id={`home-schedule-panel-${view}`}
+                aria-labelledby={`home-schedule-tab-${view}`}
+                className="space-y-3"
+              >
+                {view === "upcoming" ? (
+                  <>
+                    <UpcomingClasses rows={shownRows} />
+                    {/* The cap, said out loud. A list that quietly stops at five
+                        is indistinguishable from a section having disappeared.
+                        The calendar has no such cap — it draws every section — so
+                        this belongs to the list view and not to the section. */}
+                    {hiddenRows > 0 && (
+                      <Link
+                        href="/teacher/schedule"
+                        className="inline-flex text-sm font-medium text-platform underline underline-offset-2 hover:text-platform-700"
+                      >
+                        {hiddenRows} more {hiddenRows === 1 ? "section" : "sections"} — view
+                        full schedule →
+                      </Link>
+                    )}
+                  </>
+                ) : (
+                  // Every row, NOT `shownRows`. The five-section cap exists so a
+                  // list does not run off the page; a week grid has a fixed size
+                  // whatever it contains, and cropping it would silently remove
+                  // classes from a picture whose whole job is to be complete.
+                  <ScheduleCalendar rows={schedule.rows} compact />
+                )}
+              </div>
+            </StateBoundary>
+          </section>
 
           {/* Courses, below the timetable and shortlisted. */}
           {!board.isLoading && !board.error && shownCourses.length > 0 && (
