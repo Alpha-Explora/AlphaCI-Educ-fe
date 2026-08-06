@@ -1,15 +1,18 @@
 // VIEW LAYER — student's private grades & feedback area.
 import type { Assignment, AssignmentRepository } from "@/models/types";
-import { Card, EmptyState, Stat } from "@/components/ui";
+import { EmptyState, PanelSurface, Stat } from "@/components/ui";
 import { formatDateTime } from "@/components/ui/format";
 import { pointsPerRepo } from "@/models/points";
 
 export function StudentGradesCard({
   repo,
   assignment,
+  surface,
 }: {
   repo: AssignmentRepository;
   assignment: Assignment;
+  /** False when the page already supplies the card — see PanelSurface. */
+  surface?: boolean;
 }) {
   // Two different situations that used to look identical to a student.
   //
@@ -47,7 +50,7 @@ export function StudentGradesCard({
   const isHalf = outOf !== assignment.points;
 
   return (
-    <Card className="p-5">
+    <PanelSurface surface={surface}>
       <div className="flex items-center gap-8">
         <Stat
           label={isHalf ? "This half" : "Your grade"}
@@ -77,6 +80,6 @@ export function StudentGradesCard({
           </p>
         </div>
       )}
-    </Card>
+    </PanelSurface>
   );
 }

@@ -16,8 +16,8 @@ import { useRepoFiles } from "@/viewmodels/useRepoFiles";
 import type { RepoBranch } from "@/models/types";
 import {
   Banner,
-  Card,
   Field,
+  PanelSurface,
   SectionHeading,
   Select,
   Skeleton,
@@ -29,15 +29,18 @@ export function CodeBrowserPanel({
   repoId,
   branches,
   defaultBranch,
+  surface,
 }: {
   repoId: string;
   branches: RepoBranch[];
   defaultBranch?: string | null;
+  /** False when the page already supplies the card — see PanelSurface. */
+  surface?: boolean;
 }) {
   const vm = useRepoFiles(repoId, defaultBranch ?? branches[0]?.name ?? null);
 
   return (
-    <Card className="p-5">
+    <PanelSurface surface={surface}>
       <SectionHeading
         title="Code"
         subtitle="Browse what is actually on each branch — the same files the pipeline graded."
@@ -151,7 +154,7 @@ export function CodeBrowserPanel({
           )}
         </div>
       </StateBoundary>
-    </Card>
+    </PanelSurface>
   );
 }
 

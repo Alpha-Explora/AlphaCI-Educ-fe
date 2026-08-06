@@ -27,11 +27,11 @@ import {
 import {
   Banner,
   Button,
-  Card,
   EmptyState,
   Field,
   GenericPill,
   Select,
+  PanelSurface,
   SectionHeading,
   Skeleton,
   StateBoundary,
@@ -44,12 +44,15 @@ export function SubmitForReviewPanel({
   branches,
   audience,
   isGroup,
+  surface,
 }: {
   repoId: string;
   branches: RepoBranch[];
   audience: "student" | "teacher";
   /** Group assignments require a teammate's approval before merging. */
   isGroup: boolean;
+  /** False when the page already supplies the card — see PanelSurface. */
+  surface?: boolean;
 }) {
   const vm = usePullRequests(repoId);
   // The signed-in account, for the comment thread: who may edit or delete a
@@ -100,7 +103,7 @@ export function SubmitForReviewPanel({
       : (targetBranches[0] ?? "");
 
   return (
-    <Card className="p-5">
+    <PanelSurface surface={surface}>
       <SectionHeading
         title="Submit for review"
         subtitle="Your work reaches main through a pull request — this is where you open and merge it."
@@ -259,7 +262,7 @@ export function SubmitForReviewPanel({
           </div>
         )}
       </StateBoundary>
-    </Card>
+    </PanelSurface>
   );
 }
 
