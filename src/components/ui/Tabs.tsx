@@ -14,6 +14,16 @@
 // code, for one). It is a SIBLING of the tablist, not a child: a tablist may
 // only contain tabs, so the border lives on the wrapper and the tablist keeps
 // itself pure.
+//
+// `leading` is the same idea on the other side, and exists so a page heading can
+// share the strip's row instead of stacking above it. With a leading element and
+// no trailing one, the wrapper's `justify-between` pushes the tabs to the RIGHT
+// — which is the point: the heading and the tabs read as one band, with the
+// border running under both.
+//
+// Both slots are ReactNode rather than styled here. They carry page content, and
+// a primitive that decided their type would be a primitive with opinions about
+// the pages that use it.
 // ============================================================================
 import { useRef } from "react";
 import { cn } from "./cn";
@@ -31,6 +41,8 @@ export function Tabs<T extends string>({
   label,
   /** Prefix for the generated tab/panel ids — must match the panels' own. */
   idPrefix,
+  /** Optional content pinned to the LEFT of the strip, outside the tablist. */
+  leading,
   /** Optional content pinned to the right of the strip, outside the tablist. */
   trailing,
   className,
@@ -40,6 +52,7 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
   label: string;
   idPrefix: string;
+  leading?: React.ReactNode;
   trailing?: React.ReactNode;
   className?: string;
 }) {
@@ -79,6 +92,11 @@ export function Tabs<T extends string>({
         className,
       )}
     >
+      {/* Outside the tablist, and before it in the DOM so reading order matches
+          what is on screen. `pb-2` sits it on the same baseline as the tabs,
+          whose own py-2.5 holds them off the border. */}
+      {leading && <div className="pb-2">{leading}</div>}
+
       <div
         role="tablist"
         aria-label={label}
