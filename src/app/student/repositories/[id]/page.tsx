@@ -45,7 +45,7 @@ import {
   Tabs,
   type TabItem,
 } from "@/components/ui";
-import { PageHeader } from "@/components/domain/PageHeader";
+import { BackLink, PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
 import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
 import { CodeBrowserPanel } from "@/components/domain/CodeBrowserPanel";
@@ -155,6 +155,21 @@ export default function StudentWorkspacePage() {
               onChange={setTab}
               label="Workspace sections"
               idPrefix="workspace"
+              // The way OUT rides the strip that holds the ways AROUND, on the
+              // right where six tabs leave the row half empty. It also stops the
+              // back control competing with the title for the first thing you
+              // read inside the card below — leaving is not why you came.
+              trailing={
+                <BackLink
+                  // Back to the CLASS this project belongs to, not past it to
+                  // the course list. There is a level between them (Courses ->
+                  // class -> workspace), and a back link that skips one leaves a
+                  // student re-finding their class every time they close a
+                  // project.
+                  href={`/student/classes/${d.assignment.classId}`}
+                  label="Back to class"
+                />
+              }
             />
 
             {/*
@@ -169,12 +184,8 @@ export default function StudentWorkspacePage() {
             */}
             <Card className="p-5">
               <PageHeader
-                // Back to the CLASS this project belongs to, not past it to the
-                // course list. There is a level between them now (Courses -> class
-                // -> workspace), and a back link that skips one leaves a student
-                // re-finding their class every time they close a project.
-                backHref={`/student/classes/${d.assignment.classId}`}
-                backLabel="Back to class"
+                // No backHref: the back control lives in the tab strip above,
+                // which is why this uses the header's left-aligned layout.
                 title={d.assignment.title}
                 subtitle={<span className="font-mono text-xs">{d.repo.repoName}</span>}
                 meta={
@@ -194,6 +205,26 @@ export default function StudentWorkspacePage() {
                 // No external repository link. Students reach their code through
                 // the system only — the Start/Open-in-VS-Code panel on the Work
                 // tab is the single sanctioned route to the source.
+                //
+                // RUN PIPELINE LIVES HERE NOW, hoisted out of the Test results
+                // tab where it sat beside the branch toggle. It belongs in the
+                // header on both counts: it is an action on the REPOSITORY
+                // rather than on the runs list — `triggerRun` takes no branch,
+                // so the branch toggle it used to sit next to never applied to
+                // it — and putting it here means a student watching a run fail
+                // on Actions can re-run without first finding the tab that
+                // happened to own the button.
+                actions={
+                  !closed && (
+                    <Button
+                      variant="secondary"
+                      onClick={vm.triggerRun}
+                      loading={vm.isTriggeringRun}
+                    >
+                      <span aria-hidden="true">▶</span> Run pipeline
+                    </Button>
+                  )
+                }
               />
 
               {/* Under the header and above the rule, so it reads as a fact about
@@ -407,8 +438,10 @@ export default function StudentWorkspacePage() {
                       runs={vm.runsForBranch}
                       runsOnOtherBranches={vm.runsOnOtherBranches}
                       audience="student"
-                      onTriggerRun={vm.triggerRun}
-                      isTriggering={vm.isTriggeringRun}
+                      // No onTriggerRun on purpose — the explorer only draws its
+                      // own Run pipeline button when handed one, and this page's
+                      // copy of it is in the header above. The teacher workspace
+                      // still passes it and keeps the button in place.
                       maxPoints={pointsPerRepo(d.assignment)}
                     />
                   )}

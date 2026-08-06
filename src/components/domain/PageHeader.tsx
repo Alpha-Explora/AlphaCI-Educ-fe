@@ -19,6 +19,32 @@
 import Link from "next/link";
 import { cn } from "@/components/ui";
 
+/**
+ * The back control on its own.
+ *
+ * Exported because one caller needs it somewhere other than beside a title: the
+ * student workspace parks it in the tab strip's trailing slot, which is space the
+ * six tabs were never going to fill. Extracted rather than copied — a second
+ * hand-rolled back button is the copy that drifts out of step with this one.
+ */
+export function BackLink({
+  href,
+  label,
+  className,
+}: Readonly<{ href: string; label: string; className?: string }>) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-strong)] shadow-card transition-colors hover:border-platform/40 hover:bg-platform-50 hover:text-platform-800",
+        className,
+      )}
+    >
+      <span aria-hidden="true">←</span> {label}
+    </Link>
+  );
+}
+
 export function PageHeader({
   title,
   subtitle,
@@ -92,12 +118,7 @@ export function PageHeader({
         a magic margin that would break the moment the title's size changed.
       */}
       <div className="flex min-w-0 flex-wrap items-start gap-3 sm:gap-4">
-        <Link
-          href={backHref}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-strong)] shadow-card transition-colors hover:border-platform/40 hover:bg-platform-50 hover:text-platform-800"
-        >
-          <span aria-hidden="true">←</span> {backLabel}
-        </Link>
+        <BackLink href={backHref} label={backLabel} />
         {titleBlock}
       </div>
       {actionGroup}
