@@ -39,8 +39,8 @@ import type {
 import {
   Banner,
   Button,
-  Card,
   GenericPill,
+  PanelSurface,
   Select,
   Skeleton,
   Spinner,
@@ -198,10 +198,13 @@ function groupByCommit(
 export function GithubActionsPanel({
   repoId,
   branch,
+  surface,
 }: {
   readonly repoId: string;
   /** Which branch to open on. Defaults to the repository's default branch. */
   readonly branch?: string | null;
+  /** False when the page already supplies the card — see PanelSurface. */
+  readonly surface?: boolean;
 }) {
   // Owned here, not by the page: this filter only ever narrows this list, and
   // GitHub puts it in the same place for the same reason.
@@ -253,7 +256,7 @@ export function GithubActionsPanel({
   const commitsWithoutRuns = groups.filter((g) => g.runs.length === 0);
 
   return (
-    <Card className="p-5">
+    <PanelSurface surface={surface}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-strong)]">
@@ -445,7 +448,7 @@ export function GithubActionsPanel({
           )}
         </div>
       )}
-    </Card>
+    </PanelSurface>
   );
 }
 

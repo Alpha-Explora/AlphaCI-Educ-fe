@@ -13,10 +13,21 @@
 // are also used at different moments, not together: you work, you propose the
 // merge, you watch it run, then much later you read a grade.
 //
-// The header, the status pills and the closed-project banner stay OUTSIDE the
-// tabs: they describe the repository itself, and a student who cannot submit
-// because the teacher ended the project must see that on every tab, not just
-// the one holding the disabled button.
+// TAB STRIP AT THE TOP, THEN ONE CONTAINER holding the workspace header and
+// whichever tab is open. The header used to be page furniture above the strip,
+// which spent the top third of the screen on the repository's name and pushed
+// the six things a student came to do below the fold of a lab monitor.
+//
+// The header, the status pills and the closed-project banner still sit outside
+// any single tab — they describe the repository itself, and a student who cannot
+// submit because the teacher ended the project must see that on every tab, not
+// just the one holding the disabled button. They now say so from inside the
+// container the tabs feed, rather than from above it.
+//
+// Because the page owns that container, the panels inside it must not draw their
+// own: each is handed `surface={false}` (see PanelSurface). The teacher workspace
+// shares these panels and keeps its own layout, which is why the flag is a prop
+// with a card-drawing default rather than a change to the panels themselves.
 // ============================================================================
 import { useState } from "react";
 import { useParams } from "next/navigation";
@@ -77,6 +88,16 @@ const TABS: ReadonlyArray<TabItem<WorkspaceTab>> = [
   { id: "grades", label: "Grades" },
 ];
 
+/**
+ * A block inside the page's one card.
+ *
+ * Bordered but NOT raised. A card's shadow says "this floats above the page",
+ * which is a lie one padding-width inside another card — nested shadows are how
+ * a layout starts looking like a stack of receipts. The border on its own is
+ * enough to stop two side-by-side actions reading as one column of prose.
+ */
+const SUB_PANEL = "rounded-lg border border-[var(--border-subtle)] p-4";
+
 export default function StudentWorkspacePage() {
   const params = useParams<{ id: string }>();
   const repoId = params?.id ?? null;
@@ -119,55 +140,77 @@ export default function StudentWorkspacePage() {
       >
         {d && (
           <>
-            <PageHeader
-              // Back to the CLASS this project belongs to, not past it to the
-              // course list. There is a level between them now (Courses -> class
-              // -> workspace), and a back link that skips one leaves a student
-              // re-finding their class every time they close a project.
-              backHref={`/student/classes/${d.assignment.classId}`}
-              backLabel="Back to class"
-              title={d.assignment.title}
-              subtitle={<span className="font-mono text-xs">{d.repo.repoName}</span>}
-              meta={
-                <>
-                  <RepoStatusPill status={d.repo.status} />
-                  {d.assignment.isGroup && (
-                    <GenericPill tone="info">Group project</GenericPill>
-                  )}
-                  <GenericPill>{d.assignment.points} pts</GenericPill>
-                  {/* Guarded: relativeDue returns "" with no deadline, and an
-                      empty pill is a coloured blob with nothing in it. */}
-                  {d.assignment.dueDate && (
-                    <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
-                  )}
-                </>
-              }
-              // No external repository link. Students reach their code through
-              // the system only — the Start/Open-in-VS-Code panel on the Work
-              // tab is the single sanctioned route to the source.
+            {/*
+              TABS FIRST, AT THE TOP OF THE PAGE.
+
+              They are the highest-level control here — which of six views of this
+              repository you are looking at — and they used to sit below a header
+              band that pushed them a third of the way down the screen. On a lab
+              PC that meant the six things a student is here to do were below the
+              fold of the first thing they saw.
+            */}
+            <Tabs
+              items={TABS}
+              value={tab}
+              onChange={setTab}
+              label="Workspace sections"
+              idPrefix="workspace"
             />
 
-            {/* Outside the tabs on purpose: losing access applies to every panel,
-                so it must not be hidden behind the one a student is not on. */}
-            {closed && (
-              <Banner tone="warning" title="Project closed">
-                Your teacher has ended this project. You can no longer open it in VS
-                Code, merge a pull request, or submit. Your work and grades stay
-                available under Code, Actions, Test results and Grades.
-              </Banner>
-            )}
+            {/*
+              ONE CONTAINER for the workspace header and whichever tab is open.
 
-            {/* Tab strip and its panel are one unit, spaced closer together
-                than the page's 2rem rhythm — a panel floating that far from the
-                strip stops reading as belonging to it. */}
-            <div className="space-y-6">
-              <Tabs
-                items={TABS}
-                value={tab}
-                onChange={setTab}
-                label="Workspace sections"
-                idPrefix="workspace"
+              The header names the thing every tab is a view OF, so it belongs
+              with them rather than floating above the tab strip as page
+              furniture. Everything inside is a section of this card, which is why
+              the panels are handed `surface={false}` — see PanelSurface. A panel
+              that still drew its own card would put a second border and shadow
+              one padding-width inside this one.
+            */}
+            <Card className="p-5">
+              <PageHeader
+                // Back to the CLASS this project belongs to, not past it to the
+                // course list. There is a level between them now (Courses -> class
+                // -> workspace), and a back link that skips one leaves a student
+                // re-finding their class every time they close a project.
+                backHref={`/student/classes/${d.assignment.classId}`}
+                backLabel="Back to class"
+                title={d.assignment.title}
+                subtitle={<span className="font-mono text-xs">{d.repo.repoName}</span>}
+                meta={
+                  <>
+                    <RepoStatusPill status={d.repo.status} />
+                    {d.assignment.isGroup && (
+                      <GenericPill tone="info">Group project</GenericPill>
+                    )}
+                    <GenericPill>{d.assignment.points} pts</GenericPill>
+                    {/* Guarded: relativeDue returns "" with no deadline, and an
+                        empty pill is a coloured blob with nothing in it. */}
+                    {d.assignment.dueDate && (
+                      <GenericPill tone="warning">{relativeDue(d.assignment.dueDate)}</GenericPill>
+                    )}
+                  </>
+                }
+                // No external repository link. Students reach their code through
+                // the system only — the Start/Open-in-VS-Code panel on the Work
+                // tab is the single sanctioned route to the source.
               />
+
+              {/* Under the header and above the rule, so it reads as a fact about
+                  the repository just named — and so it is on screen whichever tab
+                  is open. Losing access applies to every panel and must not be
+                  hidden behind the one a student is not looking at. */}
+              {closed && (
+                <Banner tone="warning" title="Project closed" className="mt-4">
+                  Your teacher has ended this project. You can no longer open it in VS
+                  Code, merge a pull request, or submit. Your work and grades stay
+                  available under Code, Actions, Test results and Grades.
+                </Banner>
+              )}
+
+              {/* The rule is what separates "which repository" from "what you are
+                  doing to it". Without it the open tab reads as more header. */}
+              <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
 
               {tab === "work" && (
                 <div
@@ -177,15 +220,18 @@ export default function StudentWorkspacePage() {
                   className="space-y-5"
                 >
                   {/* Assignment brief — first thing on the tab you work from,
-                      because it is what you are being asked to build. */}
-                  <Card className="p-5">
+                      because it is what you are being asked to build. Unboxed:
+                      it is the opening paragraph of this tab, and inside the
+                      page's card a border around prose reads as a callout the
+                      brief is not. */}
+                  <div>
                     <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       Brief
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-[var(--text-strong)]">
                       {d.assignment.description}
                     </p>
-                  </Card>
+                  </div>
 
                   {/* Actions: start-in-VS-Code + submit. Hidden once the teacher
                       closes the project.
@@ -205,7 +251,9 @@ export default function StudentWorkspacePage() {
                     // large empty panel with a button marooned at the bottom —
                     // the gap read as something failing to load.
                     <div className="grid items-start gap-5 lg:grid-cols-2">
-                      <StartAssignmentPanel repoId={d.repo.id} />
+                      <div className={SUB_PANEL}>
+                        <StartAssignmentPanel repoId={d.repo.id} surface={false} />
+                      </div>
 
                       {/*
                         Deliberately reworded to stop this being confused with
@@ -217,7 +265,7 @@ export default function StudentWorkspacePage() {
                         run filter, and students cannot push to main in the first
                         place, so the state it described was unreachable.
                       */}
-                      <Card className="p-5">
+                      <div className={SUB_PANEL}>
                         <h2 className="text-base font-semibold text-[var(--text-strong)]">
                           Tell your teacher you&apos;re finished
                         </h2>
@@ -254,7 +302,7 @@ export default function StudentWorkspacePage() {
                             </Button>
                           )}
                         </div>
-                      </Card>
+                      </div>
                     </div>
                   )}
 
@@ -273,6 +321,7 @@ export default function StudentWorkspacePage() {
                     repoId={d.repo.id}
                     branches={d.branches}
                     defaultBranch={vm.selectedBranch}
+                    surface={false}
                   />
                 </section>
               )}
@@ -310,6 +359,7 @@ export default function StudentWorkspacePage() {
                       branches={d.branches}
                       audience="student"
                       isGroup={Boolean(d.assignment.isGroup)}
+                      surface={false}
                     />
                   )}
                 </section>
@@ -324,7 +374,7 @@ export default function StudentWorkspacePage() {
                   role="tabpanel"
                   aria-labelledby="workspace-tab-actions"
                 >
-                  <GithubActionsPanel repoId={d.repo.id} />
+                  <GithubActionsPanel repoId={d.repo.id} surface={false} />
                 </div>
               )}
 
@@ -379,10 +429,11 @@ export default function StudentWorkspacePage() {
                       (private to you)
                     </span>
                   </h2>
-                  <StudentGradesCard repo={d.repo} assignment={d.assignment} />
+                  <StudentGradesCard repo={d.repo} assignment={d.assignment} surface={false} />
                 </section>
               )}
-            </div>
+              </div>
+            </Card>
           </>
         )}
       </StateBoundary>

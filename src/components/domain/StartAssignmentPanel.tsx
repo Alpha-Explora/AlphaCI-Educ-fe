@@ -22,10 +22,17 @@
 // State/actions come from useStartAssignment.
 // ============================================================================
 import { useStartAssignment } from "@/viewmodels/useStartAssignment";
-import { Banner, Button, Card, Skeleton } from "@/components/ui";
+import { Banner, Button, PanelSurface, Skeleton } from "@/components/ui";
 import { brand } from "@/config/brand";
 
-export function StartAssignmentPanel({ repoId }: { readonly repoId: string }) {
+export function StartAssignmentPanel({
+  repoId,
+  surface,
+}: {
+  readonly repoId: string;
+  /** False when the page already supplies the card — see PanelSurface. */
+  readonly surface?: boolean;
+}) {
   const vm = useStartAssignment(repoId);
 
   // "Reopen" once VS Code has already collected a launch. The distinction is the
@@ -35,7 +42,7 @@ export function StartAssignmentPanel({ repoId }: { readonly repoId: string }) {
   const canStart = vm.handoffEnabled && vm.openNow;
 
   return (
-    <Card className="p-5">
+    <PanelSurface surface={surface}>
       <h2 className="text-base font-semibold text-[var(--text-strong)]">
         Start in VS Code
       </h2>
@@ -159,6 +166,6 @@ export function StartAssignmentPanel({ repoId }: { readonly repoId: string }) {
           )}
         </div>
       )}
-    </Card>
+    </PanelSurface>
   );
 }
