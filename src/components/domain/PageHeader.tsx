@@ -52,6 +52,7 @@ export function PageHeader({
   backLabel = "Back",
   meta,
   actions,
+  titleAlign = "start",
   className,
 }: Readonly<{
   title: string;
@@ -60,8 +61,20 @@ export function PageHeader({
   backLabel?: string;
   meta?: React.ReactNode;
   actions?: React.ReactNode;
+  /**
+   * Which end of the row the title block sits at. `start` — beside the back
+   * control — is the default and what every page inside a course still uses.
+   *
+   * OPT-IN, AND DELIBERATELY NOT THE DEFAULT. Right-aligned titles are what this
+   * header USED to do everywhere; the note at the top of this file records why
+   * that was undone, and none of it stopped being true. A page that asks for
+   * `end` is accepting that trade on its own screen — it is not a signal the
+   * default should move back.
+   */
+  titleAlign?: "start" | "end";
   className?: string;
 }>) {
+  const alignEnd = titleAlign === "end";
   /*
     Title, subtitle and status pills as ONE unit, always left-aligned.
 
@@ -72,10 +85,22 @@ export function PageHeader({
     band at the cost of the thing the band was in the way of.
   */
   const titleBlock = (
-    <div className="min-w-0">
+    <div className={cn("min-w-0", alignEnd && "text-right")}>
       <h1 className="text-2xl font-semibold text-[var(--text-strong)]">{title}</h1>
       {subtitle && <div className="mt-1 text-sm text-[var(--text-muted)]">{subtitle}</div>}
-      {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
+      {/* The pills follow the text. Left-aligned pills under a right-aligned
+          heading would read as belonging to whatever is on the left, which on
+          this row is the back button. */}
+      {meta && (
+        <div
+          className={cn(
+            "mt-3 flex flex-wrap items-center gap-2",
+            alignEnd && "justify-end",
+          )}
+        >
+          {meta}
+        </div>
+      )}
     </div>
   );
 
@@ -104,24 +129,46 @@ export function PageHeader({
         className,
       )}
     >
-      {/*
-        The back control and the title, together.
+      {alignEnd ? (
+        /*
+          Back control at one end of the band, identity at the other.
 
-        `flex-wrap` rather than a fixed row: `backLabel` is a breadcrumb, not a
-        word — "AT1234 — Web Applications 2" on the teacher's workspace — so on a
-        narrow viewport it drops to its own line above the title instead of
-        squeezing the heading into a column three words wide.
+          The actions travel WITH the back control rather than staying on the
+          right, because the right is now occupied — and "where you came from"
+          plus "what you can do here" is a coherent left-hand cluster, where
+          actions stranded between a back button and a right-aligned title would
+          belong to neither.
+        */
+        <>
+          <div className="flex flex-wrap items-start gap-3 sm:gap-4">
+            <BackLink href={backHref} label={backLabel} />
+            {actionGroup}
+          </div>
+          {titleBlock}
+        </>
+      ) : (
+        <>
+          {/*
+            The back control and the title, together.
 
-        `items-start` puts the button on the title's first line. It stands ~6px
-        taller than that line (py-2 + text-sm against text-2xl's 2rem leading),
-        which is close enough to read as aligned and cheaper than pinning it with
-        a magic margin that would break the moment the title's size changed.
-      */}
-      <div className="flex min-w-0 flex-wrap items-start gap-3 sm:gap-4">
-        <BackLink href={backHref} label={backLabel} />
-        {titleBlock}
-      </div>
-      {actionGroup}
+            `flex-wrap` rather than a fixed row: `backLabel` is a breadcrumb, not
+            a word — "AT1234 — Web Applications 2" on the teacher's workspace —
+            so on a narrow viewport it drops to its own line above the title
+            instead of squeezing the heading into a column three words wide.
+
+            `items-start` puts the button on the title's first line. It stands
+            ~6px taller than that line (py-2 + text-sm against text-2xl's 2rem
+            leading), which is close enough to read as aligned and cheaper than
+            pinning it with a magic margin that would break the moment the
+            title's size changed.
+          */}
+          <div className="flex min-w-0 flex-wrap items-start gap-3 sm:gap-4">
+            <BackLink href={backHref} label={backLabel} />
+            {titleBlock}
+          </div>
+          {actionGroup}
+        </>
+      )}
     </div>
   );
 }

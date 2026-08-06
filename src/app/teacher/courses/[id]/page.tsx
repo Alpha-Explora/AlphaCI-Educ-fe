@@ -48,6 +48,11 @@ export default function TeacherCoursePage() {
       <PageHeader
         backHref="/teacher"
         backLabel="My Courses"
+        // The course's identity sits at the right of the band, opposite the way
+        // back. THIS PAGE ONLY — everything inside a course (the class detail
+        // view, the repository view) keeps the default left-aligned header, so
+        // opening a section still reads the way it always has.
+        titleAlign="end"
         title={entry ? entry.label : "Course"}
         subtitle={entry?.course.description || undefined}
         meta={
