@@ -89,9 +89,18 @@ function StudentRow({
         average are part of the same answer, and a 6px target inside a 44px row
         is the kind of hit area that only works with a mouse.
       */}
+      {/*
+        NO NEGATIVE MARGIN. `-mx-2` was here to bleed the hover tint to the
+        panel's edge, and it made every row wider than the list that holds it —
+        which, because a box cannot have `overflow-y: auto` and `overflow-x:
+        visible` at once, turned the scroll container into a horizontally
+        scrolling one. A stray scrollbar under the roster on a page with nothing
+        wide on it. Inset padding gives the same rounded hover target and stays
+        inside the box.
+      */}
       <Link
         href={`/teacher/classes/${classId}/students/${student.id}`}
-        className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
+        className="flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
       >
         <Avatar name={student.fullName} color={student.avatarColor} size="sm" />
         <div className="min-w-0 flex-1">
@@ -266,7 +275,7 @@ function ProjectsPanel({
               <li key={a.id}>
                 <Link
                   href={`/teacher/classes/${classId}/projects/${a.id}`}
-                  className="-mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

@@ -212,9 +212,18 @@ function ClassRosterContent() {
             >
               {/* Roster table */}
               <section className="space-y-4">
-                <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                  Student progress
-                </h2>
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                    Student progress
+                  </h2>
+                  {/* The count, because the table scrolls inside itself and a
+                      scroll area does not show how much is in it. */}
+                  {students.length > 0 && (
+                    <p className="text-sm text-[var(--text-muted)]">
+                      {students.length} {students.length === 1 ? "student" : "students"}
+                    </p>
+                  )}
+                </div>
                 <StateBoundary
                   isLoading={roster.isLoading}
                   error={roster.error}
@@ -230,10 +239,21 @@ function ClassRosterContent() {
                   loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
                 >
                   <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
+                    {/*
+                      Scrolls in BOTH directions, inside itself.
+
+                      Horizontally because the table has a 640px floor and a rail
+                      sits beside it; vertically because a cohort is thirty or
+                      forty people and the page's length should not be decided by
+                      how many enrolled. `max-h`, not `h`, so a section of five
+                      does not draw an empty box the height of a section of fifty.
+                    */}
+                    <div className="max-h-[34rem] overflow-auto overscroll-contain">
                       <table className="w-full min-w-[640px] text-sm">
-                        <thead>
-                          <tr className="border-b border-[var(--border-subtle)] bg-slate-50/70 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                        {/* Sticky, or scrolling past row twelve leaves five
+                            columns of numbers with nothing naming them. */}
+                        <thead className="sticky top-0 z-10">
+                          <tr className="border-b border-[var(--border-subtle)] bg-slate-50 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
                             <th scope="col" className="px-4 py-3 font-medium">
                               Student
                             </th>

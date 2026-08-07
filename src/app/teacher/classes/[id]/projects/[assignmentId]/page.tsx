@@ -10,29 +10,23 @@
 // underneath the row, pushing every project below it further down. Collapsing
 // the rows had already been tried, and it fixed the wrong half of the problem:
 // the page was short again, but the moment a teacher opened the project they
-// wanted, they were back to a screen of stacked panels with the next project's
-// header wedged beneath them. With a term's worth of projects, "open the one I
-// want" and "see all of them" were the same scroll.
+// wanted, they were back to a screen of stacked panels. With a term's worth of
+// projects, "open the one I want" and "see all of them" were the same scroll.
 //
-// A project is a destination. It has a title, a deadline, a roster of
-// submissions and four actions that change it — that is a page, and treating it
-// as one means the list can go back to being a list.
+// SECTIONED, not stacked. The first version of this page was an improvement on
+// the accordion and still wrong in the same direction: four cards in one column,
+// so the page's height was the sum of everything it can do and marking a
+// submission meant scrolling past the tests, the marks control and a danger
+// zone. It now uses the SAME rail as the class page and the repository page —
+// a teacher who has learned the pattern in either already knows this one, and
+// the sections are the map of what a project HAS.
 //
-// It also has a URL now, which the accordion could not. A teacher can bookmark
-// the project they mark every week, and the browser's Back button returns them
-// to the Assignments tab rather than to a collapsed row that has forgotten it
-// was ever open.
-//
-// WHAT STAYED BEHIND
-//
-// The list keeps everything readable from the assignment record alone — title,
-// group/closed state, points, deadline, whether marks are published — because
-// that is what answers "is this the one I want" without a request. Everything
-// here costs a query, which is precisely why it should not run for twenty
-// projects nobody opened.
+// The rail also fixes what the counts could not: with a class of fifty the
+// submission list is fifty rows, and on a stacked page every other section lived
+// below all fifty of them. Now each section owns the viewport when it is open,
+// and the list scrolls inside itself.
 // ============================================================================
-import { useState } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useClassRoster } from "@/viewmodels/useClassRoster";
 import { useClassAssignments } from "@/viewmodels/useClassAssignments";
@@ -42,8 +36,10 @@ import {
   Button,
   Card,
   GenericPill,
+  SideTabs,
   Skeleton,
   StateBoundary,
+  type SideTabGroup,
 } from "@/components/ui";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
@@ -51,6 +47,16 @@ import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
 import { formatDate, relativeDue } from "@/components/ui/format";
+
+type ProjectTab = "submissions" | "marking" | "settings";
+
+// Grouped like the class rail: the headings name what a project HAS, so the
+// list reads as a map rather than as three buttons.
+const TAB_GROUPS: ReadonlyArray<SideTabGroup<ProjectTab>> = [
+  { heading: "Work", items: [{ id: "submissions", label: "Submissions" }] },
+  { heading: "Marking", items: [{ id: "marking", label: "Tests & marks" }] },
+  { heading: "Configuration", items: [{ id: "settings", label: "Project settings" }] },
+];
 
 export default function TeacherProjectPage() {
   const params = useParams<{ id: string; assignmentId: string }>();
@@ -68,6 +74,9 @@ export default function TeacherProjectPage() {
   // reopen / delete mutations this page needs. A deep link costs one request.
   const vm = useClassAssignments(classId, () => router.replace(backHref));
 
+  // Submissions opens, because marking is why a teacher comes here. The other
+  // two are set up once and revisited rarely.
+  const [tab, setTab] = useState<ProjectTab>("submissions");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const assignment = useMemo(
@@ -143,136 +152,170 @@ export default function TeacherProjectPage() {
               }
             />
 
-            {/*
-              Submissions FIRST. Marking is why a teacher opens a project, and on
-              the accordion this list sat above three panels that pushed it off
-              screen the moment the row expanded.
-            */}
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                  Submissions
-                </h2>
-                <p className="text-sm text-[var(--text-muted)]">
-                  {assignment.dueDate
-                    ? `Due ${formatDate(assignment.dueDate)}`
-                    : "No deadline set"}
-                </p>
-              </div>
-              <Card className="overflow-hidden">
-                <AssignmentSubmissions
-                  assignmentId={assignment.id}
-                  assignment={assignment}
-                  usersById={usersById}
-                />
-              </Card>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                Marking setup
-              </h2>
-              <HiddenTestsPanel assignmentId={assignment.id} />
-              <GradeReleaseControl
-                assignmentId={assignment.id}
-                releasedAt={assignment.gradesReleasedAt}
+            {/* Rail + the open section. items-start, or the filled rail is drawn
+                as tall as whichever tab happens to be open — see the class page,
+                which had exactly that bug. */}
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
+              <SideTabs
+                groups={TAB_GROUPS}
+                value={tab}
+                onChange={setTab}
+                label="Project sections"
+                idPrefix="project"
               />
-            </section>
 
-            {/*
-              The four things that CHANGE this project, at the bottom and in one
-              place. Provisioning is the constructive one and keeps its primary
-              styling; ending and deleting are grouped with it because a teacher
-              looking for "what can I do to this project" should find one answer,
-              not three scattered ones.
-            */}
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                Project actions
-              </h2>
-              <Card className="p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {assignment.isGroup
-                      ? `Creates one shared GitHub repository per group in Section ${sectionLabel}.`
-                      : `Creates one GitHub repository per selected student in Section ${sectionLabel}.`}
-                  </p>
-                  <ProvisionRepositoriesButton assignmentId={assignment.id} />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-strong)]">
-                      {assignment.closedAt ? "This project is ended" : "End this project"}
-                    </p>
-                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                      {assignment.closedAt
-                        ? "Students cannot push, take a token or submit. Reopening restores all three."
-                        : "Students lose the ability to push, take a token or submit. Reversible."}
-                    </p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    loading={closing}
-                    onClick={() => vm.setProjectClosed(assignment.id, !assignment.closedAt)}
-                    className="shrink-0"
+              {/* min-w-0 or the submission rows push this column past the
+                  viewport instead of scrolling inside themselves. */}
+              <div className="min-w-0 flex-1 space-y-8">
+                {tab === "submissions" && (
+                  <div
+                    id="project-panel-submissions"
+                    role="tabpanel"
+                    aria-labelledby="project-tab-submissions"
+                    className="space-y-4"
                   >
-                    {assignment.closedAt ? "Reopen" : "🔒 End project"}
-                  </Button>
-                </div>
-              </Card>
-
-              {/*
-                Its own red card, matching the class page's danger zone. On the
-                accordion, Delete was a ghost button in a footer strip beside
-                Reopen and Provision — three buttons of near-equal weight, one of
-                which destroys every student's work on the project.
-              */}
-              <Card className="border-red-200 p-5">
-                <h3 className="text-base font-semibold text-[var(--text-strong)]">
-                  Danger zone
-                </h3>
-                {vm.deleteError && vm.deletingId === assignment.id && (
-                  <Banner tone="error" className="mt-3">
-                    {vm.deleteError}
-                  </Banner>
-                )}
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-strong)]">
-                      Delete this project
-                    </p>
-                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                      Permanently deletes &ldquo;{assignment.title}&rdquo;, every student
-                      repository under it, and any submitted or graded work. This cannot
-                      be undone.
-                    </p>
-                  </div>
-                  {confirmingDelete ? (
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        variant="danger"
-                        loading={vm.isDeleting && vm.deletingId === assignment.id}
-                        onClick={() => vm.deleteAssignment(assignment.id)}
-                      >
-                        Delete permanently
-                      </Button>
-                      <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
-                        Cancel
-                      </Button>
+                    <div className="flex flex-wrap items-baseline justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                        Submissions
+                      </h2>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {assignment.dueDate
+                          ? `Due ${formatDate(assignment.dueDate)}`
+                          : "No deadline set"}
+                      </p>
                     </div>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmingDelete(true)}
-                      className="shrink-0"
-                    >
-                      Delete project
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            </section>
+                    <Card className="overflow-hidden">
+                      <AssignmentSubmissions
+                        assignmentId={assignment.id}
+                        assignment={assignment}
+                        usersById={usersById}
+                      />
+                    </Card>
+                  </div>
+                )}
+
+                {tab === "marking" && (
+                  <div
+                    id="project-panel-marking"
+                    role="tabpanel"
+                    aria-labelledby="project-tab-marking"
+                    className="space-y-4"
+                  >
+                    <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                      Tests &amp; marks
+                    </h2>
+                    <HiddenTestsPanel assignmentId={assignment.id} />
+                    <GradeReleaseControl
+                      assignmentId={assignment.id}
+                      releasedAt={assignment.gradesReleasedAt}
+                    />
+                  </div>
+                )}
+
+                {tab === "settings" && (
+                  <div
+                    id="project-panel-settings"
+                    role="tabpanel"
+                    aria-labelledby="project-tab-settings"
+                    className="space-y-6"
+                  >
+                    {/* Configuration first, destruction last — the same order
+                        the class page's Settings tab uses. */}
+                    <Card className="p-5">
+                      <h2 className="text-base font-semibold text-[var(--text-strong)]">
+                        Student workspaces
+                      </h2>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-[var(--text-muted)]">
+                          {assignment.isGroup
+                            ? `Creates one shared GitHub repository per group in Section ${sectionLabel}.`
+                            : `Creates one GitHub repository per selected student in Section ${sectionLabel}.`}
+                        </p>
+                        <ProvisionRepositoriesButton assignmentId={assignment.id} />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-strong)]">
+                            {assignment.closedAt ? "This project is ended" : "End this project"}
+                          </p>
+                          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                            {assignment.closedAt
+                              ? "Students cannot push, take a token or submit. Reopening restores all three."
+                              : "Students lose the ability to push, take a token or submit. Reversible."}
+                          </p>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          loading={closing}
+                          onClick={() => vm.setProjectClosed(assignment.id, !assignment.closedAt)}
+                          className="shrink-0"
+                        >
+                          {assignment.closedAt ? "Reopen" : "🔒 End project"}
+                        </Button>
+                      </div>
+                    </Card>
+
+                    {/*
+                      Its own red card, matching the class page's danger zone. On
+                      the accordion, Delete was a ghost button in a footer strip
+                      beside Reopen and Provision — three buttons of near-equal
+                      weight, one of which destroys every student's work.
+                    */}
+                    <Card className="border-red-200 p-5">
+                      <h2 className="text-base font-semibold text-[var(--text-strong)]">
+                        Danger zone
+                      </h2>
+                      <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                        Actions here affect this project only. The rest of the class is
+                        untouched.
+                      </p>
+
+                      {vm.deleteError && vm.deletingId === assignment.id && (
+                        <Banner tone="error" className="mt-3">
+                          {vm.deleteError}
+                        </Banner>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-strong)]">
+                            Delete this project
+                          </p>
+                          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                            Permanently deletes &ldquo;{assignment.title}&rdquo;, every
+                            student repository under it, and any submitted or graded work.
+                            This cannot be undone.
+                          </p>
+                        </div>
+                        {confirmingDelete ? (
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                              variant="danger"
+                              loading={vm.isDeleting && vm.deletingId === assignment.id}
+                              onClick={() => vm.deleteAssignment(assignment.id)}
+                            >
+                              Delete permanently
+                            </Button>
+                            <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="danger"
+                            onClick={() => setConfirmingDelete(true)}
+                            className="shrink-0"
+                          >
+                            Delete project
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
       </StateBoundary>

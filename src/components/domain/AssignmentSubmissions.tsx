@@ -47,7 +47,26 @@ export function AssignmentSubmissions({
         </div>
       }
     >
-      <ul className="divide-y divide-[var(--border-subtle)]">
+      {/* How many rows are in the box, since a scroll area hides its own size. */}
+      <p className="border-b border-[var(--border-subtle)] bg-slate-50/60 px-4 py-2 text-xs text-[var(--text-muted)]">
+        {vm.repositories.length}{" "}
+        {vm.repositories.length === 1 ? "submission" : "submissions"}
+      </p>
+
+      {/*
+        A FIXED-HEIGHT SCROLL AREA, not a list that grows with the cohort.
+
+        One row per student, so a class of fifty is a fifty-row list — and every
+        section below it (hidden tests, marks, the project's actions) would sit
+        below all fifty. The panel would be a page whose length is decided by how
+        many people enrolled, which is not a property the layout should have.
+
+        `max-h`, not `h`: a project with three submissions should not draw an
+        empty box the height of a class of fifty. `overscroll-contain` keeps a
+        trackpad flick inside the list once it reaches the end, rather than
+        carrying on and scrolling the page out from under the teacher.
+      */}
+      <ul className="max-h-[26rem] divide-y divide-[var(--border-subtle)] overflow-y-auto overscroll-contain">
         {vm.repositories.map((repo) => {
           const owner = repo.ownerUserId ? usersById[repo.ownerUserId] : null;
           const ownerName = owner?.fullName ?? "Team repository";
