@@ -52,9 +52,16 @@ export const assignmentsApi = {
    * broken hidden test needs to pull marks back while they fix it.
    */
   setGradesReleased(id: string, released: boolean) {
+    // The OBJECT, not a string. `apiRequest` stringifies the body itself, so
+    // stringifying here sent `"{\"released\":true}"` — a JSON *string* rather
+    // than a JSON object. Express's parser runs in strict mode, which only
+    // accepts an object or an array at the top level, so it rejected the request
+    // before any handler saw it and the teacher got a raw parser error
+    // ("Unexpected token '\"' … is not valid JSON") where Publish marks should
+    // have been. Every other method in this file passes the object.
     return apiRequest<Assignment>(`/assignments/${id}/grades-released`, {
       method: "POST",
-      body: JSON.stringify({ released }),
+      body: { released },
     });
   },
 

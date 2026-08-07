@@ -76,6 +76,18 @@ export function setToken(token: string | null) {
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /**
+   * The payload as a PLAIN OBJECT. This function stringifies it — do not pass
+   * `JSON.stringify(...)`.
+   *
+   * Stated here because the mistake is silent at every layer that could catch
+   * it. `unknown` accepts a string happily, the request is sent, and the server
+   * receives valid JSON — just a top-level *string* instead of an object.
+   * Express's parser is strict by default and admits only objects and arrays, so
+   * it rejects the request before any handler runs, and what reaches the user is
+   * a parser error about a token in a payload they never typed. Two call sites
+   * had it (publishing marks, uploading hidden tests) and both looked correct.
+   */
   body?: unknown;
   /** Extra query params, appended when provided. */
   query?: Record<string, string | number | boolean | null | undefined>;
