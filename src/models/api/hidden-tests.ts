@@ -39,7 +39,10 @@ export const hiddenTestsApi = {
   upload(assignmentId: string, input: UploadHiddenTestsInput) {
     return apiRequest<HiddenTestSuiteSummary>(
       `/assignments/${assignmentId}/hidden-tests`,
-      { method: "POST", body: JSON.stringify(input) },
+      // The object, not a string — `apiRequest` stringifies. See the note on
+      // assignmentsApi.setGradesReleased: double-stringifying produces a
+      // top-level JSON string, which the server's strict parser refuses.
+      { method: "POST", body: input },
     );
   },
 
