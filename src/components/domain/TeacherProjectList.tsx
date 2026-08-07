@@ -18,8 +18,7 @@
 // that is entirely about recursion.
 // ============================================================================
 import { useMemo, useState } from "react";
-import type { Assignment, SystemUser } from "@/models/types";
-import type { ClassAssignmentsVM } from "@/viewmodels/useClassAssignments";
+import type { Assignment } from "@/models/types";
 import { Input } from "@/components/ui";
 import { TeacherProjectRow } from "./TeacherProjectRow";
 
@@ -31,14 +30,11 @@ const FILTER_THRESHOLD = 6;
 
 export function TeacherProjectList({
   assignments,
-  sectionLabel,
-  usersById,
-  vm,
+  classId,
 }: Readonly<{
   assignments: Assignment[];
-  sectionLabel: string;
-  usersById: Record<string, SystemUser>;
-  vm: ClassAssignmentsVM;
+  /** Each row links to `/teacher/classes/{classId}/projects/{id}`. */
+  classId: string;
 }>) {
   const [query, setQuery] = useState("");
 
@@ -88,13 +84,7 @@ export function TeacherProjectList({
       ) : (
         <div className="space-y-3">
           {filtered.map((a) => (
-            <TeacherProjectRow
-              key={a.id}
-              assignment={a}
-              sectionLabel={sectionLabel}
-              usersById={usersById}
-              vm={vm}
-            />
+            <TeacherProjectRow key={a.id} assignment={a} classId={classId} />
           ))}
         </div>
       )}
