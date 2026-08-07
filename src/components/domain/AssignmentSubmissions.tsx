@@ -6,19 +6,29 @@
 // ============================================================================
 import Link from "next/link";
 import { useAssignmentRepositories } from "@/viewmodels/useAssignmentRepositories";
-import type { SystemUser } from "@/models/types";
+import type { Assignment, SystemUser } from "@/models/types";
 import { RepoStatusPill, Skeleton, StateBoundary, cn } from "@/components/ui";
+import { pointsPerRepo } from "@/models/points";
 
 export function AssignmentSubmissions({
   assignmentId,
-  points,
+  assignment,
   usersById,
-}: {
+}: Readonly<{
   assignmentId: string;
-  points: number;
+  /**
+   * The project, for the mark's denominator.
+   *
+   * Was a bare `points` number taken straight from the assignment, which is the
+   * PROJECT total — so on a SPLIT project, where each half is worth half of it,
+   * every row read "35/100" for a repository marked out of 50. `pointsPerRepo`
+   * is the same rule the server validates a saved grade against.
+   */
+  assignment: Assignment;
   usersById: Record<string, SystemUser>;
-}) {
+}>) {
   const vm = useAssignmentRepositories(assignmentId);
+  const maxPoints = pointsPerRepo(assignment);
 
   return (
     <StateBoundary
@@ -64,7 +74,7 @@ export function AssignmentSubmissions({
                         : "text-[var(--text-muted)]",
                     )}
                   >
-                    {repo.grade !== null ? `${repo.grade}/${points}` : "—"}
+                    {repo.grade !== null ? `${repo.grade}/${maxPoints}` : "—"}
                   </span>
                   <RepoStatusPill status={repo.status} />
                   <span aria-hidden="true" className="text-[var(--text-muted)]">

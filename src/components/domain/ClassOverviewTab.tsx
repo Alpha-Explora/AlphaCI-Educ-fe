@@ -20,6 +20,7 @@
 // in it and the one with no shared state.
 // ============================================================================
 import { useMemo } from "react";
+import Link from "next/link";
 import type { Assignment, ClassCohort, ClassRoster } from "@/models/types";
 import type { ClassRosterVM } from "@/viewmodels/useClassRoster";
 import type { ClassAssignmentsVM } from "@/viewmodels/useClassAssignments";
@@ -72,45 +73,64 @@ function gradeTone(avg: number): "success" | "platform" | "warning" {
  * "Awaiting marking" are states a teacher acts on, and an empty cell would make
  * them look identical to each other.
  */
-function StudentRow({ student }: Readonly<{ student: RosterStudent }>) {
+function StudentRow({
+  student,
+  classId,
+}: Readonly<{ student: RosterStudent; classId: string }>) {
   return (
-    <li className="flex items-center gap-3 py-2.5">
-      <Avatar name={student.fullName} color={student.avatarColor} size="sm" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-[var(--text-strong)]">
-          {student.fullName}
-        </p>
-        <p className="truncate text-xs tabular-nums text-[var(--text-muted)]">
-          {student.submittedCount} submitted · {student.gradedCount} marked
-        </p>
-      </div>
+    <li>
+      {/*
+        The name is the way in. This was a static row, so the only route to one
+        student's actual work was to open every project in turn and find them in
+        each submission list — the wrong axis for the commonest question a
+        teacher has about a person ("how is this student doing?").
 
-      <div className="shrink-0 text-right">
-        {student.avgGrade !== null ? (
-          <>
-            <span className="text-sm font-semibold tabular-nums text-[var(--text-strong)]">
-              {student.avgGrade}%
-            </span>
-            <ProgressBar
-              className="mt-1 w-16"
-              value={student.avgGrade}
-              tone={gradeTone(student.avgGrade)}
-            />
-          </>
-        ) : (
-          <GenericPill tone={student.submittedCount === 0 ? "neutral" : "warning"}>
-            {student.submittedCount === 0 ? "Not started" : "Awaiting marking"}
-          </GenericPill>
-        )}
-      </div>
+        Whole-row link rather than a link on the name alone: the counters and the
+        average are part of the same answer, and a 6px target inside a 44px row
+        is the kind of hit area that only works with a mouse.
+      */}
+      <Link
+        href={`/teacher/classes/${classId}/students/${student.id}`}
+        className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
+      >
+        <Avatar name={student.fullName} color={student.avatarColor} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-[var(--text-strong)]">
+            {student.fullName}
+          </p>
+          <p className="truncate text-xs tabular-nums text-[var(--text-muted)]">
+            {student.submittedCount} submitted · {student.gradedCount} marked
+          </p>
+        </div>
+
+        <div className="shrink-0 text-right">
+          {student.avgGrade !== null ? (
+            <>
+              <span className="text-sm font-semibold tabular-nums text-[var(--text-strong)]">
+                {student.avgGrade}%
+              </span>
+              <ProgressBar
+                className="mt-1 w-16"
+                value={student.avgGrade}
+                tone={gradeTone(student.avgGrade)}
+              />
+            </>
+          ) : (
+            <GenericPill tone={student.submittedCount === 0 ? "neutral" : "warning"}>
+              {student.submittedCount === 0 ? "Not started" : "Awaiting marking"}
+            </GenericPill>
+          )}
+        </div>
+      </Link>
     </li>
   );
 }
 
 function StudentsPanel({
   roster,
+  classId,
   onSeeStudents,
-}: Readonly<{ roster: ClassRosterVM; onSeeStudents: () => void }>) {
+}: Readonly<{ roster: ClassRosterVM; classId: string; onSeeStudents: () => void }>) {
   const students = roster.data?.students ?? [];
   const notStarted = students.filter((s) => s.submittedCount === 0).length;
   const awaiting = Math.max(roster.rollup.submitted - roster.rollup.graded, 0);
@@ -179,7 +199,7 @@ function StudentsPanel({
       {students.length > 0 && (
         <ul className="mt-3 h-72 divide-y divide-[var(--border-subtle)] overflow-y-auto pr-1">
           {students.map((s) => (
-            <StudentRow key={s.id} student={s} />
+            <StudentRow key={s.id} student={s} classId={classId} />
           ))}
         </ul>
       )}
@@ -189,10 +209,12 @@ function StudentsPanel({
 
 function ProjectsPanel({
   assignments,
+  classId,
   onCreateProject,
   onSeeAssignments,
 }: Readonly<{
   assignments: Assignment[];
+  classId: string;
   onCreateProject: () => void;
   onSeeAssignments: () => void;
 }>) {
@@ -236,30 +258,40 @@ function ProjectsPanel({
         </div>
       ) : (
         <>
+          {/* Each project opens its own page — the same destination the
+              Assignments tab links to, so the two lists cannot lead anywhere
+              different. */}
           <ul className="mt-4 divide-y divide-[var(--border-subtle)]">
             {ordered.slice(0, PROJECT_PREVIEW).map((a) => (
-              <li
-                key={a.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium text-[var(--text-strong)]">
-                      {a.title}
-                    </span>
-                    {a.isGroup && <GenericPill tone="info">Group</GenericPill>}
-                    {a.closedAt && <GenericPill tone="warning">Closed</GenericPill>}
+              <li key={a.id}>
+                <Link
+                  href={`/teacher/classes/${classId}/projects/${a.id}`}
+                  className="-mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-platform"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-[var(--text-strong)]">
+                        {a.title}
+                      </span>
+                      {a.isGroup && <GenericPill tone="info">Group</GenericPill>}
+                      {a.closedAt && <GenericPill tone="warning">Closed</GenericPill>}
+                    </div>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      {a.points} pts ·{" "}
+                      {a.dueDate ? `Due ${formatDate(a.dueDate)}` : "No due date"}
+                    </p>
                   </div>
-                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                    {a.points} pts ·{" "}
-                    {a.dueDate ? `Due ${formatDate(a.dueDate)}` : "No due date"}
-                  </p>
-                </div>
-                {a.dueDate && (
-                  <span className="shrink-0 text-xs font-medium text-[var(--text-muted)]">
-                    {relativeDue(a.dueDate)}
-                  </span>
-                )}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {a.dueDate && (
+                      <span className="text-xs font-medium text-[var(--text-muted)]">
+                        {relativeDue(a.dueDate)}
+                      </span>
+                    )}
+                    <span aria-hidden="true" className="text-[var(--text-muted)]">
+                      →
+                    </span>
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>
@@ -280,6 +312,7 @@ function ProjectsPanel({
 
 export function ClassOverviewTab({
   info,
+  classId,
   roster,
   assignments,
   meetingLabs,
@@ -288,6 +321,12 @@ export function ClassOverviewTab({
   onSeeAssignments,
 }: Readonly<{
   info: ClassCohort | undefined;
+  /**
+   * From the URL, not from `info` — the roster may still be loading, and both
+   * lists below are links that must be correct on the first render rather than
+   * inert until a request returns.
+   */
+  classId: string;
   roster: ClassRosterVM;
   assignments: ClassAssignmentsVM;
   meetingLabs: ClassMeetingLabsVM;
@@ -331,9 +370,14 @@ export function ClassOverviewTab({
           on narrow screens and vertical once they sit side by side. */}
       <Card className="animate-fade-up">
         <div className="grid divide-y divide-[var(--border-subtle)] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-          <StudentsPanel roster={roster} onSeeStudents={onSeeStudents} />
+          <StudentsPanel
+            roster={roster}
+            classId={classId}
+            onSeeStudents={onSeeStudents}
+          />
           <ProjectsPanel
             assignments={assignments.assignments}
+            classId={classId}
             onCreateProject={onCreateProject}
             onSeeAssignments={onSeeAssignments}
           />
