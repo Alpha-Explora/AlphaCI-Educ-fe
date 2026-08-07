@@ -7,10 +7,14 @@
 //
 // Split across four sections, reached from a SIDE panel rather than a strip of
 // tabs above the content. Overview is the teaching surface — who is enrolled and
-// what they have submitted. Settings holds the section's configuration and the
-// danger zone; Delete class used to sit in the page header's top-right, one
-// stray click away from destroying a term of marked work, which is not a
-// standing it earns next to a roster you open every day.
+// what they have submitted. Settings holds the section's configuration, and only
+// that: class access (start / rotate / end) beside the read-only timetable.
+//
+// NOTHING DESTRUCTIVE ON THIS PAGE. Delete class travelled from the header's
+// top-right, to a Settings danger zone, to the IT admin's /admin/sections — the
+// same owner who creates sections, since a section books a person and a room and
+// deleting one is that decision reversed. A teacher who wants a section finished
+// ends its projects instead, which stops the work without destroying it.
 //
 // The panel is grouped rather than flat (CLASS / PEOPLE / WORK / CONFIGURATION)
 // so the four entries read as a map of what a section HAS, and so the grouping
@@ -18,22 +22,19 @@
 // ============================================================================
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
 import { useClassRoster } from "@/viewmodels/useClassRoster";
 import { useClassAssignments } from "@/viewmodels/useClassAssignments";
-import { useDeleteClass } from "@/viewmodels/useDeleteClass";
 import { useTeacherCourses } from "@/viewmodels/useTeacherCourses";
 import { useClassMeetingLabs } from "@/viewmodels/useClassMeetingLabs";
 import type { SystemUser } from "@/models/types";
 import {
   Avatar,
-  Banner,
   Button,
   Card,
   EmptyState,
   GenericPill,
-  Modal,
   ProgressBar,
   Skeleton,
   StateBoundary,
@@ -94,7 +95,6 @@ export default function ClassRosterPage() {
 
 function ClassRosterContent() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const classId = params?.id ?? null;
   // Naming the meeting laboratories, and deciding which may be picked.
   const { user, labs } = useSession();
@@ -111,13 +111,6 @@ function ClassRosterContent() {
   const info = roster.data?.classInfo;
   const students = roster.data?.students ?? [];
   const [createOpen, setCreateOpen] = useState(false);
-
-  // Where to land once the section is gone: the course that owned it, or the
-  // dashboard if the class never loaded.
-  const backHref = info ? `/teacher/courses/${info.courseId}` : "/teacher";
-  // `replace`, not `push` — this page no longer exists, so leaving it in the
-  // history would let Back land the teacher on a dead class.
-  const del = useDeleteClass(classId, () => router.replace(backHref));
 
   const meetingLabs = useClassMeetingLabs({
     classId,
@@ -153,14 +146,10 @@ function ClassRosterContent() {
             </>
           )
         }
-        // No actions here any more. Delete class lived in this slot and now
-        // sits in the Settings tab's danger zone.
+        // No actions here any more. Delete class lived in this slot, moved to
+        // the Settings tab's danger zone, and has now left the teacher's surface
+        // entirely — it is the IT admin's, on /admin/sections.
       />
-
-      {/* The delete failed after the dialog closed — say so on the page, since
-          the dialog is no longer there to carry the message. Above the tabs, so
-          it is visible whichever one is open. */}
-      {del.error && !del.isConfirming && <Banner tone="error">{del.error}</Banner>}
 
       {/* Side panel + the open section, as two columns on desktop and stacked
           below lg (a 224px rail beside a roster table does not fit a tablet).
@@ -400,117 +389,63 @@ function ClassRosterContent() {
               aria-labelledby="class-tab-settings"
               className="space-y-8"
             >
-              {/* Configuration first, destruction last. The danger zone used to
-                  be the only thing on this tab, so it opened on a red card;
-                  ordinary settings belong above it.
+              {/*
+                Two cards, side by side from xl and stacked below it.
 
-                  Access sits ABOVE the timetable: starting the class is the thing
-                  a teacher comes here to do in the moment, whereas the hours are
-                  set once a term. */}
-              <ClassAccessPanel
-                classId={classId}
-                sectionLabel={
-                  info ? `${info.code} · ${info.section}` : "this section"
-                }
-                hasSchedule={Boolean(info?.schedule)}
-              />
+                They were a single 672px-capped column, which left roughly half
+                the content area empty on a desktop — and the emptiness read as
+                "something failed to load" rather than "this section is
+                configured". With the danger zone gone there are only two cards
+                left, so the pair fills the row instead.
+
+                items-start so the shorter card keeps its own height: a Class
+                hours card stretched to match an OPEN access card (which grows by
+                the code, the joined count and two buttons) would be mostly blank
+                space with a rule around it.
+
+                Access leads: starting the class is what a teacher opens this tab
+                to DO, whereas the hours are read once a term.
+              */}
+              <div className="grid items-start gap-6 xl:grid-cols-2">
+                <ClassAccessPanel
+                  classId={classId}
+                  sectionLabel={
+                    info ? `${info.code} · ${info.section}` : "this section"
+                  }
+                  hasSchedule={Boolean(info?.schedule)}
+                />
+
+                {/*
+                  READ-ONLY. Class hours are the IT admin's to set now: a section's
+                  window books a person and a room, and neither is one teacher's to
+                  claim. The card that edited them is gone rather than disabled —
+                  a form whose Save always 403s is worse than no form.
+                */}
+                <ClassHoursSummary schedule={info?.schedule} />
+              </div>
 
               {/*
-                READ-ONLY. Class hours are the IT admin's to set now: a section's
-                window books a person and a room, and neither is one teacher's to
-                claim. The card that edited them is gone rather than disabled —
-                a form whose Save always 403s is worse than no form.
+                NO DANGER ZONE. Deleting a section is the IT admin's, on
+                /admin/sections. Creating one is already theirs — it books a
+                person and a room — and deleting is that decision run backwards,
+                so it cannot belong to a different owner.
+
+                Removed rather than disabled, for the same reason the schedule
+                editor was: a button that always 403s teaches a teacher the
+                product is broken. The backend refuses non-admins too
+                (ClassesService.deleteClass), so this is not the only guard.
+
+                What a teacher wants when a section is over is on the Assignments
+                tab: ending a project stops the work without destroying a term of
+                marked submissions.
               */}
-              <ClassHoursSummary schedule={info?.schedule} />
-
-              <Card className="border-red-200 p-5 animate-fade-up sm:max-w-2xl">
-                <h2 className="text-base font-semibold text-[var(--text-strong)]">
-                  Danger zone
-                </h2>
-                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                  Actions here affect this section only. Your other sections and the
-                  course itself are untouched.
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-strong)]">
-                      Delete this class
-                    </p>
-                    {/* Named rather than generic: "delete this class" is abstract
-                        until you see which section it means. */}
-                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                      Permanently deletes{" "}
-                      {info
-                        ? `${info.code} — Section ${info.section}`
-                        : "this section"}
-                      , its projects, and every student&rsquo;s submitted and graded
-                      work. This cannot be undone.
-                    </p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    onClick={del.askToDelete}
-                    disabled={!info}
-                    className="shrink-0"
-                  >
-                    Delete class
-                  </Button>
-                </div>
-              </Card>
             </div>
           )}
         </div>
       </div>
 
-      {/*
-        Destructive, permanent and cascading, so it is confirmed rather than
-        instant. The copy uses this section's REAL counts — a generic "this
-        cannot be undone" doesn't tell a teacher whether they're about to lose
-        an empty trial section or a term's worth of marked work.
-      */}
-      <Modal
-        open={del.isConfirming}
-        onClose={del.cancel}
-        title={`Delete ${info ? `${info.code} — Section ${info.section}` : "this class"}?`}
-        description="This permanently deletes the class section. It cannot be undone."
-        size="md"
-      >
-        <div className="space-y-4">
-          {del.error && <Banner tone="error">{del.error}</Banner>}
-
-          <ul className="space-y-1.5 text-sm text-[var(--text-muted)]">
-            <li>
-              •{" "}
-              <strong className="text-[var(--text-strong)]">
-                {assignments.assignments.length}{" "}
-                {assignments.assignments.length === 1 ? "project" : "projects"}
-              </strong>{" "}
-              in this section are deleted, along with every student repository
-              under them and any submitted or graded work.
-            </li>
-            <li>
-              • {students.length} {students.length === 1 ? "student is" : "students are"}{" "}
-              unenrolled.{" "}
-              <span className="text-[var(--text-strong)]">
-                Their accounts are kept
-              </span>{" "}
-              — only their place in this section goes.
-            </li>
-            <li>• The join code stops working immediately.</li>
-            <li>• The course itself and your other sections are untouched.</li>
-          </ul>
-
-          <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
-            <Button variant="secondary" onClick={del.cancel} disabled={del.isDeleting}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={del.confirm} loading={del.isDeleting}>
-              {del.isDeleting ? "Deleting…" : "Delete permanently"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* The delete-confirmation modal went with the danger zone. The admin's
+          own confirmation lives on /admin/sections, where the capability now is. */}
 
       {/* Create project (teacher-only surface). Mount on open so form state
           initializes from the loaded roster (all students checked by default). */}

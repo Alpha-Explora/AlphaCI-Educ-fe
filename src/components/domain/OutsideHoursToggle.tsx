@@ -21,9 +21,20 @@ import { CopyButton, Spinner, cn } from "@/components/ui";
 export function OutsideHoursToggle({
   classId,
   sectionLabel,
+  showCode = true,
 }: {
   readonly classId: string;
   readonly sectionLabel: string;
+  /**
+   * Whether to print the access code under the switch.
+   *
+   * True in a TABLE, where each row is a different section and the code is the
+   * only place it appears. False inside ClassAccessPanel, which already shows
+   * the same code — from the same useClassAccess — at full size a few rows
+   * above. Two renderings of one code invite the reader to look for the
+   * difference between them, and there is none.
+   */
+  readonly showCode?: boolean;
 }) {
   const access = useClassAccess(classId);
 
@@ -45,7 +56,7 @@ export function OutsideHoursToggle({
       {/* The code appears beside the switch that needed it. A teacher who has
           just enabled homework needs the thing to hand out, and sending them to
           another page for it is the step that gets forgotten. */}
-      {on && access.code && (
+      {showCode && on && access.code && (
         <div className="flex items-center gap-1.5">
           <code className="rounded bg-amber-50 px-1.5 py-0.5 font-mono text-xs font-bold tracking-wider text-amber-900 ring-1 ring-amber-200">
             {access.code}
@@ -54,6 +65,10 @@ export function OutsideHoursToggle({
         </div>
       )}
 
+      {/* Kept even when showCode is false: "no code" is a STATE, not a copy of
+          one. The panel's code block is absent in exactly this case, so without
+          this line the switch would read as on with nothing explaining why no
+          student can get in. */}
       {on && !access.code && (
         <p className="text-xs text-warning">No code — start the class on Home.</p>
       )}
