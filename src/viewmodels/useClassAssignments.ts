@@ -34,7 +34,17 @@ export interface ClassAssignmentsVM {
   closingId: string | null;
 }
 
-export function useClassAssignments(classId: string | null): ClassAssignmentsVM {
+/**
+ * @param onProjectDeleted Called after a successful delete. Exists for the
+ *   project PAGE, which is the deleted thing — it has to leave, and a page
+ *   rendering a project the server has just dropped would otherwise fall to a
+ *   "not found" state the teacher did not ask for. Optional because the class
+ *   page deletes from a list it stays on. Same shape as useDeleteClass.
+ */
+export function useClassAssignments(
+  classId: string | null,
+  onProjectDeleted?: (assignmentId: string) => void,
+): ClassAssignmentsVM {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
@@ -52,7 +62,10 @@ export function useClassAssignments(classId: string | null): ClassAssignmentsVM 
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => assignmentsApi.remove(id),
-    onSuccess: invalidate,
+    onSuccess: (_result, id) => {
+      invalidate();
+      onProjectDeleted?.(id);
+    },
   });
 
   const closeMutation = useMutation({

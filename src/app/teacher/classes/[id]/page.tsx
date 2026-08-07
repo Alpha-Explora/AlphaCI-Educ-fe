@@ -16,8 +16,9 @@
 // so the four entries read as a map of what a section HAS, and so the grouping
 // keeps working as sections are added — a flat list of seven would not.
 // ============================================================================
-import { useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/viewmodels/useSession";
 import { useClassRoster } from "@/viewmodels/useClassRoster";
 import { useClassAssignments } from "@/viewmodels/useClassAssignments";
@@ -56,7 +57,42 @@ const TAB_GROUPS: ReadonlyArray<SideTabGroup<ClassTab>> = [
   { heading: "Configuration", items: [{ id: "settings", label: "Settings" }] },
 ];
 
+const TAB_IDS: readonly ClassTab[] = ["overview", "students", "assignments", "settings"];
+
+/**
+ * The tab a `?tab=` link asks for, or Overview.
+ *
+ * Read ONCE, as the initial state — not kept in sync with the URL on every
+ * change. The tab was previously private state on the grounds that a reading
+ * position is not a destination worth sharing, and that was right while every
+ * tab's contents lived on this page. Projects and students are now pages of
+ * their own, so their back links have somewhere to point BACK to, and landing a
+ * teacher on Overview after they came from Assignments is a lost place.
+ *
+ * Validated against the union rather than cast: `?tab=` is user-supplied, and an
+ * unrecognised value should open Overview, not render nothing.
+ */
+function initialTab(raw: string | null): ClassTab {
+  return TAB_IDS.find((id) => id === raw) ?? "overview";
+}
+
+/**
+ * The page, wrapped so `useSearchParams` has a Suspense boundary above it.
+ *
+ * Required by the App Router: a client component that reads search params forces
+ * the route to bail out of static rendering, and Next refuses to build one that
+ * is not suspended. The fallback is the same skeleton shape the roster shows
+ * while it loads, so the boundary is invisible in practice.
+ */
 export default function ClassRosterPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
+      <ClassRosterContent />
+    </Suspense>
+  );
+}
+
+function ClassRosterContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const classId = params?.id ?? null;
@@ -66,16 +102,12 @@ export default function ClassRosterPage() {
   const teacherCourses = useTeacherCourses(user?.id ?? null);
   const roster = useClassRoster(classId);
   const assignments = useClassAssignments(classId);
-  const [tab, setTab] = useState<ClassTab>("overview");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<ClassTab>(() => initialTab(searchParams.get("tab")));
 
-  // Build a userId → SystemUser map so submission rows can show owner names.
-  const usersById = useMemo<Record<string, SystemUser>>(() => {
-    const map: Record<string, SystemUser> = {};
-    for (const s of roster.data?.students ?? []) map[s.id] = s;
-    for (const t of roster.data?.teachers ?? []) map[t.id] = t;
-    return map;
-  }, [roster.data]);
-
+  // The userId → SystemUser map that used to live here went with the submission
+  // rows it fed: those render on the project's own page now, which builds it from
+  // the same roster query this page already warms.
   const info = roster.data?.classInfo;
   const students = roster.data?.students ?? [];
   const [createOpen, setCreateOpen] = useState(false);
@@ -158,9 +190,10 @@ export default function ClassRosterPage() {
             pushes the whole row wider than the viewport instead of scrolling
             inside its own overflow container. */}
         <div className="min-w-0 flex-1 space-y-8">
-          {tab === "overview" && (
+          {tab === "overview" && classId && (
             <ClassOverviewTab
               info={info}
+              classId={classId}
               roster={roster}
               assignments={assignments}
               meetingLabs={meetingLabs}
@@ -222,10 +255,17 @@ export default function ClassRosterPage() {
                           {roster.data?.students.map((s) => (
                             <tr key={s.id} className="transition-colors hover:bg-slate-50/60">
                               <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
+                                {/* The same destination the Overview roster
+                                    leads to. A table row cannot be an anchor, so
+                                    the link is the identity cell — which is the
+                                    part a teacher aims at anyway. */}
+                                <Link
+                                  href={`/teacher/classes/${classId}/students/${s.id}`}
+                                  className="flex items-center gap-3 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-platform"
+                                >
                                   <Avatar name={s.fullName} color={s.avatarColor} size="sm" />
                                   <div className="min-w-0">
-                                    <p className="truncate font-medium text-[var(--text-strong)]">
+                                    <p className="truncate font-medium text-[var(--text-strong)] group-hover:underline">
                                       {s.fullName}
                                     </p>
                                     <p className="truncate text-xs text-[var(--text-muted)]">
@@ -234,7 +274,7 @@ export default function ClassRosterPage() {
                                         : "Lab-only (zero-footprint)"}
                                     </p>
                                   </div>
-                                </div>
+                                </Link>
                               </td>
                               <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
                                 {s.repoCount}
@@ -281,12 +321,30 @@ export default function ClassRosterPage() {
               aria-labelledby="class-tab-assignments"
               className="space-y-8"
             >
-              {/* Assignments + submissions */}
+              {/*
+                A LIST OF PROJECTS, not a stack of them.
+
+                This was "Assignments & submissions" — every project an accordion
+                whose expanded body carried the submission list, the hidden-tests
+                panel, the marks control and four actions. Opening the one you
+                wanted pushed the rest of the term below the fold, so finding a
+                project and working on it were the same scroll.
+
+                Each row now links to the project's own page, which is where all
+                of that moved. The heading dropped "& submissions" to match: those
+                live one click in, and promising them here would be the same lie
+                the accordion told.
+              */}
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-[var(--text-strong)]">
-                    Assignments &amp; submissions
-                  </h2>
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+                      Projects
+                    </h2>
+                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                      Open a project to see its submissions, hidden tests and marks.
+                    </p>
+                  </div>
                   <Button size="sm" onClick={() => setCreateOpen(true)}>
                     <span aria-hidden="true">＋</span> Create project
                   </Button>
@@ -304,12 +362,12 @@ export default function ClassRosterPage() {
                   }
                   loadingFallback={<Skeleton className="h-40 w-full rounded-xl" />}
                 >
-                  <TeacherProjectList
-                    assignments={assignments.assignments}
-                    sectionLabel={info?.section ?? "this section"}
-                    usersById={usersById}
-                    vm={assignments}
-                  />
+                  {classId && (
+                    <TeacherProjectList
+                      assignments={assignments.assignments}
+                      classId={classId}
+                    />
+                  )}
                 </StateBoundary>
               </section>
             </div>
