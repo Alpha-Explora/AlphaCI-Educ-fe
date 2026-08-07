@@ -19,6 +19,7 @@ import { useClassRoster } from "@/viewmodels/useClassRoster";
 import {
   Avatar,
   Banner,
+  Button,
   Card,
   GenericPill,
   RepoStatusPill,
@@ -38,13 +39,34 @@ import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
 import { formatDate, formatDateTime, relativeDue } from "@/components/ui/format";
 import { pointsPerRepo } from "@/models/points";
 
-type RepoTab = "overview" | "pipeline" | "review" | "grading";
+type RepoTab = "overview" | "actions" | "results" | "review" | "grading";
 
 // Grouped the way the class rail is: the headings name what this repository
-// HAS, so the list reads as a map rather than as four buttons.
+// HAS, so the list reads as a map rather than as five buttons.
+//
+// ACTIONS AND TEST RESULTS ARE SEPARATE, as they are in the student workspace,
+// and for the reason stated there: they are two different truths about the same
+// push. Actions is GITHUB's — which run, which job, which step, and what the
+// runner printed. Test results is ALPHACI's — the per-stage grading breakdown
+// and the mark it produced. They agree most of the time, and the times they do
+// not are exactly the times a teacher is on this page: a run green on GitHub
+// whose report never reached this server reads as "passed" in one and "no result"
+// in the other, and that gap IS the diagnosis. Stacked in one tab they looked
+// like one long story about a single system.
+//
+// The labels are the student's, deliberately. A teacher fielding "my pipeline
+// failed" is looking at the same evidence under the same name, so neither has to
+// translate. It also keeps the vocabulary GitHub's own, which is the one both
+// will meet again outside this product.
 const TAB_GROUPS: ReadonlyArray<SideTabGroup<RepoTab>> = [
   { heading: "Submission", items: [{ id: "overview", label: "Overview" }] },
-  { heading: "Pipeline", items: [{ id: "pipeline", label: "Runs & checks" }] },
+  {
+    heading: "Pipeline",
+    items: [
+      { id: "actions", label: "Actions" },
+      { id: "results", label: "Test results" },
+    ],
+  },
   { heading: "Review", items: [{ id: "review", label: "Pull request" }] },
   { heading: "Marking", items: [{ id: "grading", label: "Grade & feedback" }] },
 ];
@@ -222,19 +244,27 @@ export default function TeacherRepositoryPage() {
                   </div>
                 )}
 
-                {tab === "pipeline" && (
+                {tab === "actions" && (
                   <div
-                    id="repo-panel-pipeline"
+                    id="repo-panel-actions"
                     role="tabpanel"
-                    aria-labelledby="repo-tab-pipeline"
-                    className="space-y-8"
+                    aria-labelledby="repo-tab-actions"
                   >
                     {/* ADDENDUM M — real GitHub Actions runs, one container per commit.
                         Same panel the student sees, so a teacher debugging "my pipeline
                         failed" is looking at the identical evidence they are. */}
                     <GithubActionsPanel repoId={d.repo.id} />
+                  </div>
+                )}
 
-                    {/* Runs + 5-stage breakdown */}
+                {tab === "results" && (
+                  <div
+                    id="repo-panel-results"
+                    role="tabpanel"
+                    aria-labelledby="repo-tab-results"
+                    className="space-y-8"
+                  >
+                    {/* Runs + the stage breakdown */}
                     <section className="space-y-4">
                       <h2 className="text-lg font-semibold text-[var(--text-strong)]">
                         CI/CD pipeline
@@ -253,7 +283,35 @@ export default function TeacherRepositoryPage() {
                         </Banner>
                       )}
                       {d.runs.length === 0 ? (
-                        <Banner tone="info">No pipeline runs recorded for this repository.</Banner>
+                        /*
+                          THE DIAGNOSTIC MOMENT, and the reason the two tabs are
+                          worth separating. "No results here" and "nothing ever
+                          ran" look identical from this page, and they are
+                          different faults with different owners: a pipeline that
+                          has not run is the student's, a pipeline that ran and
+                          could not report is the school's (see
+                          docs/PIPELINE_REPORTING.md — almost always
+                          ALPHACI_API_BASE_URL). Actions is the one place that
+                          tells them apart, so the empty state sends them there
+                          rather than leaving a flat statement of absence.
+                        */
+                        <Banner tone="info">
+                          <p>AlphaCI holds no pipeline result for this repository.</p>
+                          <p className="mt-1">
+                            Check <strong>Actions</strong> first — if runs are listed there,
+                            they finished on GitHub but their report is not reaching this
+                            server, which is a configuration problem rather than anything
+                            the student can fix.
+                          </p>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => setTab("actions")}
+                          >
+                            Open Actions
+                          </Button>
+                        </Banner>
                       ) : (
                         <RepoRunsExplorer
                           branches={d.branches}

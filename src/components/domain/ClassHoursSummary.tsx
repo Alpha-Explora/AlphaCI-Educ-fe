@@ -40,7 +40,7 @@ export function ClassHoursSummary({
   const manyRooms = new Set(blocks.map((b) => b.labOrgId)).size > 1;
 
   return (
-    <Card className="p-5 animate-fade-up sm:max-w-2xl">
+    <Card className="p-5 animate-fade-up">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-[var(--text-strong)]">Class hours</h2>
@@ -49,7 +49,7 @@ export function ClassHoursSummary({
             <span className="font-medium text-[var(--text-strong)]">Philippine time</span>.
             Students can read their work at any hour; they can only{" "}
             <span className="font-medium text-[var(--text-strong)]">work on</span> projects
-            during these hours, unless you switch on outside-hours above.
+            during these hours, unless you switch on outside-hours in Class access.
           </p>
         </div>
         <GenericPill tone={scheduled ? "info" : "neutral"}>

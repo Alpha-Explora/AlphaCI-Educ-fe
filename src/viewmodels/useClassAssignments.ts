@@ -39,7 +39,7 @@ export interface ClassAssignmentsVM {
  *   project PAGE, which is the deleted thing — it has to leave, and a page
  *   rendering a project the server has just dropped would otherwise fall to a
  *   "not found" state the teacher did not ask for. Optional because the class
- *   page deletes from a list it stays on. Same shape as useDeleteClass.
+ *   page deletes from a list it stays on.
  */
 export function useClassAssignments(
   classId: string | null,

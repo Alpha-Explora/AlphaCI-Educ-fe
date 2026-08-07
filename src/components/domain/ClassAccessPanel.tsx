@@ -32,7 +32,10 @@ export function ClassAccessPanel({
   return (
     <Card
       className={cn(
-        "p-5 animate-fade-up sm:max-w-2xl",
+        // No max-width of its own: the Settings tab lays this out in a grid
+        // whose column already bounds it, and a second cap inside meant the card
+        // stopped short of its own cell on a wide screen.
+        "p-5 animate-fade-up",
         access.isOpen && "border-emerald-300 ring-1 ring-emerald-100",
       )}
     >
@@ -46,7 +49,7 @@ export function ClassAccessPanel({
                 access.isOpen ? "animate-pulse bg-success" : "bg-slate-300",
               )}
             />
-            Class access
+            <span>Class access</span>
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Students can sign in and read their work at any time. They cannot{" "}
@@ -133,11 +136,21 @@ export function ClassAccessPanel({
               there would imply the opposite. */}
           {hasSchedule && classId && (
             <div className="border-t border-[var(--border-subtle)] pt-4">
-              <OutsideHoursToggle classId={classId} sectionLabel={sectionLabel} />
+              {/* showCode={false}: this card already shows the access code at
+                  full size above, from the same useClassAccess. The toggle's own
+                  chip made the one code appear twice in a single card, which
+                  reads as two codes until you compare them character by
+                  character — and if the pair ever disagreed, it would be because
+                  of a render bug, not because the teacher has a choice. */}
+              <OutsideHoursToggle
+                classId={classId}
+                sectionLabel={sectionLabel}
+                showCode={false}
+              />
               <p className="mt-2 text-xs text-[var(--text-muted)]">
-                Lets students work on this section at any hour, not only during the
-                class hours above. They still need the code — switching this on
-                starts the class so there is one to give them.
+                Lets students work on this section at any hour, not only during
+                its class hours. They still need the code above — switching this
+                on starts the class so there is one to give them.
               </p>
             </div>
           )}
