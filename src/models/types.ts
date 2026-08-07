@@ -874,6 +874,106 @@ export interface ClassRoster {
   >;
 }
 
+// ---------------------------------------------------------------------------
+// Class report (GET /classes/:id/report) — mirrors the BE's domain/types.ts.
+//
+// One section at a time, headlined by the TEACHER'S RECORDED GRADE rather than
+// the pipeline score: the recorded grade is what reaches a report card, and the
+// UI already tells teachers the CI score is "not applied automatically".
+// ---------------------------------------------------------------------------
+
+export type AttentionReason =
+  | "NO_SUBMISSION"
+  | "AWAITING_MARK"
+  | "LOW_AVERAGE"
+  | "PIPELINE_FAILING";
+
+export interface ClassReportTotals {
+  students: number;
+  projects: number;
+  /** students × projects — NOT the repository count, which double-counts SPLIT. */
+  expectedSubmissions: number;
+  submitted: number;
+  marked: number;
+  /** Percentage over MARKED work only. Null before anything is marked. */
+  averageGrade: number | null;
+}
+
+export interface ClassReportGradeBand {
+  label: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
+export interface ClassReportStudent {
+  studentId: string;
+  fullName: string;
+  avatarColor: string;
+  reasons: AttentionReason[];
+  submitted: number;
+  marked: number;
+  expected: number;
+  averageGrade: number | null;
+  failingPipelines: number;
+}
+
+export interface ClassReportProject {
+  assignmentId: string;
+  title: string;
+  dueDate?: string;
+  points: number;
+  isGroup: boolean;
+  expected: number;
+  submitted: number;
+  marked: number;
+  /** Always 0 when the project has no dueDate — absent means never past due. */
+  overdue: number;
+  averageGrade: number | null;
+  averagePipelineScore: number | null;
+}
+
+export interface ClassReportStage {
+  stage: PipelineStage;
+  pointsAwarded: number;
+  pointsPossible: number;
+  /** Null for a stage that carries no points (SANDBOX is pass/fail). */
+  percent: number | null;
+  checksCounted: number;
+}
+
+export interface ClassReportQuality {
+  measuredRepos: number;
+  bugs: number;
+  vulnerabilities: number;
+  codeSmells: number;
+  /** Null, not 0, when nothing was measured — 0 reads as flawless code. */
+  averageDebtRatio: number | null;
+  averageDuplication: number | null;
+  ncloc: number;
+}
+
+export interface ClassReportPipelineHealth {
+  reposWithRuns: number;
+  passed: number;
+  failed: number;
+  sonarErrors: Array<{ repoId: string; repoName: string; error: string }>;
+  /** Fabricated demo runs left out of every figure. Non-zero is a warning. */
+  simulatedRunsExcluded: number;
+}
+
+export interface ClassReport {
+  classInfo: ClassCohort;
+  generatedAt: string;
+  totals: ClassReportTotals;
+  gradeDistribution: ClassReportGradeBand[];
+  attention: ClassReportStudent[];
+  projects: ClassReportProject[];
+  stages: ClassReportStage[];
+  quality: ClassReportQuality;
+  pipelineHealth: ClassReportPipelineHealth;
+}
+
 export interface RepositoryDetail {
   repo: AssignmentRepository;
   assignment: Assignment;

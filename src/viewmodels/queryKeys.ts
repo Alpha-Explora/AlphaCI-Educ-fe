@@ -35,6 +35,10 @@ export const queryKeys = {
       ["classes", filters ?? {}] as const,
     detail: (id: string) => ["classes", id] as const,
     roster: (id: string) => ["classes", id, "roster"] as const,
+    // Under `classes` on purpose: marking a submission changes the report, and
+    // sharing the prefix means the existing roster invalidations already cover
+    // it rather than leaving the report a term out of date.
+    report: (id: string) => ["classes", id, "report"] as const,
     assignments: (id: string) => ["classes", id, "assignments"] as const,
     joinCode: (id: string) => ["classes", id, "join-code"] as const,
   },

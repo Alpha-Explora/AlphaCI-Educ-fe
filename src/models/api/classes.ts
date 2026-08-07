@@ -3,6 +3,7 @@ import { apiRequest } from "./client";
 import type {
   Assignment,
   ClassCohort,
+  ClassReport,
   ClassRoster,
   ClassSchedule,
   CheckScheduleInput,
@@ -35,9 +36,11 @@ export const classesApi = {
     });
   },
 
-  // Teacher-of-class (or admin) deletes a section. Cascades: its projects,
-  // their repositories and submitted work, and every enrolment. Student
-  // ACCOUNTS survive. 403 if it isn't your section.
+  // ADMIN ONLY — an IT admin deletes a section, from /admin/sections. Teaching
+  // it is no longer enough: creating a section is the admin's because it books a
+  // person and a room, and deleting one is that decision reversed. Cascades: its
+  // projects, their repositories and submitted work, and every enrolment.
+  // Student ACCOUNTS survive. 403 for any non-admin.
   remove(id: string) {
     return apiRequest<{
       deleted: boolean;
@@ -98,6 +101,14 @@ export const classesApi = {
 
   roster(id: string) {
     return apiRequest<ClassRoster>(`/classes/${id}/roster`);
+  },
+
+  /**
+   * One section's teaching report. STAFF ONLY — it carries every student's
+   * marks, so a student calling it gets a 403, not an empty page.
+   */
+  report(id: string) {
+    return apiRequest<ClassReport>(`/classes/${id}/report`);
   },
 
   assignments(id: string) {
