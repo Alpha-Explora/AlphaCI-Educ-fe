@@ -1020,6 +1020,20 @@ export interface RepositoryDetail {
   integrity: IntegrityState | null;
 }
 
+/**
+ * The outcome of asking to run the pipeline again.
+ *
+ * `started` and `reason` are separate because "did not start" is usually a
+ * normal state — nothing pushed yet, a run already going — and deserves a
+ * sentence the reader can act on rather than an error.
+ */
+export interface PipelineRerunResult {
+  live: boolean;
+  started: boolean;
+  runId: number | null;
+  reason: string | null;
+}
+
 export interface PipelineRunDetail {
   run: PipelineRun;
   checks: PipelineCheck[];

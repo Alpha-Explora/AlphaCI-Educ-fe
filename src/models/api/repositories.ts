@@ -1,5 +1,5 @@
 // MODEL LAYER — Repositories resource
-import { apiRequest } from "./client";
+import { apiRequest, API_BASE_URL } from "./client";
 import type {
   AssignmentRepository,
   GithubRepoActivity,
@@ -8,6 +8,7 @@ import type {
   PullRequestComment,
   MergeResult,
   PipelineRun,
+  PipelineRerunResult,
   PipelineRunDetail,
   ProvisionRepositoryResult,
   PullRequestFile,
@@ -49,9 +50,32 @@ export const repositoriesApi = {
   },
 
   triggerRun(id: string) {
-    return apiRequest<PipelineRunDetail>(`/repositories/${id}/pipeline-runs`, {
+    return apiRequest<PipelineRerunResult>(`/repositories/${id}/pipeline-runs`, {
       method: "POST",
     });
+  },
+
+  /**
+   * Download a student's work.
+   *
+   * Fetched rather than linked, for two reasons: the response needs the session
+   * cookie, and the filename comes from a Content-Disposition header the server
+   * sets from the student and project names. A plain anchor to the API would
+   * work for the first but this keeps the failure path in the same shape as
+   * every other call — an error we can show, not a broken tab.
+   */
+  async downloadWork(id: string, ref?: string): Promise<{ blob: Blob; filename: string }> {
+    const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+    const res = await fetch(`${API_BASE_URL}/repositories/${id}/download${query}`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? "The download could not be prepared.");
+    }
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const match = /filename="([^"]+)"/.exec(disposition);
+    return { blob: await res.blob(), filename: match?.[1] ?? "submission.zip" };
   },
 
   runs(id: string) {

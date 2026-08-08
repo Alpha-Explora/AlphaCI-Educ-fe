@@ -44,26 +44,27 @@ type RepoTab = "overview" | "actions" | "results" | "review" | "grading";
 // Grouped the way the class rail is: the headings name what this repository
 // HAS, so the list reads as a map rather than as five buttons.
 //
-// ACTIONS AND TEST RESULTS ARE SEPARATE, as they are in the student workspace,
-// and for the reason stated there: they are two different truths about the same
-// push. Actions is GITHUB's — which run, which job, which step, and what the
-// runner printed. Test results is ALPHACI's — the per-stage grading breakdown
-// and the mark it produced. They agree most of the time, and the times they do
-// not are exactly the times a teacher is on this page: a run green on GitHub
-// whose report never reached this server reads as "passed" in one and "no result"
-// in the other, and that gap IS the diagnosis. Stacked in one tab they looked
-// like one long story about a single system.
+// PIPELINE RUNS AND TEST RESULTS ARE SEPARATE, as they are in the student
+// workspace, and for the reason stated there: they are two different truths
+// about the same push. Pipeline runs is the EXECUTION — which run, which job,
+// which step, and what it printed. Test results is the GRADING — the per-stage
+// breakdown and the mark it produced. They agree most of the time, and the times
+// they do not are exactly the times a teacher is on this page: a run that
+// finished green but whose report never reached this server reads as "passed" in
+// one and "no result" in the other, and that gap IS the diagnosis.
 //
-// The labels are the student's, deliberately. A teacher fielding "my pipeline
-// failed" is looking at the same evidence under the same name, so neither has to
-// translate. It also keeps the vocabulary GitHub's own, which is the one both
-// will meet again outside this product.
+// The labels are the student's, deliberately, so a teacher fielding "my pipeline
+// failed" is looking at the same evidence under the same name.
+//
+// They are NOT the hosting provider's names any more. This tab was called
+// "Actions" after the provider's product; the product deliberately keeps its
+// hosting invisible, and a student with no account there cannot act on the word.
 const TAB_GROUPS: ReadonlyArray<SideTabGroup<RepoTab>> = [
   { heading: "Submission", items: [{ id: "overview", label: "Overview" }] },
   {
     heading: "Pipeline",
     items: [
-      { id: "actions", label: "Actions" },
+      { id: "actions", label: "Pipeline runs" },
       { id: "results", label: "Test results" },
     ],
   },
@@ -115,9 +116,11 @@ export default function TeacherRepositoryPage() {
                 classInfo ? `${classInfo.code} — ${classInfo.name}` : "Class"
               }
               title={d.assignment.title}
-              subtitle={
-                <span className="font-mono text-xs">{d.repo.repoName}</span>
-              }
+              // WAS the hosting provider's repository slug in monospace. A
+              // teacher opening a submission wants to know WHOSE it is; the slug
+              // is infrastructure they cannot act on, and this product keeps its
+              // hosting invisible.
+              subtitle={d.owner?.fullName ?? "Unassigned"}
               meta={
                 <>
                   <RepoStatusPill status={d.repo.status} />
@@ -130,9 +133,32 @@ export default function TeacherRepositoryPage() {
                   )}
                 </>
               }
-              // No external repository link — grading happens against the
-              // pipeline results below, inside the system.
+              // No external link out — grading happens against the pipeline
+              // results below, inside the system. The download is the one way
+              // work leaves, and it streams through our own API so the provider
+              // never appears in the address bar.
+              actions={
+                <Button
+                  variant="secondary"
+                  onClick={vm.downloadWork}
+                  loading={vm.isDownloading}
+                >
+                  <span aria-hidden="true">⬇</span> Download work
+                </Button>
+              }
             />
+
+            {vm.downloadError && (
+              <Banner tone={vm.downloadError.isNetworkError ? "network" : "error"}>
+                {vm.downloadError.isNetworkError
+                  ? "Couldn't reach the server to prepare the download."
+                  : vm.downloadError.message}
+              </Banner>
+            )}
+
+            {/* A re-run that did not start is not a failure — "nothing pushed
+                yet", "a run is already going". Shown as information, not error. */}
+            {vm.runNotice && <Banner tone="info">{vm.runNotice}</Banner>}
 
             {/* Rail + the open section. items-start, or the filled rail is
                 drawn as tall as whichever tab happens to be open — see the
@@ -142,7 +168,7 @@ export default function TeacherRepositoryPage() {
                 groups={TAB_GROUPS}
                 value={tab}
                 onChange={setTab}
-                label="Repository sections"
+                label="Workspace sections"
                 idPrefix="repo"
               />
 
@@ -189,7 +215,7 @@ export default function TeacherRepositoryPage() {
                                 rel="noopener noreferrer"
                                 className="font-medium text-platform hover:underline"
                               >
-                                Repository template
+                                Project template
                               </a>
                             </div>
                           )}
@@ -296,7 +322,7 @@ export default function TeacherRepositoryPage() {
                           rather than leaving a flat statement of absence.
                         */
                         <Banner tone="info">
-                          <p>AlphaCI holds no pipeline result for this repository.</p>
+                          <p>AlphaCI holds no pipeline result for this work.</p>
                           <p className="mt-1">
                             Check <strong>Actions</strong> first — if runs are listed there,
                             they finished on GitHub but their report is not reaching this

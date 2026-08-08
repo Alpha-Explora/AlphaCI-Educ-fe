@@ -83,7 +83,7 @@ const TABS: ReadonlyArray<TabItem<WorkspaceTab>> = [
   // Then the order the work actually moves in: propose it, watch it run, read
   // what the tests said, read the mark.
   { id: "pulls", label: "Pull requests" },
-  { id: "actions", label: "Actions" },
+  { id: "actions", label: "Pipeline runs" },
   { id: "results", label: "Test results" },
   { id: "grades", label: "Grades" },
 ];
@@ -227,6 +227,14 @@ export default function StudentWorkspacePage() {
                 }
               />
 
+            {/*
+              A re-run that did not start is NOT an error, and must not look
+              like one. "There is nothing to run yet — push your work first" is
+              the ordinary state of a project nobody has pushed, and a red
+              banner there tells a student they broke something they did not.
+            */}
+            {vm.runNotice && <Banner tone="info">{vm.runNotice}</Banner>}
+
               {/* Under the header and above the rule, so it reads as a fact about
                   the repository just named — and so it is on screen whichever tab
                   is open. Losing access applies to every panel and must not be
@@ -321,7 +329,7 @@ export default function StudentWorkspacePage() {
                         <div className="mt-4">
                           {alreadySubmitted ? (
                             <Banner tone="success">
-                              Submitted — your teacher can now grade this repository.
+                              Handed in — your teacher can now grade this work.
                             </Banner>
                           ) : (
                             <Button
