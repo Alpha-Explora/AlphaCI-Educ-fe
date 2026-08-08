@@ -240,7 +240,7 @@ export default function TeacherRepositoryPage() {
                         pipeline: it describes the work that was handed in, and
                         it is one of the things a teacher checks before reading
                         a line of it. */}
-                    <PlagiarismCard flags={d.plagiarism} />
+                    <PlagiarismCard flags={d.plagiarism} integrity={d.integrity} />
                   </div>
                 )}
 

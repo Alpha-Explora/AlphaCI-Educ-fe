@@ -974,6 +974,19 @@ export interface ClassReport {
   pipelineHealth: ClassReportPipelineHealth;
 }
 
+/**
+ * Stage ⑥'s record for the latest push. Separate from PlagiarismFlag because an
+ * empty flag list cannot say whether a comparison ran — `comparedAt` is the only
+ * thing that distinguishes "compared, nothing found" from "never compared".
+ */
+export interface IntegrityState {
+  recordedAt: string;
+  /** Absent until a cohort comparison has run over this submission. */
+  comparedAt?: string;
+  files: number;
+  signals: Record<string, number>;
+}
+
 export interface RepositoryDetail {
   repo: AssignmentRepository;
   assignment: Assignment;
@@ -982,6 +995,8 @@ export interface RepositoryDetail {
   branches: RepoBranch[];
   runs: PipelineRun[];
   plagiarism: PlagiarismFlag[];
+  /** null when stage ⑥ has never reported for this repository. */
+  integrity: IntegrityState | null;
 }
 
 export interface PipelineRunDetail {
