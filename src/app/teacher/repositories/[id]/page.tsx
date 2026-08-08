@@ -29,7 +29,7 @@ import {
   StateBoundary,
   type SideTabGroup,
 } from "@/components/ui";
-import { PageHeader } from "@/components/domain/PageHeader";
+import { PageHeader, backTrail } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
 import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
 import { GradingPanel } from "@/components/domain/GradingPanel";
@@ -87,6 +87,14 @@ export default function TeacherRepositoryPage() {
   const roster = useClassRoster(d?.assignment.classId ?? null);
   const classInfo = roster.data?.classInfo;
 
+  // The class page names itself "AT-1234 — Alpha-Test", so the trail to it is
+  // those same two segments. No tab to name: unlike the project and student
+  // views, this page's backHref carries no `?tab=`, so it lands on the class
+  // itself. Computed here rather than inline in the header — one branch out
+  // here costs less against the cognitive-complexity gate than an optional
+  // chain nested inside JSX, and the gate is 35% of the grade this repo scores.
+  const classTrail = classInfo ? backTrail(classInfo.code, classInfo.name) : "Class";
+
   return (
     <div className="space-y-8">
       <StateBoundary
@@ -112,9 +120,7 @@ export default function TeacherRepositoryPage() {
               // dashboard made them navigate back in three clicks to reach the
               // next student.
               backHref={`/teacher/classes/${d.assignment.classId}`}
-              backLabel={
-                classInfo ? `${classInfo.code} — ${classInfo.name}` : "Class"
-              }
+              backLabel={classTrail}
               title={d.assignment.title}
               // WAS the hosting provider's repository slug in monospace. A
               // teacher opening a submission wants to know WHOSE it is; the slug

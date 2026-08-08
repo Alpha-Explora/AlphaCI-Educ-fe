@@ -41,7 +41,7 @@ import {
   StateBoundary,
   type SideTabGroup,
 } from "@/components/ui";
-import { PageHeader } from "@/components/domain/PageHeader";
+import { PageHeader, backTrail } from "@/components/domain/PageHeader";
 import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions";
 import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
@@ -133,7 +133,10 @@ export default function TeacherProjectPage() {
             <PageHeader
               titleAlign="end"
               backHref={backHref}
-              backLabel={info ? `${info.code} — projects` : "Projects"}
+              // The class's Projects tab, which is where `backHref` lands —
+              // not this page's own name. Bare "Projects" until the roster
+              // resolves; the tab is still the destination either way.
+              backLabel={backTrail(info?.code, "Projects")}
               title={assignment.title}
               subtitle={assignment.description || undefined}
               meta={

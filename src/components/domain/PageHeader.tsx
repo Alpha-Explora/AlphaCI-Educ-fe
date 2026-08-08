@@ -45,10 +45,48 @@ export function BackLink({
   );
 }
 
+/**
+ * A back label as the BREADCRUMB TRAIL OF THE DESTINATION: `"AT-1234 / Projects"`.
+ *
+ * THE CONVENTION, so a seventh detail page does not invent a seventh grammar.
+ * The six that existed before this used three: an identity ("My Courses"), a
+ * code-plus-section composite ("AT-1234 — classes"), and a code-plus-name
+ * ("AT1234 — Web Applications 2"). Read together they made the control look
+ * like a page title rather than the way out.
+ *
+ * The label names WHERE THE LINK LANDS, not where you are standing, read
+ * outside-in and capped at two segments:
+ *
+ *   {parent} / {destination}   "Courses / AT-1234", "AT-1234 / Students"
+ *   {destination}              when nothing sits above it — "Courses"
+ *
+ * TWO segments, not the full path. The true trail to a class's project list is
+ * "Courses / AT-1234 / Section B / Projects", which is a paragraph inside a
+ * button; the last two are the only ones carrying information, because the page
+ * you are already on supplies everything to their left.
+ *
+ * NULLISH SEGMENTS DROP rather than render "undefined / Projects". Every caller
+ * builds this from a query that has not resolved on first paint, so the
+ * degraded label is a shorter TRUE trail — not a placeholder to swap out once
+ * the data lands, and not a layout that changes width when it does.
+ *
+ * Callers must pass at least one literal segment; a trail of nothing but
+ * unresolved data would render a button containing only an arrow.
+ */
+export function backTrail(
+  ...segments: ReadonlyArray<string | null | undefined>
+): string {
+  return segments.filter((s): s is string => Boolean(s)).join(" / ");
+}
+
 export function PageHeader({
   title,
   subtitle,
   backHref,
+  /**
+   * What the back control says. Build it with {@link backTrail} whenever any
+   * part of it comes from loaded data — see that function for the wording rule.
+   */
   backLabel = "Back",
   meta,
   actions,
@@ -186,7 +224,7 @@ export function PageHeader({
             The back control and the title, together.
 
             `flex-wrap` rather than a fixed row: `backLabel` is a breadcrumb, not
-            a word — "AT1234 — Web Applications 2" on the teacher's workspace —
+            a word — "AT1234 / Web Applications 2" on the teacher's workspace —
             so on a narrow viewport it drops to its own line above the title
             instead of squeezing the heading into a column three words wide.
 

@@ -46,7 +46,7 @@ export default function Preview() {
     <div className="mx-auto max-w-6xl space-y-10 p-8">
       <PageHeader
         backHref="/teacher"
-        backLabel="AT1234 — classes"
+        backLabel="Courses / AT1234"
         title="AT1234 — AlphaTest"
         meta={
           <>

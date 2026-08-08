@@ -167,7 +167,12 @@ export default function StudentWorkspacePage() {
                   // student re-finding their class every time they close a
                   // project.
                   href={`/student/classes/${d.assignment.classId}`}
-                  label="Back to class"
+                  // One segment, not "AT-1234 / Class". This page loads a
+                  // repository, and a repository does not carry its class's
+                  // code — naming the parent would cost a second query for two
+                  // words on a button. A one-segment trail is the documented
+                  // degraded form, so it is honest rather than merely shorter.
+                  label="Class"
                 />
               }
             />

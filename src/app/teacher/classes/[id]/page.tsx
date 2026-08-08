@@ -41,7 +41,7 @@ import {
   SideTabs,
   type SideTabGroup,
 } from "@/components/ui";
-import { PageHeader } from "@/components/domain/PageHeader";
+import { PageHeader, backTrail } from "@/components/domain/PageHeader";
 import { TeacherProjectList } from "@/components/domain/TeacherProjectList";
 import { ClassHoursSummary } from "@/components/domain/ClassHoursSummary";
 import { ClassAccessPanel } from "@/components/domain/ClassAccessPanel";
@@ -126,7 +126,11 @@ function ClassRosterContent() {
         // Classes live under a course now, so go back to the course that owns
         // this section rather than all the way out to the dashboard.
         backHref={info ? `/teacher/courses/${info.courseId}` : "/teacher"}
-        backLabel={info ? `${info.code} — classes` : "My Courses"}
+        // "Courses / AT-1234" — the course page, named by the trail that
+        // reaches it. Degrades to bare "Courses" before the roster resolves,
+        // which is not a placeholder: the href above degrades in step, to the
+        // dashboard, and "Courses" is exactly what that page is.
+        backLabel={backTrail("Courses", info?.code)}
         title={info ? `${info.code} — ${info.name}` : "Class roster"}
         // Was the class's team slug. Dropped: it exposed the organization, and
         // the section/term pills below already identify the cohort.

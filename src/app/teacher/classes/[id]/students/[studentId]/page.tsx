@@ -49,7 +49,7 @@ import {
   StateBoundary,
   type SideTabGroup,
 } from "@/components/ui";
-import { PageHeader } from "@/components/domain/PageHeader";
+import { PageHeader, backTrail } from "@/components/domain/PageHeader";
 import { formatDate, formatDateTime, relativeDue } from "@/components/ui/format";
 import { pointsPerRepo } from "@/models/points";
 
@@ -109,7 +109,8 @@ export default function TeacherStudentPage() {
       <PageHeader
         titleAlign="end"
         backHref={backHref}
-        backLabel={info ? `${info.code} — students` : "Students"}
+        // The class's Student progress tab — `backHref` carries `?tab=students`.
+        backLabel={backTrail(info?.code, "Students")}
         title={student?.fullName ?? "Student"}
         subtitle={student ? <span className="text-xs">{student.email}</span> : undefined}
         meta={
