@@ -270,7 +270,7 @@ export default function TeacherReportsPage() {
                 <Card className="p-5 animate-fade-up">
                   <SectionHeading
                     title="Code quality"
-                    subtitle="SonarCloud — 35% of the mark."
+                    subtitle="Code quality — 35% of the mark."
                   />
                   {vm.data.quality.measuredRepos === 0 ? (
                     <p className="mt-4 text-sm text-[var(--text-muted)]">

@@ -30,7 +30,7 @@ const STAGE_META: Record<PipelineStage, { label: string; icon: string; blurb: st
   QUALITY: {
     label: "Code Quality",
     icon: "🔍",
-    blurb: "SonarCloud — bugs, smells, duplication",
+    blurb: "Bugs, smells and duplication",
   },
   PUBLIC_TESTS: {
     label: "Public Tests",

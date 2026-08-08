@@ -95,7 +95,7 @@ export function CodeQualityCard({
           </p>
           <p className="text-xs text-[var(--text-muted)]">
             {quality.debtRatio === null
-              ? "Graded on the A–E rating — this project's Sonar did not report a debt ratio."
+              ? "Graded on the A–E rating — no debt ratio was reported for this run."
               : "Estimated time to fix everything found, as a share of the time the project took to write. Lower is better."}
           </p>
         </div>
@@ -137,22 +137,14 @@ export function CodeQualityCard({
       </p>
 
       {/*
-        Teachers only. The SonarCloud project is world-readable (public repos on
-        the free plan), so the link is not a secret — but sending a student to a
-        dashboard that shows the raw mark would bypass the whole
-        gradesReleasedAt gate the pipeline is careful to respect.
+        NO LINK OUT TO THE ANALYSIS VENDOR.
+        
+        There was an "Open in SonarCloud" link here for teachers. It ended the
+        abstraction the rest of the product maintains — the analysis service is
+        infrastructure, like the hosting provider, and naming it hands a teacher
+        a place to go that AlphaCI does not control and a student cannot follow.
+        Every measurement it showed is on this card already.
       */}
-      {audience === "teacher" && dashboardUrl && (
-        <a
-          href={dashboardUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--brand-600,#2563eb)] hover:underline"
-        >
-          Open in SonarCloud{" "}
-          <span aria-hidden="true">↗</span>
-        </a>
-      )}
     </Card>
   );
 }
@@ -160,7 +152,7 @@ export function CodeQualityCard({
 function Heading() {
   return (
     <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-      Code quality — SonarCloud
+      Code quality
     </p>
   );
 }

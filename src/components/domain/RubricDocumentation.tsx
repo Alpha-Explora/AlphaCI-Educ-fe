@@ -149,7 +149,7 @@ export function RubricDocumentation({
       <Card className="p-5">
         <SectionHeading
           title="How a code quality score is reached"
-          subtitle="Stage 3 is graded on SonarCloud's continuous technical debt ratio, not on its A–E letter."
+          subtitle="Stage 3 is graded on the continuous technical-debt ratio, not on the A–E letter it is bucketed into."
         />
         <div className="mt-3 space-y-3 text-sm text-[var(--text-strong)]">
           <p>
