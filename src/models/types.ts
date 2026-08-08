@@ -214,6 +214,14 @@ export type ProjectRepoStructure = "SINGLE" | "SPLIT";
 
 /** How many promotion stages a project's pipeline has. Mirrors the server. */
 export type BranchStrategy = "MAIN_ONLY" | "MAIN_UAT";
+
+/**
+ * How much of the exercise a student's workspace is born with.
+ *
+ * Mirrors the backend's StarterMode. GUIDED is the default and what every
+ * project created before this existed already had.
+ */
+export type StarterMode = "GUIDED" | "TESTS_GIVEN" | "BLANK";
 export type RepoComponent = "SINGLE" | "BACKEND" | "FRONTEND";
 
 /**
@@ -566,6 +574,8 @@ export interface Assignment {
    * setting exists to teach. Absent means MAIN_UAT, matching the server.
    */
   branchStrategy?: BranchStrategy;
+  /** Absent means GUIDED. */
+  starterMode?: StarterMode;
   createdAt: string;
   // ADDENDUM L — set when a teacher ENDS (closes) the project. When present,
   // students can't start a lab session, get a token, or submit. null = open.

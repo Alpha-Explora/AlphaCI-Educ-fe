@@ -43,6 +43,8 @@ import {
   DEFAULT_TEMPLATE_ID,
   useStarterSelection,
   BRANCH_STRATEGY_OPTIONS,
+  STARTER_MODE_OPTIONS,
+  DEFAULT_STARTER_MODE,
   PROJECT_SHAPE_OPTIONS,
   repoStructureForShape,
   stackOptionsForShape,
@@ -57,6 +59,7 @@ import type {
   ProjectTemplateOption,
   ProjectType,
   Stack,
+  StarterMode,
   SystemUser,
 } from "@/models/types";
 import { customProjectIdOf } from "@/models/customProjects";
@@ -438,6 +441,7 @@ export function CreateProjectModal({
    * through. MAIN_UAT adds the stage a real team runs.
    */
   const [branchStrategy, setBranchStrategy] = useState<BranchStrategy>("MAIN_ONLY");
+  const [starterMode, setStarterMode] = useState<StarterMode>(DEFAULT_STARTER_MODE);
 
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
@@ -736,6 +740,7 @@ export function CreateProjectModal({
       points: Number(points),
       coverageThreshold: coverage,
       branchStrategy,
+      starterMode,
       ...scaffold,
     };
     if (type === "SOLO") {
@@ -1192,6 +1197,41 @@ export function CreateProjectModal({
                     a 1st-year and a capstone can share this product. Sits above
                     the coverage gate because it decides the SHAPE of the
                     workflow; coverage only decides how strict one stage is. */}
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                    What students start with
+                  </span>
+                  <div
+                    role="tablist"
+                    aria-label="What students start with"
+                    className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
+                  >
+                    {STARTER_MODE_OPTIONS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={starterMode === value}
+                        onClick={() => setStarterMode(value)}
+                        className={cn(
+                          "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
+                          starterMode === value
+                            ? "bg-white text-platform-700 shadow-sm"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* The hint carries the actual decision — the labels alone do
+                      not tell a teacher that Blank also means the student writes
+                      the tests, which is the part that changes what is marked. */}
+                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                    {STARTER_MODE_OPTIONS.find((o) => o.value === starterMode)?.hint}
+                  </p>
+                </div>
+
                 <div>
                   <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
                     Pipeline
