@@ -3,6 +3,7 @@ import { apiRequest } from "./client";
 import type {
   AnswerKey,
   Assignment,
+  OriginalityReport,
   AssignmentRepository,
   ProjectTemplateOption,
   ProvisionResult,
@@ -87,6 +88,21 @@ export const assignmentsApi = {
   reopen(id: string) {
     return apiRequest<{ closed: boolean; assignmentId: string; reposLocked: number; githubArchived: number }>(
       `/assignments/${id}/reopen`,
+      { method: "POST" },
+    );
+  },
+
+  /**
+   * Compare every submission in this project against the rest of the cohort.
+   *
+   * Teacher-triggered, not automatic: run on Monday it compares three
+   * submissions, and it would mean something different by Friday. An explicit
+   * action is also the right shape for something that can put a similarity
+   * figure next to a student's name.
+   */
+  originalityCheck(id: string) {
+    return apiRequest<OriginalityReport>(
+      `/assignments/${id}/originality-check`,
       { method: "POST" },
     );
   },
