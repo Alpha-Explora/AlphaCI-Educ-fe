@@ -46,7 +46,10 @@ import {
   withStackEnabled,
   type CustomProjectDraft,
 } from "@/viewmodels/useCustomProjects";
-import type { CustomProjectFile, Stack } from "@/models/types";
+import { gradingGapsFor } from "@/models/customProjects";
+import type { CustomProjectFile, Stack,
+  CustomProjectStackFiles,
+} from "@/models/types";
 import {
   Banner,
   Button,
@@ -222,7 +225,7 @@ function FileRow({
             <span className={style.title}>
               <GroupGlyph shipped={group.shipped} />
             </span>
-            Path in the repository
+            Path in the project
           </label>
           <Input
             id={pathId}
@@ -509,6 +512,36 @@ function StackToggles({
   );
 }
 
+/**
+ * What this project will fail to measure, stated before it is published.
+ *
+ * The derivation lives in models/customProjects so it can be tested and reused;
+ * this is only how it looks.
+ */
+function GradingGaps({ files }: { readonly files: CustomProjectStackFiles | undefined }) {
+  const gaps = gradingGapsFor(files);
+  if (gaps.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+      <p className="text-sm font-semibold text-amber-900">
+        This language is missing something
+      </p>
+      <ul className="mt-2 space-y-2">
+        {gaps.map((gap) => (
+          <li key={gap.id} className="text-xs text-amber-900/90">
+            <span className="font-medium">{gap.title}.</span> {gap.detail}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-amber-800/80">
+        You can still save and publish — nothing here blocks a student, and the
+        missing components are excluded from the total rather than scored zero.
+      </p>
+    </div>
+  );
+}
+
 export function CustomProjectFilesEditor({
   draft,
   onChange,
@@ -546,6 +579,22 @@ export function CustomProjectFilesEditor({
       ) : (
         <>
           <AudienceLegend />
+
+          {/*
+            WHAT THIS PROJECT WILL NOT MEASURE.
+
+            Only `starter` is required to save, so a project with no hidden
+            tests, no solution and no visible tests saves and publishes exactly
+            like a complete one. Each of those is silent by construction — the
+            pipeline reports the component UNMEASURED and excludes it, which is
+            the right behaviour and indistinguishable from "nothing to report"
+            until the marks come back.
+
+            Deliberately a NOTICE, not a validation error. A teacher part-way
+            through writing a project should not be blocked, and a project with
+            no visible tests is entirely correct if it will be set as Blank.
+          */}
+          <GradingGaps files={files} />
 
           {/* Only shown once there is a second language: with one, a tab strip
               of one tab is chrome that explains nothing. */}

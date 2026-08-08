@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useAssignmentRepositories } from "@/viewmodels/useAssignmentRepositories";
 import type { Assignment, SystemUser } from "@/models/types";
 import { RepoStatusPill, Skeleton, StateBoundary, cn } from "@/components/ui";
+import { formatDate } from "@/components/ui/format";
 import { pointsPerRepo } from "@/models/points";
 
 export function AssignmentSubmissions({
@@ -37,7 +38,7 @@ export function AssignmentSubmissions({
       isEmpty={vm.repositories.length === 0}
       emptyFallback={
         <p className="px-4 py-3 text-sm text-[var(--text-muted)]">
-          No repositories generated for this assignment yet.
+          No workspaces have been created for this project yet.
         </p>
       }
       loadingFallback={
@@ -69,7 +70,7 @@ export function AssignmentSubmissions({
       <ul className="max-h-[26rem] divide-y divide-[var(--border-subtle)] overflow-y-auto overscroll-contain">
         {vm.repositories.map((repo) => {
           const owner = repo.ownerUserId ? usersById[repo.ownerUserId] : null;
-          const ownerName = owner?.fullName ?? "Team repository";
+          const ownerName = owner?.fullName ?? "Team workspace";
           return (
             <li key={repo.id}>
               <Link
@@ -80,8 +81,17 @@ export function AssignmentSubmissions({
                   <p className="truncate text-sm font-medium text-[var(--text-strong)]">
                     {ownerName}
                   </p>
-                  <p className="truncate font-mono text-xs text-[var(--text-muted)]">
-                    {repo.repoName}
+                  {/*
+                    WAS `repo.repoName`, in monospace, under every student's
+                    name — "at1234-sectionb-2026-calendar-levlimit". That is the
+                    hosting provider's slug, and this product keeps its hosting
+                    invisible: a teacher marking work has no use for it and no
+                    way to act on it. The submission state is what belongs here.
+                  */}
+                  <p className="truncate text-xs text-[var(--text-muted)]">
+                    {repo.submittedAt
+                      ? `Handed in ${formatDate(repo.submittedAt)}`
+                      : "Not handed in yet"}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

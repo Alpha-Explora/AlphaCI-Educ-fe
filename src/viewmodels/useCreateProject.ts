@@ -17,6 +17,7 @@ import type {
   Assignment,
   AssignmentRepository,
   BranchStrategy,
+  StarterMode,
   CreateProjectInput,
   LabSessionLimits,
   ProjectRepoStructure,
@@ -445,6 +446,37 @@ export function useStarterSelection(
  * students; the server's own default is MAIN_UAT for backward compatibility
  * with projects created before this existed, which is a different question.
  */
+/**
+ * How much of the exercise a student's workspace is born with.
+ *
+ * Written for the TEACHER choosing, in the order of how much help it gives —
+ * a picker whose options are ordered by difficulty reads as a dial, which is
+ * what it is.
+ */
+export const STARTER_MODE_OPTIONS: ReadonlyArray<{
+  value: StarterMode;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "GUIDED",
+    label: "Guided",
+    hint: "Every function is there, empty, with its test waiting. One is fully worked as a model. The student writes the logic and nothing else — the right choice for a first project.",
+  },
+  {
+    value: "TESTS_GIVEN",
+    label: "Tests given",
+    hint: "The same empty functions, but the tests are running — so the first push is a list of named failures to work through. The tests are the specification, and students must not edit them.",
+  },
+  {
+    value: "BLANK",
+    label: "Blank",
+    hint: "Nothing but the brief. The student creates the files, writes the code AND writes the tests. The most honest assessment here — and the most demanding, so give it to students who have done this before.",
+  },
+];
+
+export const DEFAULT_STARTER_MODE: StarterMode = "GUIDED";
+
 export const BRANCH_STRATEGY_OPTIONS: ReadonlyArray<{
   value: BranchStrategy;
   label: string;

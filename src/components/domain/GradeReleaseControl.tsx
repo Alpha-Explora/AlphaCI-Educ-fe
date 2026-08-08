@@ -89,7 +89,7 @@ export function GradeReleaseControl({
       <p className="mt-4 text-xs leading-relaxed text-[var(--text-muted)]">
         {released
           ? "Withholding marks again hides the numbers from students but changes nothing you have recorded — use it if you need to correct a rubric or a hidden test."
-          : "Publishing reveals the recorded mark and your feedback for every repository in this project. It is reversible."}
+          : "Publishing reveals the recorded mark and your feedback for every submission in this project. It is reversible."}
       </p>
     </Card>
   );

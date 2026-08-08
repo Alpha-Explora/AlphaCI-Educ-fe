@@ -51,7 +51,7 @@ function GithubConnectionCard() {
             GitHub connection
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Used to create student repositories under your own GitHub account.
+            Used to create student workspaces under your own GitHub account.
           </p>
         </div>
         {!vm.isLoading && (
@@ -163,7 +163,7 @@ export function SettingsView() {
         </div>
       </Card>
 
-      {/* Staff only — students are zero-footprint and hold no GitHub identity
+      {/* Staff only — students are zero-footprint and hold no External account
           by design, so a "not connected" card would read as a fault. */}
       {isStaff && <GithubConnectionCard />}
 

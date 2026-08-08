@@ -30,7 +30,7 @@ export function RepoRunsExplorer({
   onSelectBranch: (name: string) => void;
   runs: PipelineRun[];
   /**
-   * Runs this repository has that the branch filter excluded.
+   * Runs this submission has that the branch filter excluded.
    *
    * Rendered as a note, because the filter used to give up silently and show
    * every branch's runs whenever the selected one had none — which looked

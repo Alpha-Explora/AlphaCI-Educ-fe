@@ -43,6 +43,8 @@ import {
   DEFAULT_TEMPLATE_ID,
   useStarterSelection,
   BRANCH_STRATEGY_OPTIONS,
+  STARTER_MODE_OPTIONS,
+  DEFAULT_STARTER_MODE,
   PROJECT_SHAPE_OPTIONS,
   repoStructureForShape,
   stackOptionsForShape,
@@ -57,6 +59,7 @@ import type {
   ProjectTemplateOption,
   ProjectType,
   Stack,
+  StarterMode,
   SystemUser,
 } from "@/models/types";
 import { customProjectIdOf } from "@/models/customProjects";
@@ -438,6 +441,7 @@ export function CreateProjectModal({
    * through. MAIN_UAT adds the stage a real team runs.
    */
   const [branchStrategy, setBranchStrategy] = useState<BranchStrategy>("MAIN_ONLY");
+  const [starterMode, setStarterMode] = useState<StarterMode>(DEFAULT_STARTER_MODE);
 
   const [titleTouched, setTitleTouched] = useState(false);
   const [descriptionTouched, setDescriptionTouched] = useState(false);
@@ -736,6 +740,7 @@ export function CreateProjectModal({
       points: Number(points),
       coverageThreshold: coverage,
       branchStrategy,
+      starterMode,
       ...scaffold,
     };
     if (type === "SOLO") {
@@ -789,7 +794,7 @@ export function CreateProjectModal({
         showSuccess
           ? "Project created"
           : showPartial
-            ? "Project created — repositories unfinished"
+            ? "Project created — workspaces unfinished"
             : "Create project"
       }
       description={
@@ -832,7 +837,7 @@ export function CreateProjectModal({
                 title="What went wrong"
               >
                 {vm.error.isNetworkError
-                  ? "Couldn't reach the backend to provision the repositories."
+                  ? "Couldn't reach the backend to create the workspaces."
                   : vm.error.message}
               </Banner>
             )}
@@ -858,7 +863,7 @@ export function CreateProjectModal({
 
             {/* A 401 has one cause and one cure; a link beats a paragraph. */}
             {vm.needsGithubReconnect && (
-              <Banner tone="warning" title="Your GitHub connection needs renewing">
+              <Banner tone="warning" title="Your connection needs renewing">
                 Creating real repositories uses your own GitHub account.{" "}
                 {/* New tab, so this dialog — and the project waiting in it — is
                     still here to press Retry on when the handshake finishes.
@@ -1008,8 +1013,8 @@ export function CreateProjectModal({
                         )}
                       >
                         {t === "SOLO"
-                          ? "Solo (one repo per student)"
-                          : "Group (shared repo)"}
+                          ? "Solo (one workspace per student)"
+                          : "Group (shared workspace)"}
                       </button>
                     ))}
                   </div>
@@ -1026,7 +1031,7 @@ export function CreateProjectModal({
                 {type === "SOLO" && students.length > 0 && (
                   <fieldset className="rounded-lg border border-[var(--border-subtle)] p-3">
                     <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[var(--text-strong)]">
-                      Students who get a repo
+                      Students who get a workspace
                       <span className="rounded-full bg-platform-50 px-2 py-0.5 text-xs font-medium text-platform-700">
                         {soloSelected.size} of {students.length} selected
                       </span>
@@ -1194,6 +1199,41 @@ export function CreateProjectModal({
                     workflow; coverage only decides how strict one stage is. */}
                 <div>
                   <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                    What students start with
+                  </span>
+                  <div
+                    role="tablist"
+                    aria-label="What students start with"
+                    className="inline-flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-slate-50 p-1"
+                  >
+                    {STARTER_MODE_OPTIONS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={starterMode === value}
+                        onClick={() => setStarterMode(value)}
+                        className={cn(
+                          "rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-platform",
+                          starterMode === value
+                            ? "bg-white text-platform-700 shadow-sm"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-strong)]",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* The hint carries the actual decision — the labels alone do
+                      not tell a teacher that Blank also means the student writes
+                      the tests, which is the part that changes what is marked. */}
+                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                    {STARTER_MODE_OPTIONS.find((o) => o.value === starterMode)?.hint}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
                     Pipeline
                   </span>
                   <div
@@ -1314,7 +1354,7 @@ export function CreateProjectModal({
                 )}
                 {vm.phase === "provisioning" && (
                   <span className="inline-flex items-center gap-2">
-                    <Spinner size="sm" /> Provisioning real repositories…
+                    <Spinner size="sm" /> Creating workspaces…
                   </span>
                 )}
                 {vm.phase !== "creating" && vm.phase !== "provisioning" && (

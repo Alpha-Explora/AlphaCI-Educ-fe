@@ -55,7 +55,7 @@ export function OriginalityCheckButton({ assignmentId }: { assignmentId: string 
               {report.skipped.length} not compared —{" "}
               {report.skipped.length === 1
                 ? report.skipped[0].reason
-                : "mostly repositories with nothing but starter code yet"}
+                : "mostly workspaces with nothing but starter code yet"}
               .
             </p>
           )}

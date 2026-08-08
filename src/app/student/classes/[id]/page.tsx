@@ -114,7 +114,7 @@ export default function StudentClassPage() {
               <EmptyState
                 icon="📝"
                 title="No projects yet"
-                description="When your teacher publishes one, your repository appears here automatically."
+                description="When your teacher publishes one, your workspace appears here automatically."
               />
             ) : (
               <>

@@ -4,7 +4,7 @@
 // ONE auth path: email + password, for every role (`loginWithPassword`).
 //
 // `loginWithGithub()` is NOT a login despite the name — it starts the GitHub
-// LINK flow from /connect-github, attaching a GitHub identity to the session
+// LINK flow from /connect-github, attaching a External account to the session
 // that already exists. The backend refuses it outright when nobody is signed in.
 // Staff roles are re-resolved from Team membership at that moment.
 // On mount we call me() (credentials are always included by the client) to
@@ -238,7 +238,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       loginWithPassword,
       logout,
       // Staff who have linked GitHub carry a real githubLogin. Students never
-      // do — they hold no GitHub identity by design.
+      // do — they hold no External account by design.
       isGithubSession: Boolean(user?.githubLogin),
       // ADDENDUM K — multi-lab.
       labs,

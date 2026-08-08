@@ -41,7 +41,7 @@ export function ProvisionRepositoriesButton({
           ones it could not finish instead of aborting the batch on the first
           failure, so they have to be named here or they vanish silently. */}
       {summary && summary.failures.length > 0 && (
-        <Banner tone="warning" className="w-full" title="Some repositories were not created">
+        <Banner tone="warning" className="w-full" title="Some workspaces were not created">
           <ul className="ml-4 list-disc space-y-1">
             {summary.failures.map((f) => (
               <li key={f.repoId}>

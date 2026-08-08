@@ -37,7 +37,7 @@ export function StudentGradesCard({
       <EmptyState
         icon="⏳"
         title="Not graded yet"
-        description="Marks are published for this assignment, but this repository has not been graded. If you have submitted, check with your teacher."
+        description="Marks are published for this assignment, but this submission has not been graded. If you have submitted, check with your teacher."
       />
     );
   }

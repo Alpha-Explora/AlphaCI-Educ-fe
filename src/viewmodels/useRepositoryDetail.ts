@@ -41,6 +41,11 @@ export interface RepositoryDetailVM {
   // actions
   triggerRun: () => void;
   isTriggeringRun: boolean;
+  /** Why a re-run did not start. Not an error — see the mutation. */
+  runNotice: string | null;
+  downloadWork: () => void;
+  isDownloading: boolean;
+  downloadError: PresentableError | null;
 }
 
 export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
@@ -106,13 +111,49 @@ export function useRepositoryDetail(repoId: string | null): RepositoryDetailVM {
   const triggerMutation = useMutation({
     mutationFn: () => repositoriesApi.triggerRun(repoId as string),
     onSuccess: () => {
+      // The run reports its own result when it finishes, so there is nothing to
+      // read back immediately — this refresh is what picks it up on the next
+      // poll rather than showing a result that has not happened yet.
       queryClient.invalidateQueries({
         queryKey: queryKeys.repositories.detail(repoId ?? "none"),
       });
     },
   });
 
+  /**
+   * A re-run that did not start is NOT an error.
+   *
+   * "Nothing pushed yet" and "a run is already going" are ordinary states with
+   * useful answers, and the server returns them as `reason` with a 200. Treating
+   * them as failures would put a red banner on a student doing nothing wrong.
+   */
+  const runNotice =
+    triggerMutation.data && !triggerMutation.data.started
+      ? triggerMutation.data.reason
+      : null;
+
+  const downloadMutation = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await repositoriesApi.downloadWork(repoId as string);
+      // Object URL rather than a direct link: the bytes are already in memory
+      // from an authenticated fetch, and this keeps the API host out of the
+      // browser's address bar and download history.
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
   return {
+    runNotice,
+    downloadWork: () => downloadMutation.mutate(),
+    isDownloading: downloadMutation.isPending,
+    downloadError: downloadMutation.error
+      ? toPresentableError(downloadMutation.error)
+      : null,
     data: query.data,
     isLoading: query.isLoading,
     error: query.error ? toPresentableError(query.error) : null,

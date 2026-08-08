@@ -366,7 +366,7 @@ function ClassRosterContent() {
                     <EmptyState
                       icon="📝"
                       title="No assignments yet"
-                      description="Create an assignment to generate per-student repositories."
+                      description="Create a project to generate a workspace for each student."
                     />
                   }
                   loadingFallback={<Skeleton className="h-40 w-full rounded-xl" />}
