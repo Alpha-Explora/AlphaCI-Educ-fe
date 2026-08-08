@@ -260,7 +260,7 @@ export function GithubActionsPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-strong)]">
-            Actions
+            Pipeline runs
             {vm.isFetching && <Spinner size="sm" className="text-platform" />}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">

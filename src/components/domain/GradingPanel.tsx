@@ -61,7 +61,7 @@ export function GradingPanel({
 
       {notSubmitted && (
         <Banner tone="info" className="mt-4">
-          This repository hasn&rsquo;t been submitted yet. You can still record a grade, but
+          This submission hasn&rsquo;t been submitted yet. You can still record a grade, but
           students normally submit first.
         </Banner>
       )}

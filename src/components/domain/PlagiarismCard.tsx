@@ -70,7 +70,7 @@ export function PlagiarismCard({
         <div>
           <p className="text-sm font-semibold text-slate-700">No originality data</p>
           <p className="text-xs text-slate-600/80">
-            Nothing has been recorded for this repository yet.
+            Nothing has been recorded for this work yet.
           </p>
         </div>
       </Card>

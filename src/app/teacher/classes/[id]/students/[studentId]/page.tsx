@@ -174,7 +174,7 @@ export default function TeacherStudentPage() {
                   <EmptyState
                     icon="📭"
                     title="No projects yet"
-                    description="Once a project in this class is created and its workspaces provisioned, this student's repositories appear here."
+                    description="Once a project in this class is created and its workspaces are ready, this student's work appears here."
                   />
                 }
                 loadingFallback={<Skeleton className="h-64 w-full rounded-xl" />}
@@ -340,7 +340,7 @@ export default function TeacherStudentPage() {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-[var(--text-muted)]">GitHub identity</dt>
+                      <dt className="text-xs text-[var(--text-muted)]">External account</dt>
                       {/* The commonest reason a teacher opens this tab: work is
                           missing and the question is whether the student can push
                           at all. Lab-only is the normal answer, not a fault. */}

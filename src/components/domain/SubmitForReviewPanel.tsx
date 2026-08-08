@@ -423,7 +423,7 @@ function PullRequestRow({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={
                   noResult
-                    ? "e.g. checks green on GitHub, results not reaching AlphaCI — reporting URL being fixed"
+                    ? "e.g. the checks passed but the result never reached AlphaCI — reporting being fixed"
                     : "e.g. hidden test 3 was broken; fixed for the next assignment"
                 }
               />

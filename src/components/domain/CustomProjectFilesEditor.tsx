@@ -222,7 +222,7 @@ function FileRow({
             <span className={style.title}>
               <GroupGlyph shipped={group.shipped} />
             </span>
-            Path in the repository
+            Path in the project
           </label>
           <Input
             id={pathId}

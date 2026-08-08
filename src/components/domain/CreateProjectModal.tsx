@@ -789,7 +789,7 @@ export function CreateProjectModal({
         showSuccess
           ? "Project created"
           : showPartial
-            ? "Project created — repositories unfinished"
+            ? "Project created — workspaces unfinished"
             : "Create project"
       }
       description={
@@ -832,7 +832,7 @@ export function CreateProjectModal({
                 title="What went wrong"
               >
                 {vm.error.isNetworkError
-                  ? "Couldn't reach the backend to provision the repositories."
+                  ? "Couldn't reach the backend to create the workspaces."
                   : vm.error.message}
               </Banner>
             )}
@@ -858,7 +858,7 @@ export function CreateProjectModal({
 
             {/* A 401 has one cause and one cure; a link beats a paragraph. */}
             {vm.needsGithubReconnect && (
-              <Banner tone="warning" title="Your GitHub connection needs renewing">
+              <Banner tone="warning" title="Your connection needs renewing">
                 Creating real repositories uses your own GitHub account.{" "}
                 {/* New tab, so this dialog — and the project waiting in it — is
                     still here to press Retry on when the handshake finishes.
@@ -1008,8 +1008,8 @@ export function CreateProjectModal({
                         )}
                       >
                         {t === "SOLO"
-                          ? "Solo (one repo per student)"
-                          : "Group (shared repo)"}
+                          ? "Solo (one workspace per student)"
+                          : "Group (shared workspace)"}
                       </button>
                     ))}
                   </div>
@@ -1026,7 +1026,7 @@ export function CreateProjectModal({
                 {type === "SOLO" && students.length > 0 && (
                   <fieldset className="rounded-lg border border-[var(--border-subtle)] p-3">
                     <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[var(--text-strong)]">
-                      Students who get a repo
+                      Students who get a workspace
                       <span className="rounded-full bg-platform-50 px-2 py-0.5 text-xs font-medium text-platform-700">
                         {soloSelected.size} of {students.length} selected
                       </span>
@@ -1314,7 +1314,7 @@ export function CreateProjectModal({
                 )}
                 {vm.phase === "provisioning" && (
                   <span className="inline-flex items-center gap-2">
-                    <Spinner size="sm" /> Provisioning real repositories…
+                    <Spinner size="sm" /> Creating workspaces…
                   </span>
                 )}
                 {vm.phase !== "creating" && vm.phase !== "provisioning" && (

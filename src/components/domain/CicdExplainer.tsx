@@ -65,7 +65,7 @@ export function CicdExplainer({ className }: { className?: string }) {
             },
             {
               label: "The pipeline wakes up",
-              body: "GitHub Actions sees the push and starts your pipeline. You will see a yellow dot next to your commit while it runs.",
+              body: "Your push starts the pipeline automatically. You will see it appear here while it runs.",
             },
             {
               label: "Seven stages run in order",

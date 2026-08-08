@@ -184,7 +184,7 @@ export default function TeacherGroupsPage() {
                               href={`/teacher/repositories/${r.id}`}
                               className="text-xs font-medium text-platform hover:underline"
                             >
-                              {r.component === "SINGLE" ? "Open repo" : `Open ${r.component.toLowerCase()}`} →
+                              {r.component === "SINGLE" ? "Open workspace" : `Open ${r.component.toLowerCase()}`} →
                             </Link>
                           ))}
                         </div>

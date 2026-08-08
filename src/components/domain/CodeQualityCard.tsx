@@ -53,7 +53,7 @@ export function CodeQualityCard({
         <Banner tone="warning">
           Code quality could not be measured for this run.{" "}
           {audience === "teacher"
-            ? "Check that this repository has its SONAR_TOKEN, SONAR_PROJECT_KEY and SONAR_ORGANIZATION secrets — re-provisioning the repository writes them."
+            ? "Check that this submission has its SONAR_TOKEN, SONAR_PROJECT_KEY and SONAR_ORGANIZATION secrets — re-provisioning the repository writes them."
             : "This did not lower the mark: the component was left out of the total rather than scored as zero."}
         </Banner>
       </Card>

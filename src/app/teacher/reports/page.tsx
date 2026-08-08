@@ -250,7 +250,7 @@ export default function TeacherReportsPage() {
               <Card className="p-5 animate-fade-up">
                 <SectionHeading
                   title="Pipeline stages"
-                  subtitle="Class average per stage, from the latest real run of each repository."
+                  subtitle="Class average per stage, from the latest real run of each submission."
                 />
                 <div className="mt-4">
                   <StageBreakdown stages={vm.data.stages} />
@@ -323,7 +323,7 @@ export default function TeacherReportsPage() {
                 <Card className="p-5 animate-fade-up">
                   <SectionHeading
                     title="Pipeline health"
-                    subtitle="Latest real run of each repository."
+                    subtitle="Latest real run of each submission."
                   />
                   <div className="mt-4 grid grid-cols-3 gap-5">
                     <Stat label="With runs" value={vm.data.pipelineHealth.reposWithRuns} />
@@ -347,8 +347,8 @@ export default function TeacherReportsPage() {
                       <p className="text-sm font-medium text-amber-900">
                         {vm.data.pipelineHealth.sonarErrors.length}{" "}
                         {vm.data.pipelineHealth.sonarErrors.length === 1
-                          ? "repository has"
-                          : "repositories have"}{" "}
+                          ? "submission has"
+                          : "submissions have"}{" "}
                         no SonarCloud wiring
                       </p>
                       <p className="mt-0.5 text-xs text-amber-800">
