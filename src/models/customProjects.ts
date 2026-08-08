@@ -167,3 +167,78 @@ export function supportedStacksOf(
     (stack) => (stacks[stack]?.starter.length ?? 0) > 0,
   );
 }
+
+// ---------------------------------------------------------------------------
+// What this project will and will not measure
+// ---------------------------------------------------------------------------
+
+/**
+ * Is this one of the project's TEST files?
+ *
+ * Mirrors the backend's isGeneratedTestFile. A teacher names their own files,
+ * so this covers the mainstream conventions rather than only the ones the
+ * built-in starters emit.
+ */
+export function looksLikeTestFile(path: string): boolean {
+  return (
+    /\.(spec|test)\.[jt]sx?$/.test(path) ||
+    /(^|\/)(__tests__|tests?|spec)\//.test(path) ||
+    /(^|\/)test_[^/]+\.py$/.test(path) ||
+    /_test\.py$/.test(path) ||
+    /(Test|Spec)\.(java|php)$/.test(path)
+  );
+}
+
+export interface GradingGap {
+  id: "no-hidden-tests" | "no-visible-tests" | "no-solution";
+  /** What the teacher loses, named in the same terms the rubric uses. */
+  title: string;
+  detail: string;
+}
+
+/**
+ * What a project will fail to measure, given what the teacher has written.
+ *
+ * ONLY `starter` is required to save a project. A teacher can therefore publish
+ * one with no hidden tests, no solution and no visible tests, and nothing
+ * anywhere says so — they find out at marking time that more than half the
+ * grade was never assessed. Every gap below is silent by construction: the
+ * pipeline reports those components as UNMEASURED and excludes them, which is
+ * the correct behaviour and completely invisible until the marks come back.
+ *
+ * Written as a pure derivation rather than a check inside the editor so it can
+ * be tested, and so the same answer can be shown wherever a project is chosen.
+ */
+export function gradingGapsFor(files: CustomProjectStackFiles | undefined): GradingGap[] {
+  if (!files) return [];
+  const gaps: GradingGap[] = [];
+
+  if (files.hiddenTests.length === 0) {
+    gaps.push({
+      id: "no-hidden-tests",
+      title: "No hidden tests — 25% of the mark will not be measured",
+      detail:
+        "Hidden tests are what stop a student passing by satisfying only the tests they can see. Without them that component is excluded from every student's total.",
+    });
+  }
+
+  if (!files.starter.some((f) => looksLikeTestFile(f.path))) {
+    gaps.push({
+      id: "no-visible-tests",
+      title: "No tests in the starter — students get no task list",
+      detail:
+        "Unless you set this project to Blank, where students write their own tests, there is nothing for the visible-test stage to run and that 30% measures nothing.",
+    });
+  }
+
+  if (files.solution.length === 0) {
+    gaps.push({
+      id: "no-solution",
+      title: "No reference solution — there is no answer key",
+      detail:
+        "A Blank assignment also takes its list of expected files from the solution, so without one the brief cannot tell students which files their work is checked against.",
+    });
+  }
+
+  return gaps;
+}
