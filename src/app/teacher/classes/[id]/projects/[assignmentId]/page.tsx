@@ -46,6 +46,7 @@ import { AssignmentSubmissions } from "@/components/domain/AssignmentSubmissions
 import { HiddenTestsPanel } from "@/components/domain/HiddenTestsPanel";
 import { GradeReleaseControl } from "@/components/domain/GradeReleaseControl";
 import { ProvisionRepositoriesButton } from "@/components/domain/ProvisionRepositoriesButton";
+import { OriginalityCheckButton } from "@/components/domain/OriginalityCheckButton";
 import { formatDate, relativeDue } from "@/components/ui/format";
 
 type ProjectTab = "submissions" | "marking" | "settings";
@@ -232,6 +233,22 @@ export default function TeacherProjectPage() {
                             : `Creates one GitHub repository per selected student in Section ${sectionLabel}.`}
                         </p>
                         <ProvisionRepositoriesButton assignmentId={assignment.id} />
+                      </div>
+
+                      {/* Sits beside provisioning because it is the same kind of
+                          action: a deliberate, whole-cohort operation the teacher
+                          chooses to run, not something that happens per push. */}
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-strong)]">
+                            Check originality
+                          </p>
+                          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                            Compares every submission in this project against the others.
+                            Shared starter code is excluded, and no marks are affected.
+                          </p>
+                        </div>
+                        <OriginalityCheckButton assignmentId={assignment.id} />
                       </div>
 
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
