@@ -39,7 +39,7 @@ export default function TeacherCoursePage() {
         <PageHeader
           titleAlign="end"
           backHref="/teacher"
-          backLabel="My Courses"
+          backLabel="Courses"
           title="Course not found"
         />
         <EmptyState
@@ -55,7 +55,7 @@ export default function TeacherCoursePage() {
     <div className="space-y-8">
       <PageHeader
         backHref="/teacher"
-        backLabel="My Courses"
+        backLabel="Courses"
         // The course's identity sits at the right of the band, opposite the way
         // back. THIS PAGE ONLY — everything inside a course (the class detail
         // view, the repository view) keeps the default left-aligned header, so
