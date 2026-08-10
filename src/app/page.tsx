@@ -9,9 +9,14 @@
 // and the chooser has nothing left to choose between.
 //
 // This page previously held the entire sign-in surface AND its logic — a
-// role→route map, an OAuth-error switch, and the mock persona switcher. Those
-// now live in the ViewModel layer (authRoutes, useAuthNotice, useRoleSwitcher),
-// leaving this file as presentation only.
+// role→route map, an OAuth-error switch, and a persona picker that listed real
+// accounts to click. The first two now live in the ViewModel layer (authRoutes,
+// useAuthNotice), leaving this file as presentation only.
+//
+// The persona picker is gone entirely. It read the user directory to show real
+// names on a signed-out page, and that endpoint is staff-only now — so it had
+// been falling back to generic cards for a while, and nothing rendered it at
+// all. Its ViewModel was deleted rather than left to read as live code.
 //
 // THE SCENE: a marked-up worksheet. The page is a sheet of ruled paper with a
 // margin rule, and the one thing a first-time visitor must do is circled in
