@@ -33,6 +33,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useRepositoryDetail } from "@/viewmodels/useRepositoryDetail";
 import { useGrading } from "@/viewmodels/useGrading";
+import { useSession } from "@/viewmodels/useSession";
 import {
   Banner,
   Button,
@@ -48,6 +49,7 @@ import {
 import { BackLink, PageHeader } from "@/components/domain/PageHeader";
 import { RepoRunsExplorer } from "@/components/domain/RepoRunsExplorer";
 import { SubmitForReviewPanel } from "@/components/domain/SubmitForReviewPanel";
+import { GroupMembers } from "@/components/domain/GroupMembers";
 import { CodeBrowserPanel } from "@/components/domain/CodeBrowserPanel";
 import { StartAssignmentPanel } from "@/components/domain/StartAssignmentPanel";
 import { GithubActionsPanel } from "@/components/domain/GithubActionsPanel";
@@ -103,6 +105,9 @@ export default function StudentWorkspacePage() {
   const repoId = params?.id ?? null;
   const vm = useRepositoryDetail(repoId);
   const d = vm.data;
+  // Only to mark which group member is the reader — see GroupMembers on why
+  // self is labelled rather than filtered out.
+  const { user } = useSession();
   // Component state rather than the URL, matching the teacher class page. The
   // tab is a reading position, not a destination worth sharing.
   const [tab, setTab] = useState<WorkspaceTab>("work");
@@ -250,6 +255,18 @@ export default function StudentWorkspacePage() {
                   Code, merge a pull request, or submit. Your work and grades stay
                   available under Code, Actions, Test results and Grades.
                 </Banner>
+              )}
+
+              {/* Same placement logic as the closed banner directly above: who
+                  your group is is a fact about the repository, not about the tab
+                  you happen to have open. It is also where "ask a teammate to
+                  review it" finally names someone. */}
+              {d.assignment.isGroup && (
+                <GroupMembers
+                  members={d.collaborators}
+                  currentUserId={user?.id ?? null}
+                  className="mt-4"
+                />
               )}
 
               {/* The rule is what separates "which repository" from "what you are

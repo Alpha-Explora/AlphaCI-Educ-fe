@@ -3,10 +3,12 @@ import { apiRequest } from "./client";
 import type {
   AnswerKey,
   Assignment,
+  AssignmentGroup,
   OriginalityReport,
   AssignmentRepository,
   ProjectTemplateOption,
   ProvisionResult,
+  UpdateGroupsResult,
 } from "../types";
 
 export const assignmentsApi = {
@@ -90,6 +92,36 @@ export const assignmentsApi = {
       `/assignments/${id}/reopen`,
       { method: "POST" },
     );
+  },
+
+  /**
+   * Who is currently in each group of this project. STAFF ONLY.
+   *
+   * The teacher's Groups page reconstructs the same picture by walking
+   * assignments → repos → repo detail, because collaborators only ever travelled
+   * on the detail endpoint. This is the direct answer, and it is what the editor
+   * saves against — the `key` returned here is the identity the update names.
+   */
+  groups(id: string) {
+    return apiRequest<AssignmentGroup[]>(`/assignments/${id}/groups`);
+  },
+
+  /**
+   * Replace who is in each group.
+   *
+   * PUT, and the whole composition every time. It cannot add or remove groups —
+   * a group is a provisioned repository, so creating one is the create-project
+   * flow and deleting one destroys real work.
+   *
+   * Sending everything is also what makes a SWAP expressible: moving one student
+   * each way between two full groups has no legal ordering as two separate
+   * calls, because whichever you do first breaks the size rule.
+   */
+  updateGroups(id: string, groups: Array<{ key: string; studentIds: string[] }>) {
+    return apiRequest<UpdateGroupsResult>(`/assignments/${id}/groups`, {
+      method: "PUT",
+      body: { groups },
+    });
   },
 
   /**

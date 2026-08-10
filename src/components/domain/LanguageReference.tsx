@@ -206,6 +206,35 @@ function LanguagePanel({ profile }: { profile: LanguageProfile }) {
               />
             ))}
           </div>
+
+          {/*
+            Stage 4 only, and only where alternatives exist. The command above is
+            what runs on a project that uses the default runner — but the pipeline
+            probes for what the project ACTUALLY has, so a teacher reading one
+            command and concluding "their tests ran under Jest" can be wrong.
+            Vite scaffolds React with Vitest by default, which makes this the
+            common case rather than the exotic one.
+          */}
+          {stage === 4 && profile.alternativeRunners && (
+            <div className="mt-5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3">
+              <p className="text-xs font-medium text-[var(--text-strong)]">
+                Unless the project uses something else
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {profile.alternativeRunners.map((runner) => (
+                  <li key={runner} className="text-xs text-[var(--text-muted)]">
+                    {runner}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Checked in that order, most specific first. If none of them match,
+                this stage is reported as <strong>not measured</strong> and taken
+                out of the total — never scored zero, because the student did not
+                choose the pipeline&rsquo;s blind spot.
+              </p>
+            </div>
+          )}
         </Card>
       ))}
     </div>

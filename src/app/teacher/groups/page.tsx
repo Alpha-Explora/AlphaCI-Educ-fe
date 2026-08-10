@@ -13,6 +13,7 @@ import { useTeacherDashboard } from "@/viewmodels/useTeacherDashboard";
 import { useTeacherGroups } from "@/viewmodels/useTeacherGroups";
 import {
   Avatar,
+  Button,
   Card,
   EmptyState,
   GenericPill,
@@ -21,6 +22,8 @@ import {
   Stat,
   StateBoundary,
 } from "@/components/ui";
+import { EditGroupsModal } from "@/components/domain/EditGroupsModal";
+import type { Assignment } from "@/models/types";
 
 export default function TeacherGroupsPage() {
   const { user, selectedOrgId } = useSession();
@@ -34,6 +37,12 @@ export default function TeacherGroupsPage() {
   const activeClass = classes.find((c) => c.id === classId) ?? null;
 
   const groups = useTeacherGroups(classId);
+
+  // The project whose groups are being edited, or null. Held here rather than
+  // per-card so only one editor can be open at a time — two open drafts of
+  // overlapping rosters would let a teacher place the same student twice and
+  // only find out on the second save.
+  const [editing, setEditing] = useState<Assignment | null>(null);
 
   return (
     <div className="space-y-8">
@@ -136,10 +145,24 @@ export default function TeacherGroupsPage() {
                         {project.assignment.description}
                       </p>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {project.groups.length}{" "}
-                      {project.groups.length === 1 ? "group" : "groups"}
-                    </p>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {project.groups.length}{" "}
+                        {project.groups.length === 1 ? "group" : "groups"}
+                      </p>
+                      {/* Disabled once the project is ended: a closed project's
+                          repositories are archived read-only, so moving someone
+                          into one would grant access to something nobody can
+                          push to and take it from work already finished. */}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setEditing(project.assignment)}
+                        disabled={Boolean(project.assignment.closedAt)}
+                      >
+                        Edit groups
+                      </Button>
+                    </div>
                   </div>
 
                   <ul className="divide-y divide-[var(--border-subtle)]">
@@ -218,6 +241,19 @@ export default function TeacherGroupsPage() {
             </div>
           </StateBoundary>
         </>
+      )}
+
+      {/* Mounted only while open, and keyed by project. Both matter: the editor
+          holds a draft, and a stale draft rehydrated against a different
+          project's groups would be nonsense. */}
+      {editing && (
+        <EditGroupsModal
+          key={editing.id}
+          assignment={editing}
+          roster={groups.roster}
+          open
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );
