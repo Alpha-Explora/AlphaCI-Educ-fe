@@ -44,6 +44,13 @@ export interface GroupProject {
 
 export interface TeacherGroupsVM {
   projects: GroupProject[];
+  /**
+   * Every STUDENT enrolled in this class.
+   *
+   * The editor needs the whole roster, not just the grouped: moving somebody
+   * INTO a group means offering people who are currently in none of them.
+   */
+  roster: SystemUser[];
   /** Enrolled students not in any group of any group project in this class. */
   ungrouped: SystemUser[];
   totals: { projects: number; groups: number; groupedStudents: number };
@@ -142,6 +149,7 @@ export function useTeacherGroups(classId: string | null): TeacherGroupsVM {
 
   return {
     projects,
+    roster: rosterQuery.data?.students ?? [],
     ungrouped,
     totals: {
       projects: projects.length,

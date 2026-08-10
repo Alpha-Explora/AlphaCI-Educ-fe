@@ -871,6 +871,35 @@ export interface StudentDashboard {
   }>;
 }
 
+/**
+ * One group of a GROUP project, as the server reports it.
+ *
+ * `key` is the group's base repository name and is its IDENTITY — the update
+ * names groups by this rather than by position, so a client whose ordering
+ * differed from the server's cannot write membership onto the wrong group.
+ *
+ * Mirrors GroupSnapshot in the backend's assignments.service.ts.
+ */
+export interface AssignmentGroup {
+  key: string;
+  /** One for SINGLE, two for SPLIT (backend + frontend). */
+  repoIds: string[];
+  memberIds: string[];
+  /** Either half submitted — removing a member starts to cost something. */
+  hasSubmittedWork: boolean;
+  /** Either half marked — removing a member costs them the mark. */
+  isGraded: boolean;
+}
+
+export interface UpdateGroupsResult {
+  assignmentId: string;
+  groups: Array<{ key: string; memberIds: string[]; added: string[]; removed: string[] }>;
+  /** Enrolled students who now belong to no group on this project. */
+  ungrouped: string[];
+  /** Removals that cost someone access to submitted or marked work. */
+  warnings: string[];
+}
+
 export interface ClassRoster {
   classInfo: ClassCohort;
   teachers: SystemUser[];

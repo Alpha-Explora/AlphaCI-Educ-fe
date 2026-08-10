@@ -48,21 +48,25 @@ export interface LanguageProfile {
   /** Files whose presence identifies this language in a repository. */
   detect: string[];
   /**
-   * The project types a teacher can pick that all run THIS pipeline.
+   * The project types a teacher can pick that all run THIS set of commands.
    *
-   * There are seven scaffold stacks and four pipeline languages, and the gap
-   * between those two numbers is the single most confusing thing on this page:
-   * a teacher who set a project to "React" goes looking for a React tab, finds
-   * none, and reasonably concludes their language is unsupported. It is not —
-   * React, Next.js and NestJS are all `package.json` projects that install with
-   * `npm ci` and test with `npm test`, so the pipeline has one Node definition
-   * covering all four (see the `language:` input in scaffold-builder.util.ts,
-   * whose type is exactly 'node' | 'java' | 'python' | 'php').
+   * There are seven scaffold stacks and seven manifests — `pipelineManifestFor`
+   * in scaffold-builder.util.ts maps them one-to-one, so a React project really
+   * does load `languages/react/language.yml` rather than being folded into node.
+   * But the four node-family manifests (node, nestjs, react, nextjs) carry
+   * BYTE-IDENTICAL commands; the split buys visibility in the pipeline logs, not
+   * different behaviour.
    *
-   * Listing them here rather than giving each its own tab is deliberate. Four
-   * tabs would print the same six commands four times, imply a difference the
-   * pipeline does not make, and leave four copies to drift apart the next time
-   * a command changes.
+   * Do not confuse this with `pipelineLanguageFor`, which is still
+   * 'node' | 'java' | 'python' | 'php'. That one picks the SCAFFOLD shape — a
+   * React project is a Node project by every measure that matters to a
+   * package.json — and it is not what the `language:` workflow input receives.
+   * An earlier version of this comment cited it as though it were, which is how
+   * this file came to claim the pipeline has four languages.
+   *
+   * So: four tabs, because four distinct command sets. Seven tabs would print
+   * the same six commands four times, imply a difference the pipeline does not
+   * make, and leave four copies to drift apart the next time a command changes.
    */
   stacks: string[];
   toolchain: {
@@ -73,6 +77,19 @@ export interface LanguageProfile {
     note?: string;
   };
   commands: LanguageCommand[];
+  /**
+   * What stage 4 runs INSTEAD of the command above when it finds one of these in
+   * the project. Listing them is not trivia: the page used to name a single test
+   * command, so a teacher whose class works in Vite-scaffolded React — which
+   * ships Vitest, not Jest, by default — was reading a command their students'
+   * runs never executed.
+   *
+   * Probed in the order given, most specific first, because a project can still
+   * have the old runner in package.json long after its suite moved. If none
+   * match, the component is reported UNMEASURED and dropped from the total
+   * rather than scored zero.
+   */
+  alternativeRunners?: readonly string[];
   reports: {
     junit: string;
     coverage: string;
@@ -103,7 +120,8 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 1,
         id: "install",
         label: "Install dependencies",
-        command: "npm ci --ignore-scripts",
+        command:
+          "if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts --no-audit --no-fund; fi",
         what: "Installs exactly what the lockfile pins, falling back to npm install when the student has not committed one yet.",
         why: "--ignore-scripts is a security control, not a speed setting. npm's postinstall hook runs arbitrary code from any dependency at install time — before stage 1 has established anything about this repository.",
       },
@@ -119,14 +137,15 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 2,
         id: "lint",
         label: "Style",
-        command: "npx eslint src",
+        command: "npx eslint . --ignore-pattern '.pipeline/**'",
         what: "ESLint 9 with the typescript-eslint recommended rules, configured by eslint.config.mjs in the student's repository.",
+        why: "Scoped by EXCLUDING the pipeline's own checkout rather than by naming src. No check may name the project's folders — this pipeline grades any repository of this language, including a teacher's own idea or a student who restructured theirs, and a command that says src exits 'file not found' on a project laid out around app/. Losing a mark for a directory name is not a thing this should be able to do.",
       },
       {
         stage: 2,
         id: "format",
         label: "Formatting",
-        command: "npx prettier --check .",
+        command: "npx prettier --check . '!.pipeline/**'",
         what: "Checks formatting against the .prettierrc the scaffold ships.",
         why: "Check-only, never --write. A formatter that rewrote files would turn the student's next pull into a merge conflict they did not create.",
       },
@@ -134,18 +153,24 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 4,
         id: "test",
         label: "Visible tests",
-        command:
-          "npx jest --coverage --coverageReporters=lcov --coverageReporters=json-summary --reporters=default --reporters=jest-junit",
+        command: String.raw`npx jest --coverage --coverageReporters=lcov --coverageReporters=json-summary --reporters=default --reporters=jest-junit --testPathIgnorePatterns=node_modules --testPathIgnorePatterns='\.pipeline'`,
         what: "Runs the student's own test suite and writes both an LCOV coverage file and a JUnit XML report.",
-        why: "jest-junit must be a dependency of the project. Jest resolves a custom reporter by requiring it from the repository, and npx cannot supply it — npx installs the binary it runs, never that binary's internal requires.",
+        why: "jest-junit must be a dependency of the project. Jest resolves a custom reporter by requiring it from the repository, and npx cannot supply it — npx installs the binary it runs, never that binary's internal requires. The ignore patterns keep jest off the pipeline's own checkout, which sits inside the workspace: without them a starter's testMatch collects the engine's fixtures and fails suites the student never wrote.",
       },
       {
         stage: 5,
         id: "test-hidden",
         label: "Hidden tests",
-        command: "npx jest tests/hidden --reporters=default --reporters=jest-junit",
+        command:
+          "JEST_JUNIT_OUTPUT_NAME=junit-hidden.xml npx jest tests/hidden --reporters=default --reporters=jest-junit",
         what: "Runs only the teacher's injected suite, reporting counts rather than assertion text.",
+        why: "The output name is not decoration. jest-junit writes junit.xml by default — the VISIBLE suite's filename — so without the override stage 5 finds no hidden report, and the missing-report branch hands the full hidden-test component to every student regardless of what their code did.",
       },
+    ],
+    alternativeRunners: [
+      "Vitest — used when the project has it, which Vite-scaffolded React does by default",
+      "Mocha",
+      "whatever the project defines as `npm test`, as a last resort (no coverage)",
     ],
     reports: { junit: "junit.xml", coverage: "coverage/lcov.info", coverageFormat: "LCOV" },
     integrity: { engine: "JPlag" },
@@ -162,14 +187,15 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 1,
         id: "install",
         label: "Install dependencies",
-        command: "python -m pip install -r requirements.txt",
+        command:
+          "python -m pip install --upgrade pip && python -m pip install -r requirements.txt",
         what: "Installs the pinned dependencies, which include pytest, pytest-cov and ruff.",
       },
       {
         stage: 1,
         id: "syntax",
         label: "Parse check",
-        command: "python -m compileall -q src",
+        command: String.raw`python -m compileall -q -x '\.pipeline' .`,
         what: "Byte-compiles every module to prove it parses.",
         why: "compileall parses without importing. `python -c \"import app\"` would look equivalent and is not — importing executes module-level code, which is exactly what stage 1 must avoid.",
       },
@@ -177,7 +203,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 2,
         id: "lint",
         label: "Style",
-        command: "ruff check .",
+        command: "ruff check . --exclude .pipeline",
         what: "Ruff with rules E, F and I — pycodestyle errors, pyflakes, and import ordering.",
         why: "Ruff replaces flake8, isort and pylint in one static binary. Across hundreds of pushes a day the 10-100x speed difference is real CI-minute money, and there is no plugin resolution to go wrong.",
       },
@@ -185,23 +211,28 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 2,
         id: "format",
         label: "Formatting",
-        command: "ruff format --check .",
+        command: "ruff format --check . --exclude .pipeline",
         what: "Checks formatting at the 100-column width set in pyproject.toml.",
       },
       {
         stage: 4,
         id: "test",
         label: "Visible tests",
-        command: "pytest --cov --cov-report=xml --cov-report=term --junitxml=junit.xml",
+        command:
+          "python -m pytest --cov --cov-report=xml --cov-report=term --junitxml=junit.xml",
         what: "Runs the suite, writing Cobertura coverage and a JUnit report.",
       },
       {
         stage: 5,
         id: "test-hidden",
         label: "Hidden tests",
-        command: "pytest tests/hidden --junitxml=junit-hidden.xml",
+        command: "python -m pytest tests/hidden --junitxml=junit-hidden.xml",
         what: "Runs only the teacher's injected suite.",
       },
+    ],
+    alternativeRunners: [
+      "unittest with coverage.py — used when the project has no pytest",
+      "plain unittest, as a last resort (no coverage)",
     ],
     reports: { junit: "junit.xml", coverage: "coverage.xml", coverageFormat: "Cobertura" },
     integrity: {
@@ -260,9 +291,13 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 5,
         id: "test-hidden",
         label: "Hidden tests",
-        command: "mvn -B verify -Dtest='hidden/**' -DfailIfNoTests=false",
-        what: "Runs only the teacher's injected suite.",
+        command: "mvn -B verify -Dtest='*HiddenTest' -DfailIfNoTests=false",
+        what: "Runs only the teacher's injected suite, matched by test-class name rather than by folder.",
       },
+    ],
+    alternativeRunners: [
+      "Gradle via the project's wrapper — used when it ships one",
+      "Gradle on the runner, when the project has no wrapper",
     ],
     reports: {
       junit: "target/surefire-reports/*.xml",
@@ -295,7 +330,8 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         stage: 1,
         id: "syntax",
         label: "Parse check",
-        command: "find src -name '*.php' -print0 | xargs -0 -n1 -P4 php -l",
+        command:
+          "find . -name '*.php' -not -path './.pipeline/*' -not -path './vendor/*' -print0 | xargs -0 -n1 -P4 php -l",
         what: "Lints every file for parse errors, four at a time.",
         why: "`php -l` is parse-only and never executes the file.",
       },
@@ -330,6 +366,7 @@ export const LANGUAGES: readonly LanguageProfile[] = [
         what: "Runs only the teacher's injected suite.",
       },
     ],
+    alternativeRunners: ["Pest — used when the project has it"],
     reports: { junit: "junit.xml", coverage: "coverage.xml", coverageFormat: "Clover" },
     integrity: {
       engine: "Dolos",
