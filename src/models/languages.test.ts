@@ -3,7 +3,7 @@
 //
 // WHY THIS EXISTS
 // ---------------
-// models/languages.ts is a hand-maintained copy of cicd-workflow's
+// models/languages.ts is a hand-maintained copy of alphaci-educ-workflow's
 // languages/<key>/language.yml, and its header instructs whoever edits a
 // manifest to edit the copy "in the same pull request". That is a process
 // control guarding a correctness property, and it decayed exactly as process

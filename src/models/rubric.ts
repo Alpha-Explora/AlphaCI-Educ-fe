@@ -3,11 +3,11 @@
 //
 // The documentation a teacher reads is NOT written here. It is read out of
 // rubric.schema.json, which is the same file the pipeline validates every
-// rubric against in cicd-workflow. Prose and behaviour therefore cannot drift:
+// rubric against in alphaci-educ-workflow. Prose and behaviour therefore cannot drift:
 // changing what a threshold does means editing the schema, and the teacher's
 // explanation of it changes in the same commit.
 //
-// rubric.schema.json is vendored from cicd-workflow/rubrics/rubric.schema.json.
+// rubric.schema.json is vendored from alphaci-educ-workflow/rubrics/rubric.schema.json.
 // It is the contract between the three repositories; when it changes there,
 // copy it here in the same pull request.
 // ============================================================================

@@ -3,7 +3,7 @@
 //
 // What the pipeline actually runs, per language, at each stage.
 //
-// MIRRORS cicd-workflow/languages/<key>/language.yml. Those manifests are the
+// MIRRORS alphaci-educ-workflow/languages/<key>/language.yml. Those manifests are the
 // executable source of truth; this file is a vendored copy for the teacher's
 // reference page, in the same way models/rubric.schema.json is a vendored copy
 // of the rubric contract. When a manifest changes there, change it here in the

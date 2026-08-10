@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cicd-external-project.github.io/cicd-workflow/rubrics/rubric.schema.json",
+  "$id": "https://cicd-external-project.github.io/alphaci-educ-workflow/rubrics/rubric.schema.json",
   "title": "Grading rubric",
   "description": "What a pipeline run is worth and which stages stop it. Served by the AlphaCI backend per assignment; rubrics/default.rubric.yml is the fallback used only when that request fails.\n\nEvery `title` and `description` in this schema is rendered verbatim in the teacher's rubric documentation view. Editing wording here changes what teachers read — the docs cannot drift from the behaviour because they are generated from the same file the pipeline validates against.",
   "type": "object",
