@@ -41,9 +41,21 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { LANGUAGES, type LanguageProfile } from "./languages";
 
-const MANIFEST_ROOT =
-  process.env.CICD_WORKFLOW_PATH ??
-  path.resolve(import.meta.dirname, "..", "..", "..", "cicd-workflow");
+/**
+ * The pipeline repository, as a sibling checkout.
+ *
+ * `alphaci-educ-workflow` first, `cicd-workflow` second: the educ engine moved
+ * out of the shared repository into its own, and both may be checked out beside
+ * this one during the changeover. Whichever is found first wins, so this keeps
+ * working before and after a developer pulls the new one.
+ */
+const MANIFEST_ROOT = (() => {
+  if (process.env.CICD_WORKFLOW_PATH) return process.env.CICD_WORKFLOW_PATH;
+  const siblings = ["alphaci-educ-workflow", "cicd-workflow"].map((name) =>
+    path.resolve(import.meta.dirname, "..", "..", "..", name),
+  );
+  return siblings.find((dir) => existsSync(path.join(dir, "languages"))) ?? siblings[0];
+})();
 
 const LANGUAGES_DIR = path.join(MANIFEST_ROOT, "languages");
 const available = existsSync(LANGUAGES_DIR);
@@ -66,8 +78,23 @@ const MANIFEST_FOR: Record<string, string> = {
   php: "php",
 };
 
+/**
+ * A manifest, with line endings normalised to LF.
+ *
+ * NOT COSMETIC. Git checks these files out with CRLF on Windows, and in
+ * JavaScript `.` does not match `\r` — it is a line terminator. So a pattern
+ * ending `(.+)$` fails on every single line of a CRLF file, which made
+ * `commandMap` below return an empty object and the node-family comparison
+ * pass vacuously... until it started asserting the map was non-empty, and then
+ * fail on a machine whose checkout differed from the one it was written on.
+ *
+ * The manifests are read here as data, so their line endings are noise.
+ */
 function manifestText(key: string): string {
-  return readFileSync(path.join(LANGUAGES_DIR, key, "language.yml"), "utf8");
+  return readFileSync(path.join(LANGUAGES_DIR, key, "language.yml"), "utf8").replace(
+    /\r\n/g,
+    "\n",
+  );
 }
 
 /**
